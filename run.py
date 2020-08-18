@@ -2,7 +2,7 @@ import argparse
 import os
 from src.main import main
 
-parser = argparse.ArgumentParser(description='A-Optimal Active Learning')
+parser = argparse.ArgumentParser(description='Distogram Predictor')
 
 # General
 parser.add_argument('--seed', default=123558, type=int, metavar='N', help='seed number')

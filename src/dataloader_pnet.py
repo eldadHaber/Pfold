@@ -58,16 +58,9 @@ class Dataset_pnet(Dataset):
         dist,omega,phi,theta = convert_coord_to_dist_angles(r1, r2, r3,mask=mask)
         target = (dist,omega,phi,theta)
 
-        #Now plot the distances and angles to see that they seem okay
-
         f1d = np.concatenate((seq_onehot,pssm,entropy[:,None]),axis=1)
 
         f2d = np.concatenate([np.tile(f1d[:, None, :], [1, f1d.shape[0], 1]),np.tile(f1d[None, :, :], [f1d.shape[0], 1, 1])], axis=-1)
-
-        # if self.transform is not None:
-        #     seq = self.transform(seq)
-        # if self.target_transform is not None:
-        #     target = self.target_transform(target)
 
         return f2d, target
 
@@ -99,7 +92,6 @@ def convert_coord_to_dist_angles(r1,r2,r3,mask=None):
                 continue
 
             r1i = r1[i]
-            # Nj = np.array([coord[0][j*3], coord[1][j*3], coord[2][j*3]])
             r2i = r2[i]
             r2j = r2[j]
             r3i = r3[i]
