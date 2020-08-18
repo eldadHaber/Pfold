@@ -18,7 +18,7 @@ PSSM_PAD_VALUE = 0
 ENTROPY_PAD_VALUE = 0
 COORDS_PAD_VALUE = 0
 
-class SegResizeAndFlip(object):
+class SeqResizeAndFlip(object):
     def __init__(self, seq_len):
         self.seq_len = seq_len
     def __call__(self, seq, padding_value, idx_start=None,flip=None):
@@ -48,7 +48,7 @@ class SegResizeAndFlip(object):
 
 class SeqFlip(object):
     def __init__(self, prob = 0.5):
-        self.prob = 0.5
+        self.prob = prob
     def __call__(self, *args):
         if random.random() > self.prob:
             for arg in args:
@@ -58,6 +58,17 @@ class SeqFlip(object):
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
+class ListToNumpy(object):
+    def __init__(self):
+        pass
+    def __call__(self, *args):
+        args_array = ()
+        for arg in args:
+            args_array += (np.asarray(arg),)
+        return args_array
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 
