@@ -7,6 +7,7 @@ import torch.optim as optim
 
 from src import log
 from src.dataloader import select_dataset
+from src.loss import CrossEntropyMultiTargets
 from src.network import ResNet
 from src.optimization import train
 from src.utils import fix_seed
@@ -41,11 +42,11 @@ def main(c):
     dl_train = select_dataset(c.dataset_train)
 
     # Select loss function for training
-    loss_fnc = torch.nn.CrossEntropyLoss()
+    loss_fnc = CrossEntropyMultiTargets()
 
     c.LOG.info('Date:{}'.format(datetime.now()))
 
-    net = ResNet(c.nlayers)
+    net = ResNet(c.nlayers,dl_train.dataset.nfeatures)
     net.to(c.device)
     optimizer = optim.Adam(list(net.parameters()), lr=c.SL_lr)
 

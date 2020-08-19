@@ -187,7 +187,7 @@ def parse_pnet(file):
 
 
 ####################### DO SOMETHING
-dataFile ='./Data/testing'
+dataFile ='./data/testing'
 
 id, seq, pssm2, entropy, dssp, r1,r2,r3, mask = parse_pnet(dataFile)
 
@@ -195,12 +195,7 @@ print('Done Reading File')
 
 L2np = ListToNumpy()
 
-S   = L2np(seq[0])
-RN  = L2np(r1[0])
-RCa = L2np(r2[0])
-RCb = L2np(r3[0])
-msk = L2np(mask[0])
-
+S, RN, RCa, RCb, msk = L2np(seq[0],r1[0],r2[0],r3[0],mask[0])
 
 d,omega,phi,theta = convert_coord_to_dist_angles_linear(RN,RCa,RCb,mask=msk)
 

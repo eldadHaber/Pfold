@@ -64,7 +64,13 @@ class ListToNumpy(object):
     def __call__(self, *args):
         args_array = ()
         for arg in args:
-            args_array += (np.asarray(arg),)
+            if type(arg[0]) == int: #Note that this will only work for this particular list system, for deeper lists this will need to be looped.
+                dtype = np.int
+            elif type(arg[0]) == bool:
+                dtype = np.bool
+            else:
+                dtype = np.float32
+            args_array += (np.asarray(arg,dtype=dtype),)
         return args_array
 
     def __repr__(self):

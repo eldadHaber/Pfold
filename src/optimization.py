@@ -3,6 +3,8 @@ import time
 import matplotlib
 import numpy as np
 
+from src.utils import move_tuple_to
+
 matplotlib.use('Agg')
 
 import torch
@@ -28,17 +30,20 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',epochs = 100)
         samples_train = 0
         correct = 0
         total = 0
-        for i,(seq, target) in enumerate(dataloader_train):
-            if len(target) == 4:
-                dist,omega,phi,theta = target[0],target[1],target[2],target[3]
+        for i,(seq, target, mask) in enumerate(dataloader_train):
+            # if len(target) == 4:
+            #     dist,omega,phi,theta = target[0],target[1],target[2],target[3]
+            # elif len(target) == 5:
+            #     dist,omega,phi,theta,mask = target[0],target[1],target[2],target[3],target[4]
             seq = seq.to(device)
-            dist = dist.to(device, non_blocking=True)
-            omega = omega.to(device, non_blocking=True)
-            phi = phi.to(device, non_blocking=True)
-            theta = theta.to(device, non_blocking=True)
+            target = move_tuple_to(target, device)
+            # dist = dist.to(device, non_blocking=True)
+            # omega = omega.to(device, non_blocking=True)
+            # phi = phi.to(device, non_blocking=True)
+            # theta = theta.to(device, non_blocking=True)
             optimizer.zero_grad()
             outputs = net(seq)
-            loss = loss_fnc(outputs, target)
+            loss = loss_fnc(outputs, target,mask=mask)
             loss.backward()
             optimizer.step()
             loss_train += loss

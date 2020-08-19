@@ -32,6 +32,7 @@ class Dataset_pnet(Dataset):
 
         self.SeqFlip = SeqFlip()
         self.ListToNumpy = ListToNumpy()
+        self.nfeatures = 84
 
     def __getitem__(self, index):
         seq = self.seq[index]
@@ -45,10 +46,10 @@ class Dataset_pnet(Dataset):
         seq, pssm, entropy, mask, r1, r2, r3 = self.SeqFlip(seq,pssm,entropy,mask,r1,r2,r3)
         seq, pssm, entropy, mask, r1, r2, r3 = self.ListToNumpy(seq,pssm,entropy,mask,r1,r2,r3)
 
-        seq_onehot = np.eye(len(AA_DICT))[seq]
+        seq_onehot = np.eye(len(AA_DICT),dtype=np.float32)[seq]
 
-        dist,omega,phi,theta = convert_coord_to_dist_angles(r1, r2, r3,mask=mask)
-        dist2, omega2, phi2, theta2 = convert_coord_to_dist_angles_lite(r1, r2, r3, mask=mask)
+        dist,omega,phi,theta = convert_dist_angles_to_bins(*convert_coord_to_dist_angles(r1, r2, r3,mask=mask))
+        # dist2, omega2, phi2, theta2 = convert_coord_to_dist_angles_lite(r1, r2, r3, mask=mask)
 
         target = (dist,omega,phi,theta)
 
@@ -56,7 +57,7 @@ class Dataset_pnet(Dataset):
 
         f2d = np.concatenate([np.tile(f1d[:, None, :], [1, f1d.shape[0], 1]),np.tile(f1d[None, :, :], [f1d.shape[0], 1, 1])], axis=-1).transpose((-1, 0, 1))
 
-        return f2d, target
+        return f2d, target, mask
 
     def __len__(self):
         return len(self.seq)
@@ -67,6 +68,27 @@ class Dataset_pnet(Dataset):
 def proj_3d(v1,v2):
     #project v1 onto v2
     return np.dot(v1,v2)/norm(v2) * v2
+
+def convert_dist_angles_to_bins(d,omega,phi,theta):
+    d_bin = np.linspace(250,2000,36)
+    d = np.digitize(d, bins=d_bin)
+
+    angle25_bin = np.linspace(15,360,24)
+    angle13_bin = np.linspace(15,180,12)
+
+    d_mask = d == 36
+    omega = np.digitize(omega, bins=angle25_bin)
+    omega[d_mask] = 24
+
+    theta = np.digitize(theta, bins=angle25_bin)
+    theta[d_mask] = 24
+
+    phi = np.digitize(phi, bins=angle13_bin)
+    phi[d_mask] = 12
+
+    return d,omega,phi,theta
+
+
 
 def convert_coord_to_dist_angles(r1,r2,r3,mask=None):
     '''
@@ -82,7 +104,7 @@ def convert_coord_to_dist_angles(r1,r2,r3,mask=None):
     theta = np.zeros([seq_len, seq_len])
     for i in range(seq_len):
         for j in range(seq_len):
-            if mask[i] == 0 or mask[j] == 0 or i == j:
+            if mask[i] is False or mask[j] is False or i == j:
                 continue
 
             r1i = r1[i]
@@ -119,72 +141,6 @@ def convert_coord_to_dist_angles(r1,r2,r3,mask=None):
 
     d = d + d.transpose()
     omega = omega + omega.transpose()
-
-    mask_nan = np.isnan(phi)
-    phi[mask_nan] = 0
-
-    mask_nan = np.isnan(theta)
-    theta[mask_nan] = 0
-
-    return d,omega,phi,theta
-
-
-def convert_coord_to_dist_angles(r1,r2,r3,mask=None):
-    '''
-    Data should be coordinate data in pnet format, meaning that each amino acid is characterized by a 3x3 matrix, which are the coordinates of r1,r2,r3=N,Calpha,Cbeta.
-    :return:
-    '''
-    seq_len = len(r1)
-
-    d = np.zeros([seq_len, seq_len])
-    phi = np.zeros([seq_len, seq_len])
-    omega = np.zeros([seq_len, seq_len])
-    theta = np.zeros([seq_len, seq_len])
-    for i in range(seq_len):
-        for j in range(seq_len):
-            if mask is not None and (mask[i] == 0 or mask[j] == 0 or i == j):
-                continue
-
-            r1i = r1[i]
-            r2i = r2[i]
-            r2j = r2[j]
-            r3i = r3[i]
-            r3j = r3[j]
-
-            a = norm(r3i-r3j)
-            b = norm(r3i-r2i)
-            c = norm(r3j-r2i)
-
-            phi[i,j] = np.degrees(np.arccos((a*a + b*b - c*c)/(2*a*b)))
-
-            v1 = r3j - r3i
-            v2 = r2i - r3i
-            normal_vec = np.cross(v1,v2)
-            v3 = r2j - r3j
-
-            #Now we find thetas
-            v4 = r1i - r2i
-            v4_proj = proj_3d(v4, v2)
-            v4_ort = v4 - v4_proj
-            theta[i,j] = (np.degrees(np.arccos(np.dot(v4_ort,normal_vec) / (norm(v4_ort) * norm(normal_vec)))) + 90) % 360
-
-            if i > j: #These two are symmetric so we only calculate half of them
-                d[i,j] = norm(v1)
-                #First project this vector on the vector running between Cbi Cbj
-                v3_proj = proj_3d(v3,v1)
-                v3_ort = v3 - v3_proj
-                #Now find the angle between the normal vector and project vector and add 90 to make it to the plane
-                omega[i,j] = (np.degrees(np.arccos(np.dot(v3_ort,normal_vec) / (norm(v3_ort) * norm(normal_vec)))) + 90) % 360
-
-
-    d = d + d.transpose()
-    omega = omega + omega.transpose()
-
-    mask_nan = np.isnan(phi)
-    phi[mask_nan] = 0
-
-    mask_nan = np.isnan(theta)
-    theta[mask_nan] = 0
 
     return d,omega,phi,theta
 
@@ -350,6 +306,14 @@ def letter_to_num(string, dict_):
     num = [int(i) for i in num_string.split()]
     return num
 
+def letter_to_bool(string, dict_):
+    """ Convert string of letters to list of bools """
+    patt = re.compile('[' + ''.join(dict_.keys()) + ']')
+    num_string = patt.sub(lambda m: dict_[m.group(0)] + ' ', string)
+    num = [bool(int(i)) for i in num_string.split()]
+    return num
+
+
 
 def read_record(file_, num_evo_entries):
     """ Read all protein records from pnet file. """
@@ -383,7 +347,7 @@ def read_record(file_, num_evo_entries):
                 for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord) for coord in file_.readline().split()])
                 coord.append(tertiary)
             elif case('[MASK]' + '\n'):
-                mask.append(letter_to_num(file_.readline()[:-1], MASK_DICT))
+                mask.append(letter_to_bool(file_.readline()[:-1], MASK_DICT))
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask
 

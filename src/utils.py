@@ -13,6 +13,13 @@ import torch.nn as nn
 
 # Define some functions
 
+def move_tuple_to(args,device,non_blocking=True):
+    new_args = ()
+    for arg in args:
+        new_args += (arg.to(device,non_blocking=non_blocking),)
+    return new_args
+
+
 def fix_seed(seed, include_cuda=True):
     torch.manual_seed(seed)
     np.random.seed(seed)
