@@ -16,7 +16,7 @@ parser.add_argument('--seq-len', default=512, type=int, metavar='N', help='Lengt
 # parser.add_argument('--batch-size', default=50, type=int, metavar='N', help='batch size used in dataloader')
 # Learning
 
-# parser.add_argument('--nlayers', default=10, type=int, metavar='N', help='Number of residual layers in network')
+parser.add_argument('--nlayers', default=10, type=int, metavar='N', help='Number of residual layers in network')
 parser.add_argument('--SL-lr', default=5e-5, type=float, metavar='N', help='Learning Rate')
 # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
 # parser.add_argument('--epochs', default=100, type=int, metavar='N', help='select the neural network to train (resnet)')
