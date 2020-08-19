@@ -1,5 +1,5 @@
 import os
-
+import matplotlib.pyplot as plt
 import string
 import numpy as np
 from numpy.linalg import norm
@@ -18,9 +18,21 @@ from src.dataloader_utils import AA_DICT, MASK_DICT, DSSP_DICT, NUM_DIMENSIONS, 
     DSSP_PAD_VALUE, SeqFlip, PSSM_PAD_VALUE, ENTROPY_PAD_VALUE, COORDS_PAD_VALUE, ListToNumpy
 
 
-def proj_3d(v1,v2):
-    #project v1 onto v2
-    return np.dot(v1,v2)/norm(v2) * v2
+#def proj_3d(v1,v2):
+#    #project v1 onto v2
+#    return np.dot(v1,v2)/norm(v2) * v2
+
+
+def ang2plain(v1,v2,v3,v4):
+    nA = np.cross(v1,v2)
+    nA = nA/np.linalg.norm(nA)
+    nB = np.cross(v3,v4)
+    nB = nB/np.linalg.norm(nB)
+
+    cosPsi = np.dot(nA,nB)
+
+    return np.degrees(np.arccos(cosPsi))
+
 
 
 def convert_coord_to_dist_angles_linear(r1,r2,r3,mask=None):
@@ -32,47 +44,52 @@ def convert_coord_to_dist_angles_linear(r1,r2,r3,mask=None):
     seq_len = len(r1)
 
     d = np.zeros([seq_len, seq_len])
-    phi = np.zeros([seq_len])
-    omega = np.zeros([seq_len])
-    theta = np.zeros([seq_len])
+    phi = np.zeros([seq_len,seq_len])
+    omega = np.zeros([seq_len,seq_len])
+    theta = np.zeros([seq_len,seq_len])
     for i in range(seq_len):
         for j in range(i+1,seq_len):
             if mask is not None and (mask[i] == 0 or mask[j] == 0):
                 continue
+
+            r1i = r1[i]
+            r2i = r2[i]
             r3i = r3[i]
+            r1j = r1[j]
+            r2j = r2[j]
             r3j = r3[j]
+
+            # Compute distance Cb-Cb
             v1 = r3j - r3i
-            d[i,j] = norm(v1)
+            d[i, j] = norm(v1)
+            d[j, i] = d[i,j]
 
-            if i+1 == j:
-                r1i = r1[i]
-                r2i = r2[i]
-                r2j = r2[j]
+            # Compute phi
+            v1 = r2i - r3i # Ca1 - Cb1
+            v2 = r3i - r3j # Cb1 - Cb2
+            phi[i,j] = np.degrees(np.arccos(np.dot(v1,v2)/norm(v1)/norm(v2)))
 
-                a = norm(r3i-r3j)
-                b = norm(r3i-r2i)
-                c = norm(r3j-r2i)
+            v1 = r2j - r3j # Ca2 - Cb2
+            v2 = r3j - r3i # Cb2 -Cb1
+            phi[j, i] = np.degrees(np.arccos(np.dot(v1, v2) / norm(v1) / norm(v2)))
 
-                phi[i] = np.degrees(np.arccos((a*a + b*b - c*c)/(2*a*b)))
+            # Thetas
+            v1 = r1i - r2i  # N1 - Ca1
+            v2 = r2i - r3i  # Ca1 - Cb1
+            v3 = r3i - r3j  # Cb1 - Cb2
+            theta[i,j] = ang2plain(v1, v2, v2, v3)
 
-                v2 = r2i - r3i
-                normal_vec = np.cross(v1,v2)
-                v3 = r2j - r3j
+            v1 = r1j - r2j  # N2 - Ca2
+            v2 = r2j - r3j  # Ca2 - Cb2
+            v3 = r3j - r3i  # Cb2 - Cb1
+            theta[j,i] = ang2plain(v1, v2, v2, v3)
 
-                #Now we find thetas
-                v4 = r1i - r2i
-                v4_proj = proj_3d(v4, v2)
-                v4_ort = v4 - v4_proj
-                theta[i] = (np.degrees(np.arccos(np.dot(v4_ort,normal_vec) / (norm(v4_ort) * norm(normal_vec)))) + 90) % 360
-
-                #First project this vector on the vector running between Cbi Cbj
-                v3_proj = proj_3d(v3,v1)
-                v3_ort = v3 - v3_proj
-                #Now find the angle between the normal vector and project vector and add 90 to make it to the plane
-                omega[i] = (np.degrees(np.arccos(np.dot(v3_ort,normal_vec) / (norm(v3_ort) * norm(normal_vec)))) + 90) % 360
-
-
-    d = d + d.transpose()
+            # Omega
+            v1 = r2i - r3i # Ca1 - Cb1
+            v2 = r3i - r3j # Cb1 - Cb2
+            v3 = r3j - r2j # Cb2 - Ca2
+            omega[i,j] = ang2plain(v1,v2,v2,v3)
+            omega[j,i] = omega[i,j]
 
     return d,omega,phi,theta
 
@@ -186,18 +203,27 @@ def parse_pnet(file):
     return id, seq, pssm2, entropy, dssp, r1,r2,r3, mask
 
 
-####################### DO SOMETHING
+##
 dataFile ='./Data/testing'
 
-id, seq, pssm2, entropy, dssp, r1,r2,r3, mask = parse_pnet(dataFile)
+id, seq, pssm2, entropy, dssp, r1, r2, r3, mask = parse_pnet(dataFile)
 
 print('Done Reading File')
 
 L2np = ListToNumpy()
 
-S, RN, RCa, RCb, msk = L2np(seq[0],r1[0],r2[0],r3[0],mask[0])
+S, RN, RCa, RCb, msk = L2np(seq[10],r1[10],r2[10],r3[10],mask[10])
 
 d,omega,phi,theta = convert_coord_to_dist_angles_linear(RN,RCa,RCb,mask=msk)
+
+plt.figure(1)
+plt.imshow(d)
+plt.figure(2)
+plt.plot(omega)
+plt.plot(phi)
+plt.plot(theta)
+
+
 
 print('Done Converting')
 
