@@ -187,7 +187,7 @@ def parse_pnet(file):
 
 
 ####################### DO SOMETHING
-dataFile ='./data/testing'
+dataFile ='./Data/testing'
 
 id, seq, pssm2, entropy, dssp, r1,r2,r3, mask = parse_pnet(dataFile)
 
