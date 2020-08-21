@@ -225,7 +225,7 @@ def convertCoordToDistAnglesVec(rN, rCa, rCb, mask=None):
 
     # Get D
     D = torch.sum(rCb ** 2, dim=1).unsqueeze(1) + torch.sum(rCb ** 2, dim=1).unsqueeze(0) - 2 * (rCb @ rCb.t())
-    M = msk.unsqueeze(1) @  msk.unsqueeze(0)
+    M = mask.unsqueeze(1) @  mask.unsqueeze(0)
     D = torch.sqrt(torch.relu(M*D))
 
     # Get Upper Phi
@@ -292,8 +292,57 @@ def convertCoordToDistAnglesVec(rN, rCa, rCb, mask=None):
     THETA = M*ang2plainMat(V1, V2, V2, V3)
     indnan = torch.isnan(THETA)
     THETA[indnan] = 0.0
-    return D, OMEGA, PHI, THETA
+    M[indnan]     = 0.0
+    return D, OMEGA, PHI, THETA, M
 
+# Use the codes to process the data and get X and Y
+def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
 
+    L2np = ListToNumpy()
 
+    Sh, S, E, rN, rCa, rCb, msk = L2np(seq[idx], pssm2[idx], entropy[idx],
+                                       RN[idx], RCa[idx], RCb[idx], mask[idx])
+    S   = torch.tensor(S)
+    Sh  = torch.tensor(Sh)
+    E   = torch.tensor(E)
 
+    nc = ncourse
+    kp = S.shape[0]
+    k  = (2**nc)*(kp//(2**nc) + 1)
+    X  = torch.zeros(21,k,k)
+    for i in range(20):
+        X[i,:kp,:kp] = S[:,i].unsqueeze(1)@S[:,i].unsqueeze(1).t()
+    X[-1,:kp,:kp] = E.unsqueeze(1)@E.unsqueeze(1).t()
+    X = X.unsqueeze(0)
+
+    rN  = torch.tensor(rN)
+    rCa = torch.tensor(rCa)
+    rCb = torch.tensor(rCb)
+    msk = torch.tensor(msk)
+
+    # Define model and data Y
+    D, OMEGA, PHI, THETA, M = convertCoordToDistAnglesVec(rN,rCa,rCb,mask=msk)
+    Yobs = torch.zeros(4, k, k)
+    Yobs[0, :kp, :kp] = D
+    Yobs[1, :kp, :kp] = OMEGA
+    Yobs[2, :kp, :kp] = PHI
+    Yobs[3, :kp, :kp] = THETA
+
+    Yobs = Yobs.unsqueeze(0)
+
+    Mpad = torch.zeros(1, k, k)
+    Mpad[0, :kp, :kp] = M
+
+    return X, Yobs, Mpad
+
+def plotProteinData(Y,j):
+
+    plt.figure(j)
+    plt.subplot(2,2,1)
+    plt.imshow(Y[0,0,:,:])
+    plt.subplot(2,2,2)
+    plt.imshow(Y[0,1,:,:])
+    plt.subplot(2,2,3)
+    plt.imshow(Y[0,2,:,:])
+    plt.subplot(2,2,4)
+    plt.imshow(Y[0,3,:,:])
