@@ -45,14 +45,85 @@ class SeqResizeAndFlip(object):
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
+class ConvertDistAnglesToBins(object):
+    def __init__(self, nbins_d=36, nbins_omega=24, nbins_theta=24, nbins_phi=12, remove_angles_from_max_dist=True):
+        self.nbins_d = nbins_d
+        self.nbins_omega = nbins_omega
+        self.nbins_phi = nbins_phi
+        self.nbins_theta = nbins_theta
+        self.remove_angles = remove_angles_from_max_dist
+    def __call__(self, targets):
+        d = targets[0]
+        omega = targets[1]
+        phi = targets[2]
+        theta = targets[3]
+
+        bins_d = np.linspace(250, 2000, self.nbins_d)
+        bins_omega = np.linspace(15, 360, self.nbins_omega)
+        bins_phi = np.linspace(15, 180, self.nbins_phi)
+        bins_theta = np.linspace(15, 360, self.nbins_theta)
+        mask_unknown = d == 0
+
+        d_cat = np.digitize(d, bins=bins_d)
+        omega_cat = np.digitize(omega, bins=bins_omega)
+        phi_cat = np.digitize(phi, bins=bins_phi)
+        theta_cat = np.digitize(theta, bins=bins_theta)
+
+        # Now we make sure that all the unknown gets set to -100, which is the standard in pytorch for ignored values
+        d_cat[mask_unknown] = -100
+        omega_cat[mask_unknown] = -100
+        phi_cat[mask_unknown] = -100
+        theta_cat[mask_unknown] = -100
+
+        if self.remove_angles:
+            d_mask = d_cat == self.nbins_d
+            omega_cat[d_mask] = self.nbins_omega
+            phi_cat[d_mask] = self.nbins_phi
+            theta_cat[d_mask] = self.nbins_theta
+
+        return d_cat, omega_cat, phi_cat, theta_cat
+
+
+
+class ConvertPnetFeaturesTo2D(object):
+    def __init__(self):
+        pass
+    def __call__(self, features):
+        seq_onehot = np.eye(len(AA_DICT), dtype=np.float32)[features[0]]
+
+        f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1)
+
+        f2d = np.concatenate(
+            [np.tile(f1d[:, None, :], [1, f1d.shape[0], 1]), np.tile(f1d[None, :, :], [f1d.shape[0], 1, 1])],
+            axis=-1).transpose((-1, 0, 1))
+        return f2d
+
 
 class SeqFlip(object):
+    '''
+    This function is specially designed for flipping the features made in pnet. For other types of features, this might not work.
+    '''
     def __init__(self, prob = 0.5):
         self.prob = prob
     def __call__(self, *args):
+        if len(args) == 1:
+            args = args[0]
         if random.random() > self.prob:
+            new_args = ()
             for arg in args:
-                arg.reverse()
+                if isinstance(arg,list):
+                    new_args += (arg.reverse(),)
+                elif isinstance(arg,np.ndarray):
+                    if arg.ndim == 1:
+                        new_args += (np.flip(arg, axis=0),)
+                    elif arg.ndim == 2:
+                        if arg.shape[0] == arg.shape[1]:
+                            new_args += (np.flip(arg, axis=(0, 1)),)  # = np.flip(arg),axis=(0, 1))
+                        else:
+                            new_args += (np.flip(arg, axis=0),)
+                    else:
+                        raise NotImplementedError("the array you are attempting to flip does not have an implemented shape")
+            args = new_args
         return args
 
     def __repr__(self):
@@ -62,21 +133,19 @@ class ListToNumpy(object):
     def __init__(self):
         pass
     def __call__(self, *args):
+        if len(args) == 1:
+            args = args[0]
         args_array = ()
         for arg in args:
-            if type(arg[0]) == int: #Note that this will only work for this particular list system, for deeper lists this will need to be looped.
+            if type(arg[
+                        0]) == int:  # Note that this will only work for this particular list system, for deeper lists this will need to be looped.
                 dtype = np.int
             elif type(arg[0]) == bool:
                 dtype = np.bool
             else:
                 dtype = np.float32
-            args_array += (np.asarray(arg,dtype=dtype),)
+            args_array += (np.asarray(arg, dtype=dtype),)
         return args_array
-
-    def __repr__(self):
-        return self.__class__.__name__ + '()'
-
-
 
 
 def convert_coord_to_dist_angles(coords):

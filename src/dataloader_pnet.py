@@ -12,13 +12,15 @@ from torch.utils.data import Dataset
 from os import listdir
 from os.path import isfile, join
 from Bio.PDB import PDBParser
+import time
 from src.dataloader_utils import AA_DICT, MASK_DICT, DSSP_DICT, NUM_DIMENSIONS, AA_PAD_VALUE, MASK_PAD_VALUE, \
     DSSP_PAD_VALUE, SeqFlip, PSSM_PAD_VALUE, ENTROPY_PAD_VALUE, COORDS_PAD_VALUE, ListToNumpy
-
+from src.visualization import compare_distogram
+from itertools import compress
 
 class Dataset_pnet(Dataset):
-    def __init__(self, file, transform=None, target_transform=None):
-        id,seq,pssm,entropy,dssp,r1,r2,r3,mask = parse_pnet(file)
+    def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300):
+        id,seq,pssm,entropy,dssp,r1,r2,r3,mask = parse_pnet(file,max_seq_len=max_seq_len)
         self.file = file
         self.id = id
         self.seq = seq
@@ -30,34 +32,24 @@ class Dataset_pnet(Dataset):
         self.r2 = r2
         self.r3 = r3
 
-        self.SeqFlip = SeqFlip()
-        self.ListToNumpy = ListToNumpy()
+        self.transform = transform
+        self.transform_target = transform_target
+        self.transform_mask = transform_mask
         self.nfeatures = 84
 
     def __getitem__(self, index):
-        seq = self.seq[index]
-        pssm = self.pssm[index]
-        entropy = self.entropy[index]
+        features = (self.seq[index], self.pssm[index], self.entropy[index])
         mask = self.mask[index]
-        r1 = self.r1[index]
-        r2 = self.r2[index]
-        r3 = self.r3[index]
+        target = (self.r1[index], self.r2[index], self.r3[index], mask)
 
-        seq, pssm, entropy, mask, r1, r2, r3 = self.SeqFlip(seq,pssm,entropy,mask,r1,r2,r3)
-        seq, pssm, entropy, mask, r1, r2, r3 = self.ListToNumpy(seq,pssm,entropy,mask,r1,r2,r3)
+        if self.transform is not None:
+            features = self.transform(features)
+        if self.transform_target is not None:
+            target = self.transform_target(target)
+        if self.transform_mask is not None:
+            mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
 
-        seq_onehot = np.eye(len(AA_DICT),dtype=np.float32)[seq]
-
-        dist,omega,phi,theta = convert_dist_angles_to_bins(*convert_coord_to_dist_angles(r1, r2, r3,mask=mask))
-        # dist2, omega2, phi2, theta2 = convert_coord_to_dist_angles_lite(r1, r2, r3, mask=mask)
-
-        target = (dist,omega,phi,theta)
-
-        f1d = np.concatenate((seq_onehot,pssm,entropy[:,None]),axis=1)
-
-        f2d = np.concatenate([np.tile(f1d[:, None, :], [1, f1d.shape[0], 1]),np.tile(f1d[None, :, :], [f1d.shape[0], 1, 1])], axis=-1).transpose((-1, 0, 1))
-
-        return f2d, target, mask
+        return features, target, mask
 
     def __len__(self):
         return len(self.seq)
@@ -65,141 +57,178 @@ class Dataset_pnet(Dataset):
     def __repr__(self):
         return self.__class__.__name__ + ' (' + self.file + ')'
 
-def proj_3d(v1,v2):
-    #project v1 onto v2
-    return np.dot(v1,v2)/norm(v2) * v2
 
 def convert_dist_angles_to_bins(d,omega,phi,theta):
     d_bin = np.linspace(250,2000,36)
-    d = np.digitize(d, bins=d_bin)
+    mask_unknown = d == 0
+    d_cat = np.digitize(d, bins=d_bin)
 
     angle25_bin = np.linspace(15,360,24)
     angle13_bin = np.linspace(15,180,12)
 
-    d_mask = d == 36
-    omega = np.digitize(omega, bins=angle25_bin)
-    omega[d_mask] = 24
+    d_mask = d_cat == 36
+    omega_cat = np.digitize(omega, bins=angle25_bin)
+    omega_cat[d_mask] = 24
 
-    theta = np.digitize(theta, bins=angle25_bin)
-    theta[d_mask] = 24
+    theta_cat = np.digitize(theta, bins=angle25_bin)
+    theta_cat[d_mask] = 24
 
-    phi = np.digitize(phi, bins=angle13_bin)
-    phi[d_mask] = 12
+    phi_cat = np.digitize(phi, bins=angle13_bin)
+    phi_cat[d_mask] = 12
 
-    return d,omega,phi,theta
+    #Now we make sure that all the unknown gets set to -100, which is the standard in pytorch for ignored values
+    d_cat[mask_unknown] = -100
+    omega_cat[mask_unknown] = -100
+    theta_cat[mask_unknown] = -100
+    phi_cat[mask_unknown] = -100
+
+
+    # compare_distogram((d,omega,theta,phi), (d_cat,omega_cat,theta_cat,phi_cat))
+
+    return d_cat,omega_cat,phi_cat,theta_cat
 
 
 
-def convert_coord_to_dist_angles(r1,r2,r3,mask=None):
+def ang_between_planes(v1,v2,v3,v4):
     '''
-    Data should be coordinate data in pnet format, meaning that each amino acid is characterized by a 3x3 matrix, which are the coordinates of N,Calpha,Cbeta.
-    :param coord:
+    Given a plane spanned by: (v1,v2) and another plane spanned by (v3,v4), it finds the angle between these two planes.
+    The angle is found by computing the normal vector to each plane, and finding the angle between those two vectors
+    :param v1:
+    :param v2:
+    :param v3:
+    :param v4:
     :return:
     '''
-    seq_len = len(r1)
+    nA = np.cross(v1,v2)
+    nA = nA/np.linalg.norm(nA)
+    nB = np.cross(v3,v4)
+    nB = nB/np.linalg.norm(nB)
 
-    d = np.zeros([seq_len, seq_len])
-    phi = np.zeros([seq_len, seq_len])
-    omega = np.zeros([seq_len, seq_len])
-    theta = np.zeros([seq_len, seq_len])
-    for i in range(seq_len):
-        for j in range(seq_len):
-            if mask[i] is False or mask[j] is False or i == j:
-                continue
+    cosPsi = np.round(np.dot(nA,nB),decimals=6)
+    if cosPsi < -1 or cosPsi > 1:
+        print('wtf')
 
-            r1i = r1[i]
-            r2i = r2[i]
-            r2j = r2[j]
-            r3i = r3[i]
-            r3j = r3[j]
-
-            a = norm(r3i-r3j)
-            b = norm(r3i-r2i)
-            c = norm(r3j-r2i)
-
-            phi[i,j] = np.degrees(np.arccos((a*a + b*b - c*c)/(2*a*b)))
-
-            v1 = r3j - r3i
-            v2 = r2i - r3i
-            normal_vec = np.cross(v1,v2)
-            v3 = r2j - r3j
-
-            #Now we find thetas
-            v4 = r1i - r2i
-            v4_proj = proj_3d(v4, v2)
-            v4_ort = v4 - v4_proj
-            theta[i,j] = (np.degrees(np.arccos(np.dot(v4_ort,normal_vec) / (norm(v4_ort) * norm(normal_vec)))) + 90) % 360
-
-            if i > j: #These two are symmetric so we only calculate half of them
-                d[i,j] = norm(v1)
-                #First project this vector on the vector running between Cbi Cbj
-                v3_proj = proj_3d(v3,v1)
-                v3_ort = v3 - v3_proj
-                #Now find the angle between the normal vector and project vector and add 90 to make it to the plane
-                omega[i,j] = (np.degrees(np.arccos(np.dot(v3_ort,normal_vec) / (norm(v3_ort) * norm(normal_vec)))) + 90) % 360
-
-
-    d = d + d.transpose()
-    omega = omega + omega.transpose()
-
-    return d,omega,phi,theta
-
-
-def convert_coord_to_dist_angles_lite(r1,r2,r3,mask=None):
-    '''
-    Data should be coordinate data in pnet format, meaning that each amino acid is characterized by a 3x3 matrix, which are the coordinates of r1,r2,r3=N,Calpha,Cbeta.
-    This lite version, only computes the angles in along the sequence (upper one-off diagonal of the angle matrices of the full version)
-    :return:
-    '''
-    seq_len = len(r1)
-
-    d = np.zeros([seq_len, seq_len])
-    phi = np.zeros([seq_len])
-    omega = np.zeros([seq_len])
-    theta = np.zeros([seq_len])
-    for i in range(seq_len):
-        for j in range(i+1,seq_len):
-            if mask is not None and (mask[i] == 0 or mask[j] == 0):
-                continue
-            r3i = r3[i]
-            r3j = r3[j]
-            v1 = r3j - r3i
-            d[i,j] = norm(v1)
-
-            if i+1 == j:
-                r1i = r1[i]
-                r2i = r2[i]
-                r2j = r2[j]
-
-                a = norm(r3i-r3j)
-                b = norm(r3i-r2i)
-                c = norm(r3j-r2i)
-
-                phi[i] = np.degrees(np.arccos((a*a + b*b - c*c)/(2*a*b)))
-
-                v2 = r2i - r3i
-                normal_vec = np.cross(v1,v2)
-                v3 = r2j - r3j
-
-                #Now we find thetas
-                v4 = r1i - r2i
-                v4_proj = proj_3d(v4, v2)
-                v4_ort = v4 - v4_proj
-                theta[i] = (np.degrees(np.arccos(np.dot(v4_ort,normal_vec) / (norm(v4_ort) * norm(normal_vec)))) + 90) % 360
-
-                #First project this vector on the vector running between Cbi Cbj
-                v3_proj = proj_3d(v3,v1)
-                v3_ort = v3 - v3_proj
-                #Now find the angle between the normal vector and project vector and add 90 to make it to the plane
-                omega[i] = (np.degrees(np.arccos(np.dot(v3_ort,normal_vec) / (norm(v3_ort) * norm(normal_vec)))) + 90) % 360
-
-
-    d = d + d.transpose()
-
-    return d,omega,phi,theta
+    return np.degrees(np.arccos(cosPsi))
 
 
 
+def crossProdMat(V1,V2):
+    Vcp = np.zeros(V1.shape)
+    Vcp[:,:,0] =  V1[:,:,1]*V2[:,:,2] - V1[:,:,2]*V2[:,:,1]
+    Vcp[:,:,1] = -V1[:,:,0]*V2[:,:,2] + V1[:,:,2]*V2[:,:,0];
+    Vcp[:,:,2] =  V1[:,:,0]*V2[:,:,1] - V1[:,:,1]*V2[:,:,0];
+    return Vcp
+
+def ang_between_planes_matrix(v1,v2,v3,v4):
+    nA = crossProdMat(v1,v2)
+    nB = crossProdMat(v3, v4)
+    nA = nA/(np.sqrt(np.sum(nA**2,axis=2))[:,:,None])
+    nB = nB/(np.sqrt(np.sum(nB**2,axis=2))[:,:,None])
+
+    cosPsi = np.sum(nA*nB,axis=2)
+    #Psi    = torch.acos(cosPsi)
+    return cosPsi
+
+
+def ang_between_planes_matrix_360(v1,v2,v3,v4):
+    nA = crossProdMat(v1,v2)
+    nB = crossProdMat(v3, v4)
+    nA = nA/(np.sqrt(np.sum(nA**2,axis=2))[:,:,None])
+    nB = nB/(np.sqrt(np.sum(nB**2,axis=2))[:,:,None])
+
+    v2n = v2/(np.sqrt(np.sum(v2**2,axis=2))[:,:,None])
+    det = np.sum(v2n*crossProdMat(nA,nB), axis=2)
+    dot = np.sum(nA*nB,axis=2)
+    angle = np.degrees(np.arctan2(det,dot))+180
+
+    #Psi    = torch.acos(cosPsi)
+    return angle
+
+
+
+class ConvertCoordToDistAnglesVec(object):
+    def __init__(self):
+        pass
+    def __call__(self, *args):
+        if len(args) == 1:
+            args = args[0]
+
+        rN = args[0]
+        rCa = args[1]
+        rCb = args[2]
+        mask = args[3]
+
+        # Get D
+        D = np.sum(rCb ** 2, axis=1)[:,None] + np.sum(rCb ** 2, axis=1)[None,:] - 2 * (rCb @ rCb.transpose())
+        M = mask[:,None] @  mask[None,:]
+        D = np.sqrt(np.maximum(M*D,0))
+
+        # Get Upper Phi
+        # TODO clean Phi to be the same as OMEGA
+        V1x = (rCa[:, 0])[:,None] - (rCb[:, 0])[:,None]
+        V1y = (rCa[:, 1])[:,None] - (rCb[:, 1])[:,None]
+        V1z = (rCa[:, 2])[:,None] - (rCb[:, 2])[:,None]
+        V2x = (rCb[:, 0])[:,None] - (rCb[:, 0])[:,None].transpose()
+        V2y = (rCb[:, 1])[:,None] - (rCb[:, 1])[:,None].transpose()
+        V2z = (rCb[:, 2])[:,None] - (rCb[:, 2])[:,None].transpose()
+        # Normalize them
+        V1n = np.sqrt(V1x**2 + V1y**2 + V1z**2)
+        V1x = V1x/V1n
+        V1y = V1y/V1n
+        V1z = V1z/V1n
+        V2n = np.sqrt(V2x**2 + V2y**2 + V2z**2)
+        V2x = V2x/V2n
+        V2y = V2y/V2n
+        V2z = V2z/V2n
+        # go for it
+        PHI = M*(V1x * V2x + V1y * V2y + V1z * V2z)
+        PHI = np.degrees(np.arccos(PHI))
+        indnan = np.isnan(PHI)
+        PHI[indnan] = 0.0
+
+        # Omega
+        nat = rCa.shape[0]
+        V1 = np.zeros((nat, nat, 3))
+        V2 = np.zeros((nat, nat, 3))
+        V3 = np.zeros((nat, nat, 3))
+        # Ca1 - Cb1
+        V1[:,:,0] = ((rCa[:,0])[:,None] - (rCb[:,0])[:,None]).repeat(nat,axis=1)
+        V1[:,:,1] = ((rCa[:,1])[:,None] - (rCb[:,1])[:,None]).repeat(nat,axis=1)
+        V1[:,:,2] = ((rCa[:,2])[:,None] - (rCb[:,2])[:,None]).repeat(nat,axis=1)
+        # Cb1 - Cb2
+        V2[:,:,0] = (rCb[:,0])[:,None] - (rCb[:,0])[:,None].transpose()
+        V2[:,:,1] = (rCb[:,1])[:,None] - (rCb[:,1])[:,None].transpose()
+        V2[:,:,2] = (rCb[:,2])[:,None] - (rCb[:,2])[:,None].transpose()
+        # Cb2 - Ca2
+        V3[:,:,0] = ((rCb[:,0])[None,:] - (rCa[:,0])[None,:]).repeat(nat,axis=0)
+        V3[:,:,1] = ((rCb[:,1])[None,:] - (rCa[:,1])[None,:]).repeat(nat,axis=0)
+        V3[:,:,2] = ((rCb[:,2])[None,:] - (rCa[:,2])[None,:]).repeat(nat,axis=0)
+
+        OMEGA     = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
+        indnan = np.isnan(OMEGA)
+        OMEGA[indnan] = 0.0
+
+        # Theta
+        V1 = np.zeros((nat, nat, 3))
+        V2 = np.zeros((nat, nat, 3))
+        V3 = np.zeros((nat, nat, 3))
+        # N - Ca
+        V1[:,:,0] = (rN[:,0][:,None] - rCa[:,0][:,None]).repeat(nat,axis=1)
+        V1[:,:,1] = (rN[:,1][:,None] - rCa[:,1][:,None]).repeat(nat,axis=1)
+        V1[:,:,2] = (rN[:,2][:,None] - rCa[:,2][:,None]).repeat(nat,axis=1)
+        # Ca - Cb # TODO - repeated computation
+        V2[:,:,0] = (rCa[:,0][:,None] - rCb[:,0][:,None]).repeat(nat,axis=1)
+        V2[:,:,1] = (rCa[:,1][:,None] - rCb[:,1][:,None]).repeat(nat,axis=1)
+        V2[:,:,2] = (rCa[:,2][:,None] - rCb[:,2][:,None]).repeat(nat,axis=1)
+        # Cb1 - Cb2 # TODO - repeated computation
+        V3[:,:,0] = rCb[:,0][:,None] - rCb[:,0][:,None].transpose()
+        V3[:,:,1] = rCb[:,1][:,None] - rCb[:,1][:,None].transpose()
+        V3[:,:,2] = rCb[:,2][:,None] - rCb[:,2][:,None].transpose()
+
+        THETA = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
+        indnan = np.isnan(THETA)
+        THETA[indnan] = 0.0
+        return D, OMEGA, PHI, THETA
 
 def separate_coords(full_coords, pos):  # pos can be either 0(n_term), 1(calpha), 2(cterm)
     res = []
@@ -216,66 +245,6 @@ def flip_multidimensional_list(list_in):  # pos can be either 0(n_term), 1(calph
     for i in range(len(list_in[0])):
         list_out.append([list_in[j][i] for j in range(ld)])
     return list_out
-
-
-def convert_coord_to_dist_angles_mini(coords):
-    coords_nterm = [separate_coords(full_coords, 0) for full_coords in coords]
-    coords_calpha = [separate_coords(full_coords, 1) for full_coords in coords]
-    coords_cterm = [separate_coords(full_coords, 2) for full_coords in coords]
-    print("Length coords_calpha (# proteins): ", len(coords_cterm))
-    print("Length coords_calpha[0] (# amino acids in protein[0]) : ", len(coords_cterm[0]))
-    print("Length coords_calpha[0][0] (# coordinates cterm is represented by (x,y,z)): ", len(coords_cterm[0][0]))
-
-    phis, psis = [], []  # phi always starts with a 0 and psi ends with a 0
-    ph_angle_dists, ps_angle_dists = [], []
-    for k in range(len(coords)):
-        phi, psi = [0.0], []
-        # Use our own functions inspired from bioPython
-        for i in range(len(coords_calpha[k])):
-            # Calculate phi, psi
-            # CALCULATE PHI - Can't calculate for first residue
-            if i > 0:
-                phi.append(get_dihedral(coords_cterm[k][i - 1], coords_nterm[k][i], coords_calpha[k][i],
-                                        coords_cterm[k][i]))  # my_calc
-
-            # CALCULATE PSI - Can't calculate for last residue
-            if i < len(coords_calpha[k]) - 1:
-                psi.append(get_dihedral(coords_nterm[k][i], coords_calpha[k][i], coords_cterm[k][i],
-                                        coords_nterm[k][i + 1]))  # my_calc
-
-        # Add an extra 0 to psi (unable to claculate angle with next aa)
-        psi.append(0)
-        # Add protein info to register
-        phis.append(phi)
-        psis.append(psi)
-
-    return phis,psis
-
-def get_dihedral(coords1, coords2, coords3, coords4):
-    """Returns the dihedral angle in degrees."""
-
-    a1 = coords2 - coords1
-    a2 = coords3 - coords2
-    a3 = coords4 - coords3
-
-    v1 = np.cross(a1, a2)
-    if (v1 * v1).sum(-1) ** 0.5 != 0:
-        v1 = v1 / (v1 * v1).sum(-1) ** 0.5
-    v2 = np.cross(a2, a3)
-    if (v2 * v2).sum(-1) ** 0.5 != 0:
-        v2 = v2 / (v2 * v2).sum(-1) ** 0.5
-    porm = np.sign((v1 * a3).sum(-1))
-    if ((v1 ** 2).sum(-1) * (v2 ** 2).sum(-1)) ** 0.5 != 0:
-        rad = np.arccos((v1 * v2).sum(-1) / ((v1 ** 2).sum(-1) * (v2 ** 2).sum(-1)) ** 0.5)
-    else:
-        rad = 0
-    if not porm == 0:
-        rad = rad * porm
-
-    return np.degrees(rad)
-
-
-
 
 class switch(object):
     """Switch statement for Python, based on recipe from Python Cookbook."""
@@ -326,12 +295,14 @@ def read_record(file_, num_evo_entries):
     coord = []
     mask = []
 
-
+    t0 = time.time()
     while True:
         next_line = file_.readline()
         for case in switch(next_line):
             if case('[ID]' + '\n'):
                 id.append(file_.readline()[:-1])
+                if len(id) % 1000 == 0:
+                    print("loading sample: {:}, Time: {:2.2f}".format(len(id),time.time() - t0))
             elif case('[PRIMARY]' + '\n'):
                 seq.append(letter_to_num(file_.readline()[:-1], AA_DICT))
             elif case('[EVOLUTIONARY]' + '\n'):
@@ -349,11 +320,15 @@ def read_record(file_, num_evo_entries):
             elif case('[MASK]' + '\n'):
                 mask.append(letter_to_bool(file_.readline()[:-1], MASK_DICT))
             elif case(''):
+
+
                 return id,seq,pssm,entropy,dssp,coord,mask
 
-def parse_pnet(file):
+def parse_pnet(file,max_seq_len=-1):
     with open(file, 'r') as f:
+        t0 = time.time()
         id, seq, pssm, entropy, dssp, coords, mask = read_record(f, 20)
+        print("loading data complete! Took: {:2.2f}".format(time.time()-t0))
         r1 = []
         r2 = []
         r3 = []
@@ -363,77 +338,20 @@ def parse_pnet(file):
             r1.append(separate_coords(coords[i], 0))
             r2.append(separate_coords(coords[i], 1))
             r3.append(separate_coords(coords[i], 2))
+            if i+1 % 1000 == 0:
+                print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
 
-    return id, seq, pssm2, entropy, dssp, r1,r2,r3, mask
+        args = (id, seq, pssm2, entropy, dssp, r1,r2,r3, mask)
+        if max_seq_len > 0:
+            filter = np.full(len(seq), True, dtype=bool)
+            for i,seq_i in enumerate(seq):
+                if len(seq_i) > max_seq_len:
+                    filter[i] = False
+            new_args = ()
+            for list_i in (id, seq, pssm2, entropy, dssp, r1,r2,r3, mask):
+                new_args += (list(compress(list_i,filter)),)
+        else:
+            new_args = args
+        print("parse complete! Took: {:2.2f}".format(time.time() - t0))
+    return new_args
 
-
-
-#
-# def convert_coord_to_dist_angles(coords):
-#     '''
-#     Data should be coordinate data in pnet format, meaning that each amino acid is characterized by a 3x3 matrix, which are the coordinates of N,Calpha,Cbeta.
-#     :param coord:
-#     :return:
-#     '''
-#     dists = []
-#     phis = []
-#     omegas = []
-#     thetas = []
-#     for coord in coords: #For each protein
-#         seq_len = len(coord[0])//3
-#
-#         d = np.zeros([seq_len, seq_len])
-#         phi = np.zeros([seq_len, seq_len])
-#         omega = np.zeros([seq_len, seq_len])
-#         theta = np.zeros([seq_len, seq_len])
-#         for i in range(seq_len):
-#             for j in range(seq_len):
-#                 Cbi = np.array([coord[0][i*3+2], coord[1][i*3+2], coord[2][i*3+2]])
-#                 Cbj = np.array([coord[0][j*3+2], coord[1][j*3+2], coord[2][j*3+2]])
-#                 Cai = np.array([coord[0][i*3+1], coord[1][i*3+1], coord[2][i*3+1]])
-#                 Ni = np.array([coord[0][i*3], coord[1][i*3], coord[2][i*3]])
-#                 Nj = np.array([coord[0][j*3], coord[1][j*3], coord[2][j*3]])
-#
-#
-#                 a = norm(Cbi-Cbj)
-#                 b = norm(Cbi-Cai)
-#                 c = norm(Cbj-Cai)
-#
-#                 phi[i,j] = np.degrees(np.arccos((a*a + b*b - c*c)/(2*a*b)))
-#
-#                 Caj = np.array([coord[0][j*3+1], coord[1][j*3+1], coord[2][j*3+1]])
-#                 v1 = Cbj - Cbi
-#                 v2 = Cai - Cbi
-#                 normal_vec = np.cross(v1,v2)
-#                 v3 = Caj - Cbj
-#
-#                 #Now we find thetas
-#                 v4 = Ni - Cai
-#                 v4_proj = proj_3d(v4, Cai - Cbi)
-#                 v4_ort = v4 - v4_proj
-#                 theta[i,j] = (np.degrees(np.arccos(np.dot(v4_ort,normal_vec) / (norm(v4_ort) * norm(normal_vec)))) + 90) % 360
-#
-#                 if i > j: #These two are symmetric so we only calculate half of them
-#                     d[i,j] = norm(Cbi-Cbj)
-#                     #First project this vector on the vector running between Cbi Cbj
-#                     v3_proj = proj_3d(v3,v1)
-#                     v3_ort = v3 - v3_proj
-#                     #Now find the angle between the normal vector and project vector and add 90 to make it to the plane
-#                     omega[i,j] = (np.degrees(np.arccos(np.dot(v3_ort,normal_vec) / (norm(v3_ort) * norm(normal_vec)))) + 90) % 360
-#
-#
-#         d = d + d.transpose()
-#         dists.append(d)
-#         omega = omega + omega.transpose()
-#         omegas.append(omega)
-#
-#         mask_nan = np.isnan(phi)
-#         phi[mask_nan] = 0
-#
-#         mask_nan = np.isnan(theta)
-#         theta[mask_nan] = 0
-#
-#         phis.append(phi)
-#         thetas.append(theta)
-#
-#     return dists,omegas,phis,thetas

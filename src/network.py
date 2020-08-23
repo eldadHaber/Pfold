@@ -29,11 +29,11 @@ class ResNet(nn.Module):
         for block in self.blocks:
             x = block(x)
         x = self.activation(x)
-        theta = self.softmax(self.conv_theta(x))
-        phi = self.softmax(self.conv_phi(x))
+        theta = self.conv_theta(x)
+        phi = self.conv_phi(x)
         y = x + torch.transpose(x, -1, -2)
-        d = self.softmax(self.conv_d(y))
-        omega = self.softmax(self.conv_omega(y))
+        d = self.conv_d(y)
+        omega = self.conv_omega(y)
         return d, omega, phi, theta
 
 

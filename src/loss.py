@@ -13,10 +13,10 @@ class CrossEntropyMultiTargets(nn.Module):
         super(CrossEntropyMultiTargets, self).__init__()
         self.loss = torch.nn.CrossEntropyLoss()
 
-    def forward(self, inputs,targets,mask=None):
-        loss = 0
+    def forward(self, inputs,targets):
+        loss = []
         for (input,target) in zip(inputs,targets):
-            loss += self.loss(input[:,:,mask,mask],target)
+            loss.append(self.loss(input,target))
         return loss
 
 
