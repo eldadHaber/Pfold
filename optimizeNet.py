@@ -6,7 +6,7 @@ import torch.optim as optim
 import networks
 
 
-def trainNetwork(dnn, X, Y, M, iters, lr, regpar = 1e-4, stopTol = 5e-2):
+def trainNetwork(dnn, X, Y, M, iters, lr, regpar = 1e-4, dweights = torch.tensor([1.0,1,1,1]), stopTol = 5e-3):
     """
     Train network with given parameters using our semi-symmetric loss.
     """
@@ -24,7 +24,7 @@ def trainNetwork(dnn, X, Y, M, iters, lr, regpar = 1e-4, stopTol = 5e-2):
         optimizer.zero_grad()
 
         Ypred  = dnn(Xi)
-        misfit = networks.misfitFun(Ypred, Yi, M)
+        misfit = networks.misfitFun(Ypred, Yi, M, dweights)
         reg, normGrad    = networks.TVreg(Ypred, M)
 
         # Calculate loss and backpropagate
@@ -75,3 +75,27 @@ def getMax(dK):
             mx = mxt
 
     return mx
+
+def getCoordsFromDist(X,D,lr=1e-2,niter=100):
+
+    optimizer = optim.Adam([{'params': X, 'lr': lr}])
+    for i in range(niter):
+        optimizer.zero_grad()
+        Dpred = torch.max(torch.sum(X**2,1).unsqueeze(1) + torch.sum(X**2,1).unsqueeze(0) - 2*X@X.t())
+        loss  = 0.5*torch.sum((D-Dpred)**2)
+        loss.backward()
+        optimizer.step()
+
+        dX = X.grad
+        nx = torch.max(torch.abs(dX))
+
+        # Iterations  loss    nX
+        print("% 2d, % 10.3E,   % 10.3E" % (i, loss.item(),  nx.item()))
+        if nx < 1e-5:
+            print('Converge 0')
+            return X
+        if loss  < 1e-3:
+            print('Converge ')
+            return X
+
+    return X

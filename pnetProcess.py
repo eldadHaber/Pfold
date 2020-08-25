@@ -60,7 +60,7 @@ def flip_multidimensional_list(list_in):  # pos can be either 0(n_term), 1(calph
     return list_out
 
 
-class ListToNumpy(object):
+class list2np(object):
     def __init__(self):
         pass
     def __call__(self, *args):
@@ -137,76 +137,52 @@ def ang2plain(v1,v2,v3,v4):
     return cosPsi
 
 
-def convertCoordToDistAngles(rN, rCa, rCb, mask=None):
-    '''
-    Data should be coordinate data in pnet format, meaning that each amino acid is characterized
-    by a 3x3 matrix, which are the coordinates of r1,r2,r3=N,Calpha,Cbeta.
-    This lite version, only computes the angles in along the sequence
-    (upper one-off diagonal of the angle matrices of the full version)
-    '''
-    seq_len = rN.shape[0]
-    # Initialize distances and angles
+def torsionAngle(r1,r2,r3,r4,M=1.0):
 
-    d     = torch.zeros([seq_len, seq_len])
-    phi   = torch.zeros([seq_len,seq_len])
-    omega = torch.zeros([seq_len,seq_len])
-    theta = torch.zeros([seq_len,seq_len])
+    a = getPairwiseDiff(r2,r1)
+    b = getPairwiseDiff(r3,r2)
+    c = getPairwiseDiff(r4,r3)
 
-    for i in range(seq_len):
-        for j in range(i+1,seq_len):
-            if mask is not None and (mask[i] == 0 or mask[j] == 0):
-                continue
+    a = a/torch.sqrt(dotProdMat(a,a).unsqueeze(0))
+    b = b/torch.sqrt(dotProdMat(b,b).unsqueeze(0))
+    c = c/torch.sqrt(dotProdMat(c,c).unsqueeze(0))
 
-            r1i = rN[i, :]  # N1  atom
-            r2i = rCa[i, :]  # Ca1 atom
-            r3i = rCb[i, :]  # Cb1 atom
-            r1j = rN[j, :]  # N2  atom
-            r2j = rCa[j, :]  # Ca2 atom
-            r3j = rCb[j, :]  # Cb2 atom
+    bXc = crossProdMat(b, c)
+    x = dotProdMat(a, c) + dotProdMat(a, b) * dotProdMat(b, c)
+    y = dotProdMat(a, bXc)
 
-            # Compute distance Cb-Cb
-            vbb = r3j - r3i
-            d[i, j] = torch.norm(vbb)
-            d[j, i] = d[i,j]
+    PHI = torch.acos(x/torch.sqrt(x**2 + y**2 + 1e-8))
 
-            # Compute phi
-            v1 = r2i - r3i # Ca1 - Cb1
-            v2 = r3i - r3j # Cb1 - Cb2
-            #phi[i,j] = torch.acos(torch.dot(v1,v2)/torch.norm(v1)/torch.norm(v2))
-            phi[i, j] = torch.dot(v1, v2) / torch.norm(v1) / torch.norm(v2)
+    # (b.((cxb)x(axb)) , |b|(axb).(cxb)
+    #cs    = dotProdMat(b,crossProdMat(crossProdMat(c,b),crossProdMat(a,b)))
+    #normb = torch.sqrt(dotProdMat(b,b))
+    #sn    = normb * dotProdMat(crossProdMat(a,b),crossProdMat(c,b))
+    #psi = torch.atan2(cs,sn)
+    return M*PHI
 
-            v1 = r2j - r3j # Ca2 - Cb2
-            v2 = r3j - r3i # Cb2 -Cb1
-            #phi[j, i] = torch.acos(torch.dot(v1,v2)/torch.norm(v1)/torch.norm(v2))
-            phi[j, i] = torch.dot(v1, v2) / torch.norm(v1) / torch.norm(v2)
+def getPairwiseDiff(rCa,rCb):
+    # Getting a matrix of rCa_i - rCb_j
+    n = rCa.shape[0]
+    m = rCb.shape[0]
 
-            # Thetas
-            v1 = r1i - r2i  # N1 - Ca1
-            v2 = r2i - r3i  # Ca1 - Cb1
-            v3 = r3i - r3j  # Cb1 - Cb2
-            theta[i,j] = ang2plain(v1, v2, v2, v3)
+    V = torch.zeros(3,n,m)
+    V[0,:,:] = rCa[:, 0].unsqueeze(1) - rCb[:, 0].unsqueeze(0)
+    V[1,:,:] = rCa[:, 1].unsqueeze(1) - rCb[:, 1].unsqueeze(0)
+    V[2,:,:] = rCa[:, 2].unsqueeze(1) - rCb[:, 2].unsqueeze(0)
 
-            v1 = r1j - r2j  # N2 - Ca2
-            v2 = r2j - r3j  # Ca2 - Cb2
-            v3 = r3j - r3i  # Cb2 - Cb1
-            theta[j,i] = ang2plain(v1, v2, v2, v3)
+    return V
 
-            # Omega
-            v1 = r2i - r3i # Ca1 - Cb1
-            v2 = r3i - r3j # Cb1 - Cb2
-            v3 = r3j - r2j # Cb2 - Ca2
-            omega[i,j] = ang2plain(v1,v2,v2,v3)
-            omega[j,i] = omega[i,j]
-
-
-    return d, omega, phi, theta
 
 def crossProdMat(V1,V2):
     Vcp = torch.zeros(V1.shape)
-    Vcp[:,:,0] =  V1[:,:,1]*V2[:,:,2] - V1[:,:,2]*V2[:,:,1]
-    Vcp[:,:,1] = -V1[:,:,0]*V2[:,:,2] + V1[:,:,2]*V2[:,:,0];
-    Vcp[:,:,2] =  V1[:,:,0]*V2[:,:,1] - V1[:,:,1]*V2[:,:,0];
+    Vcp[0,:,:] =  V1[1,:,:]*V2[2,:,:] - V1[2,:,:]*V2[1,:,:]
+    Vcp[1,:,:] = -V1[0,:,:]*V2[2,:,:] + V1[2,:,:]*V2[0,:,:]
+    Vcp[2,:,:] =  V1[0,:,:]*V2[1,:,:] - V1[1,:,:]*V2[0,:,:]
     return Vcp
+
+def dotProdMat(V1,V2):
+    Vdp = torch.sum(V1*V2,dim=0)
+    return Vdp
 
 def ang2plainMat(v1,v2,v3,v4):
     nA = crossProdMat(v1,v2)
@@ -218,87 +194,76 @@ def ang2plainMat(v1,v2,v3,v4):
     #Psi    = torch.acos(cosPsi)
     return cosPsi
 
+def convertCoordToDistMaps(rN, rCa, rCb, mask=None):
+
+    # Central coordinate
+    rM = (rN + rCa + rCb)/3
+    M = mask.unsqueeze(1) @ mask.unsqueeze(0)
+    # Get Dmm
+    D = torch.sum(rM**2, dim=1).unsqueeze(1) + torch.sum(rM**2, dim=1).unsqueeze(0) - 2*(rM@rM.t())
+    Dmm = torch.sqrt(torch.relu(M * D))
+
+    # Get Dmb
+    D = torch.sum(rM**2, dim=1).unsqueeze(1) + torch.sum(rCb**2, dim=1).unsqueeze(0) - 2*(rM@rCb.t())
+    Dmb = torch.sqrt(torch.relu(M*D))
+
+    # Get Dma
+    D = torch.sum(rM**2, dim=1).unsqueeze(1) + torch.sum(rCa**2, dim=1).unsqueeze(0) - 2 * (rM@rCa.t())
+    Dma = torch.sqrt(torch.relu(M*D))
+
+    # Get DmN
+    D = torch.sum(rM ** 2, dim=1).unsqueeze(1) + torch.sum(rN ** 2, dim=1).unsqueeze(0) - 2 * (rM @ rN.t())
+    DmN = torch.sqrt(torch.relu(M*D))
+
+    return Dmm, Dma, Dmb, DmN, M
+
+def torsionAngleIJ(r1,r2,r3,r4,M=1.0):
+
+    pi = 3.1415926535
+    m   = r1.shape[0]
+    psi = torch.zeros(m,m, dtype=r1.dtype)
+    for i in range(m):
+        for j in range(m):
+            a = r2[i,:] - r1[j,:]
+            b = r3[i,:] - r2[j,:]
+            c = r4[i,:] - r3[j,:]
+            a = a/torch.norm(a)
+            b = b/torch.norm(b)
+            c = c/torch.norm(c)
+            bXc = torch.cross(b,c)
+            x = torch.dot(a,c) + torch.dot(a,b)*torch.dot(b,c)
+            y = torch.dot(a, bXc)
+            #psi[i,j] = torch.atan2(x,y)
+            ang = 0
+            if (x != 0) & (y!=0):
+                c = x/torch.sqrt(x**2 + y**2)
+                ang = torch.sign(y) * torch.acos(c)
+            elif(x==0):
+                if (y>0):
+                    ang = pi/2
+                elif(y<0):
+                    ang = -pi/2
+            psi[i,j] = ang
+
+    return M*psi
 
 
-def convertCoordToDistAnglesVec(rN, rCa, rCb, mask=None):
-    # Vectorized
+def convertCoordToAngles(rN, rCa, rCb, mask=1.0):
+    #OMEGA, COMEGA, SOMEGA = torsionAngle(rCa, rCb, rCb, rCa) # Omega: Ca, Cb, Cb, Ca
+    #THETA, CTHETA, STHETA = torsionAngle(rN, rCa, rCb, rCb) # N, Ca, Cb, Cb
+    #PHI,   CPHI,   SPHI   = torsionAngle(rCb, rCb, rCa, rN) # Cb, Cb, Ca, N
+    OMEGA = torsionAngle(rCa, rCb, rCb, rCa)  # Omega: Ca, Cb, Cb, Ca
+    THETA = torsionAngle(rN, rCa, rCb, rCb) # N, Ca, Cb, Cb
+    PHI   = torsionAngle(rCb, rCb, rCa, rN) # Cb, Cb, Ca, N
 
-    # Get D
-    D = torch.sum(rCb ** 2, dim=1).unsqueeze(1) + torch.sum(rCb ** 2, dim=1).unsqueeze(0) - 2 * (rCb @ rCb.t())
-    M = mask.unsqueeze(1) @  mask.unsqueeze(0)
-    D = torch.sqrt(torch.relu(M*D))
+    return mask*OMEGA, mask*THETA, mask*PHI
 
-    # Get Upper Phi
-    # TODO clean Phi to be the same as OMEGA
-    V1x = rCa[:, 0].unsqueeze(1) - rCb[:, 0].unsqueeze(1)
-    V1y = rCa[:, 1].unsqueeze(1) - rCb[:, 1].unsqueeze(1)
-    V1z = rCa[:, 2].unsqueeze(1) - rCb[:, 2].unsqueeze(1)
-    V2x = rCb[:, 0].unsqueeze(1) - rCb[:, 0].unsqueeze(1).t()
-    V2y = rCb[:, 1].unsqueeze(1) - rCb[:, 1].unsqueeze(1).t()
-    V2z = rCb[:, 2].unsqueeze(1) - rCb[:, 2].unsqueeze(1).t()
-    # Normalize them
-    V1n = torch.sqrt(V1x**2 + V1y**2 + V1z**2)
-    V1x = V1x/V1n
-    V1y = V1y/V1n
-    V1z = V1z/V1n
-    V2n = torch.sqrt(V2x**2 + V2y**2 + V2z**2)
-    V2x = V2x/V2n
-    V2y = V2y/V2n
-    V2z = V2z/V2n
-    # go for it
-    PHI = M*(V1x * V2x + V1y * V2y + V1z * V2z)
-    indnan = torch.isnan(PHI)
-    PHI[indnan] = 0.0
 
-    # Omega
-    nat = rCa.shape[0]
-    V1 = torch.zeros(nat, nat, 3)
-    V2 = torch.zeros(nat, nat, 3)
-    V3 = torch.zeros(nat, nat, 3)
-    # Ca1 - Cb1
-    V1[:,:,0] = (rCa[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1)).repeat((1,nat))
-    V1[:,:,1] = (rCa[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1)).repeat((1, nat))
-    V1[:,:,2] = (rCa[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1)).repeat((1, nat))
-    # Cb1 - Cb2
-    V2[:,:,0] = rCb[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1).t()
-    V2[:,:,1] = rCb[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1).t()
-    V2[:,:,2] = rCb[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1).t()
-    # Cb2 - Ca2
-    V3[:,:,0] = (rCb[:,0].unsqueeze(0) - rCa[:,0].unsqueeze(0)).repeat((nat,1))
-    V3[:,:,1] = (rCb[:,1].unsqueeze(0) - rCa[:,1].unsqueeze(0)).repeat((nat,1))
-    V3[:,:,2] = (rCb[:,2].unsqueeze(0) - rCa[:,2].unsqueeze(0)).repeat((nat,1))
-
-    OMEGA     = M*ang2plainMat(V1, V2, V2, V3)
-    indnan = torch.isnan(OMEGA)
-    OMEGA[indnan] = 0.0
-
-    # Theta
-    V1 = torch.zeros(nat, nat, 3)
-    V2 = torch.zeros(nat, nat, 3)
-    V3 = torch.zeros(nat, nat, 3)
-    # N - Ca
-    V1[:,:,0] = (rN[:,0].unsqueeze(1) - rCa[:,0].unsqueeze(1)).repeat((1,nat))
-    V1[:,:,1] = (rN[:,1].unsqueeze(1) - rCa[:,1].unsqueeze(1)).repeat((1, nat))
-    V1[:,:,2] = (rN[:,2].unsqueeze(1) - rCa[:,2].unsqueeze(1)).repeat((1, nat))
-    # Ca - Cb # TODO - repeated computation
-    V2[:,:,0] = (rCa[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1)).repeat((1,nat))
-    V2[:,:,1] = (rCa[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1)).repeat((1, nat))
-    V2[:,:,2] = (rCa[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1)).repeat((1, nat))
-    # Cb1 - Cb2 # TODO - repeated computation
-    V3[:,:,0] = rCb[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1).t()
-    V3[:,:,1] = rCb[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1).t()
-    V3[:,:,2] = rCb[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1).t()
-
-    THETA = M*ang2plainMat(V1, V2, V2, V3)
-    indnan = torch.isnan(THETA)
-    THETA[indnan] = 0.0
-    M[indnan]     = 0.0
-    return D, OMEGA, PHI, THETA, M
 
 # Use the codes to process the data and get X and Y
 def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
 
-    L2np = ListToNumpy()
+    L2np = list2np()
 
     Sh, S, E, rN, rCa, rCb, msk = L2np(seq[idx], pssm2[idx], entropy[idx],
                                        RN[idx], RCa[idx], RCb[idx], mask[idx])
@@ -321,12 +286,14 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     msk = torch.tensor(msk)
 
     # Define model and data Y
-    D, OMEGA, PHI, THETA, M = convertCoordToDistAnglesVec(rN,rCa,rCb,mask=msk)
+    #D, OMEGA, PHI, THETA, M = convertCoordToDistAnglesVec(rN,rCa,rCb,mask=msk)
+    Dmm, Dma, Dmb, DmN, M = convertCoordToDistMaps(rN, rCa, rCb, mask=msk)
+
     Yobs = torch.zeros(4, k, k)
-    Yobs[0, :kp, :kp] = D
-    Yobs[1, :kp, :kp] = OMEGA
-    Yobs[2, :kp, :kp] = PHI
-    Yobs[3, :kp, :kp] = THETA
+    Yobs[0, :kp, :kp] = Dmm
+    Yobs[1, :kp, :kp] = Dma
+    Yobs[2, :kp, :kp] = Dmb
+    Yobs[3, :kp, :kp] = DmN
 
     Yobs = Yobs.unsqueeze(0)
 
@@ -340,9 +307,14 @@ def plotProteinData(Y,j):
     plt.figure(j)
     plt.subplot(2,2,1)
     plt.imshow(Y[0,0,:,:])
+    plt.colorbar()
     plt.subplot(2,2,2)
     plt.imshow(Y[0,1,:,:])
+    plt.colorbar()
     plt.subplot(2,2,3)
     plt.imshow(Y[0,2,:,:])
+    plt.colorbar()
     plt.subplot(2,2,4)
     plt.imshow(Y[0,3,:,:])
+    plt.colorbar()
+

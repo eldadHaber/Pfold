@@ -117,16 +117,18 @@ class vnet2D(nn.Module):
         x = conv2(x, self.W)
         return x
 
-def misfitFun(Ypred, Yobs, Active=torch.tensor([1])):
+def misfitFun(Ypred, Yobs, Active=torch.tensor([1]), dweights = torch.tensor([1,1,1,1.0])):
     n = Yobs.shape
+    dweights = dweights.unsqueeze(0).unsqueeze(2).unsqueeze(3)
+
     R = torch.zeros(n)
-    R[0, 0, :, :] = (Ypred[0, 0, :, :] + Ypred[0, 0, :, :].t())/2 - Yobs[0, 0, :, :]
-    R[0, 1, :, :] = (Ypred[0, 1, :, :] + Ypred[0, 1, :, :].t()) / 2 - Yobs[0, 1, :, :]
-    R[0, 2, :, :] =  Ypred[0, 2, :, :]  - Yobs[0, 2, :, :]
-    R[0, 3, :, :] =  Ypred[0, 3, :, :] -  Yobs[0, 3, :, :]
-    R             = Active*R
+    R[0, 0, :, :] = ((Ypred[0, 0, :, :] + Ypred[0, 0, :, :].t())/2 - Yobs[0, 0, :, :])
+    R[0, 1, :, :] = ((Ypred[0, 1, :, :] + Ypred[0, 1, :, :].t()) / 2 - Yobs[0, 1, :, :])
+    R[0, 2, :, :] = ( Ypred[0, 2, :, :]  - Yobs[0, 2, :, :])
+    R[0, 3, :, :] = ( Ypred[0, 3, :, :] -  Yobs[0, 3, :, :])
+    R             = Active*(dweights*R)
     loss  = 0.5*torch.norm(R)**2
-    loss0 = 0.5*torch.norm(Active*Yobs)**2
+    loss0 = 0.5*torch.norm(Active*(dweights*Yobs))**2
     return loss/loss0
 
 def TVreg(I, Active=torch.tensor([1]), h=(1.0,1.0), eps=1e-3):
