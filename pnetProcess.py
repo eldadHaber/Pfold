@@ -143,21 +143,21 @@ def torsionAngle(r1,r2,r3,r4,M=1.0):
     b = getPairwiseDiff(r3,r2)
     c = getPairwiseDiff(r4,r3)
 
-    a = a/torch.sqrt(dotProdMat(a,a).unsqueeze(0))
-    b = b/torch.sqrt(dotProdMat(b,b).unsqueeze(0))
-    c = c/torch.sqrt(dotProdMat(c,c).unsqueeze(0))
+    #a = a/torch.sqrt(1e-8+dotProdMat(a,a).unsqueeze(0))
+    #b = b/torch.sqrt(1e-8+dotProdMat(b,b).unsqueeze(0))
+    #c = c/torch.sqrt(1e-8+dotProdMat(c,c).unsqueeze(0))
 
-    bXc = crossProdMat(b, c)
-    x = dotProdMat(a, c) + dotProdMat(a, b) * dotProdMat(b, c)
-    y = dotProdMat(a, bXc)
+    #bXc = crossProdMat(b, c)
+    #x = dotProdMat(a, c) + dotProdMat(a, b) * dotProdMat(b, c)
+    #y = dotProdMat(a, bXc)
 
-    PHI = torch.acos(x/torch.sqrt(x**2 + y**2 + 1e-8))
+    #PHI = torch.acos(x/torch.sqrt(x**2 + y**2 + 1e-8))
 
     # (b.((cxb)x(axb)) , |b|(axb).(cxb)
-    #cs    = dotProdMat(b,crossProdMat(crossProdMat(c,b),crossProdMat(a,b)))
-    #normb = torch.sqrt(dotProdMat(b,b))
-    #sn    = normb * dotProdMat(crossProdMat(a,b),crossProdMat(c,b))
-    #psi = torch.atan2(cs,sn)
+    cs    = dotProdMat(b,crossProdMat(crossProdMat(c,b),crossProdMat(a,b)))
+    normb = torch.sqrt(dotProdMat(b,b))
+    sn    = normb * dotProdMat(crossProdMat(a,b),crossProdMat(c,b))
+    PHI = torch.atan2(cs,sn)
     return M*PHI
 
 def getPairwiseDiff(rCa,rCb):
@@ -187,10 +187,10 @@ def dotProdMat(V1,V2):
 def ang2plainMat(v1,v2,v3,v4):
     nA = crossProdMat(v1,v2)
     nB = crossProdMat(v3, v4)
-    nA = nA/(torch.sqrt(torch.sum(nA**2,axis=2)).unsqueeze(2))
-    nB = nB/(torch.sqrt(torch.sum(nB**2,axis=2)).unsqueeze(2))
+    nA = nA/(torch.sqrt(torch.sum(nA**2,axis=0)).unsqueeze(0))
+    nB = nB/(torch.sqrt(torch.sum(nB**2,axis=0)).unsqueeze(0))
 
-    cosPsi = torch.sum(nA*nB,axis=2)
+    cosPsi = torch.sum(nA*nB,axis=0)
     #Psi    = torch.acos(cosPsi)
     return cosPsi
 
@@ -220,41 +220,68 @@ def convertCoordToDistMaps(rN, rCa, rCb, mask=None):
 def torsionAngleIJ(r1,r2,r3,r4,M=1.0):
 
     pi = 3.1415926535
-    m   = r1.shape[0]
-    psi = torch.zeros(m,m, dtype=r1.dtype)
-    for i in range(m):
-        for j in range(m):
-            a = r2[i,:] - r1[j,:]
-            b = r3[i,:] - r2[j,:]
-            c = r4[i,:] - r3[j,:]
-            a = a/torch.norm(a)
-            b = b/torch.norm(b)
-            c = c/torch.norm(c)
-            bXc = torch.cross(b,c)
-            x = torch.dot(a,c) + torch.dot(a,b)*torch.dot(b,c)
-            y = torch.dot(a, bXc)
-            #psi[i,j] = torch.atan2(x,y)
-            ang = 0
-            if (x != 0) & (y!=0):
-                c = x/torch.sqrt(x**2 + y**2)
-                ang = torch.sign(y) * torch.acos(c)
-            elif(x==0):
-                if (y>0):
-                    ang = pi/2
-                elif(y<0):
-                    ang = -pi/2
-            psi[i,j] = ang
+    a = r2 - r1
+    b = r3 - r2
+    c = r4 - r3
+    norma = torch.norm(a)
+    normb = torch.norm(b)
+    normc = torch.norm(c)
+    if norma != 0:
+        a = a/norma
+    if normb != 0:
+        b = b/normb
+    if normc != 0:
+        c = c/normc
 
-    return M*psi
+    x = torch.dot(b, torch.cross(torch.cross(c, b), torch.cross(a, b)))
+    y = torch.norm(b) * torch.dot(torch.cross(a, b), torch.cross(c, b))
+    ang = torch.atan2(x, y)
+
+    #bXc = torch.cross(b,c)
+    #x = torch.dot(a,c) + torch.dot(a,b)*torch.dot(b,c)
+    #y = torch.dot(a, bXc)
+    #ang = 0
+    #if (x != 0) & (y!=0):
+    #    c = x/torch.sqrt(x**2 + y**2)
+    #    ang = torch.sign(y) * torch.acos(c)
+    #elif(x==0):
+    #    if (y>0):
+    #        ang = pi/2
+    #    elif(y<0):
+    #        ang = -pi/2
+
+    return ang
 
 
 def convertCoordToAngles(rN, rCa, rCb, mask=1.0):
-    #OMEGA, COMEGA, SOMEGA = torsionAngle(rCa, rCb, rCb, rCa) # Omega: Ca, Cb, Cb, Ca
-    #THETA, CTHETA, STHETA = torsionAngle(rN, rCa, rCb, rCb) # N, Ca, Cb, Cb
-    #PHI,   CPHI,   SPHI   = torsionAngle(rCb, rCb, rCa, rN) # Cb, Cb, Ca, N
-    OMEGA = torsionAngle(rCa, rCb, rCb, rCa)  # Omega: Ca, Cb, Cb, Ca
-    THETA = torsionAngle(rN, rCa, rCb, rCb) # N, Ca, Cb, Cb
-    PHI   = torsionAngle(rCb, rCb, rCa, rN) # Cb, Cb, Ca, N
+    #OMEGA = torsionAngle(rCa, rCb, rCb, rCa) # Omega: Ca, Cb, Cb, Ca
+    #THETA = torsionAngle(rN, rCa, rCb, rCb) # N, Ca, Cb, Cb
+    #PHI   = torsionAngle(rCb, rCb, rCa, rN) # Cb, Cb, Ca, N
+
+    n = rN.shape[0]
+    OMEGA = torch.zeros(n,n,dtype=rN.dtype)
+    THETA = torch.zeros(n,n,dtype=rN.dtype)
+    PHI = torch.zeros(n,n,dtype=rN.dtype)
+    for i in range(n):
+        for j in range(n):
+            p1 = rCa[i,:]
+            p2 = rCb[i,:]
+            p3 = rCb[j,:]
+            p4 = rCa[j,:]
+            OMEGA[i,j] = torsionAngleIJ(p1,p2,p3,p4)
+
+            p1 = rN[i,:]
+            p2 = rCa[i,:]
+            p3 = rCb[i, :]
+            p4 = rCb[j, :]
+            THETA[i, j] = torsionAngleIJ(p1, p2, p3, p4)
+
+            p1 = rCb[i,:]
+            p2 = rCb[j,:]
+            p3 = rCa[j, :]
+            p4 = rN[j, :]
+            PHI[i, j] = torsionAngleIJ(p1, p2, p3, p4)
+
 
     return mask*OMEGA, mask*THETA, mask*PHI
 
@@ -318,3 +345,78 @@ def plotProteinData(Y,j):
     plt.imshow(Y[0,3,:,:])
     plt.colorbar()
 
+def convertCoordToAnglesVec(rN, rCa, rCb, mask=1.0):
+    # Vectorized operations to compute angles
+    # OMEGA : Ca, Cb, Cb, Ca
+    # THETA : N, Ca, Cb, Cb
+    # PHI   : Cb, Cb, Ca, N
+
+    nat = rCa.shape[0]
+    # Phi: Cb, Cb, Ca, N
+    V1 = torch.zeros(3,nat,  nat, dtype=rN.dtype)
+    V2 = torch.zeros(3, nat, nat, dtype=rN.dtype)
+    V3 = torch.zeros(3, nat, nat, dtype=rN.dtype)
+    V1[0,:,:] = rCb[:, 0].unsqueeze(1) - rCb[:, 0].unsqueeze(0)
+    V1[1,:,:] = rCb[:, 1].unsqueeze(1) - rCb[:, 1].unsqueeze(0)
+    V1[2,:,:] = rCb[:, 2].unsqueeze(1) - rCb[:, 2].unsqueeze(0)
+    V2[0,:,:] = rCb[:, 0].unsqueeze(1) - rCa[:, 0].repeat(1,nat)
+    V2[1,:,:] = rCb[:, 1].unsqueeze(1) - rCa[:, 1].repeat(1,nat)
+    V2[2,:,:] = rCb[:, 2].unsqueeze(1) - rCa[:, 2].repeat(1,nat)
+    V3[0,:,:] = rCa[:, 0].unsqueeze(1) - rN[:, 0].repeat(1,nat)
+    V3[1,:,:] = rCa[:, 1].unsqueeze(1) - rN[:, 1].repeat(1,nat)
+    V3[2,:,:] = rCa[:, 2].unsqueeze(1) - rN[:, 2].repeat(1,nat)
+    # Normalize them
+    V1n = torch.sqrt(torch.sum(V1**2,dim=0) )
+    V1 = V1/V1n.unsqueeze(0)
+    V2n = torch.sqrt(torch.sum(V2**2,dim=0) )
+    V2 = V2/V2n.unsqueeze(0)
+    V3n = torch.sqrt(torch.sum(V3**2,dim=0) )
+    V3 = V3/V3n.unsqueeze(0)
+    PHI = mask * ang2plainMat(V1, V2, V2, V3)
+    indnan = torch.isnan(PHI)
+    PHI[indnan] = 0.0
+
+    # Omega
+    nat = rCa.shape[0]
+    V1 = torch.zeros(3, nat, nat)
+    V2 = torch.zeros(3, nat, nat)
+    V3 = torch.zeros(3, nat, nat)
+    # Ca1 - Cb1
+    V1[0,:,:] = (rCa[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1)).repeat((1,nat))
+    V1[1,:,:] = (rCa[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1)).repeat((1, nat))
+    V1[2,:,:] = (rCa[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1)).repeat((1, nat))
+    # Cb1 - Cb2
+    V2[0,:,:] = rCb[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1).t()
+    V2[1,:,:] = rCb[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1).t()
+    V2[2,:,:] = rCb[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1).t()
+    # Cb2 - Ca2
+    V3[0,:,:] = (rCb[:,0].unsqueeze(0) - rCa[:,0].unsqueeze(0)).repeat((nat,1))
+    V3[1,:,:] = (rCb[:,1].unsqueeze(0) - rCa[:,1].unsqueeze(0)).repeat((nat,1))
+    V3[2,:,:] = (rCb[:,2].unsqueeze(0) - rCa[:,2].unsqueeze(0)).repeat((nat,1))
+
+    OMEGA     = mask*ang2plainMat(V1, V2, V2, V3)
+    indnan = torch.isnan(OMEGA)
+    OMEGA[indnan] = 0.0
+
+    # Theta
+    V1 = torch.zeros(3, nat, nat)
+    V2 = torch.zeros(3, nat, nat)
+    V3 = torch.zeros(3, nat, nat)
+    # N - Ca
+    V1[0,:,:] = (rN[:,0].unsqueeze(1) - rCa[:,0].unsqueeze(1)).repeat((1,nat))
+    V1[0,:,:] = (rN[:,1].unsqueeze(1) - rCa[:,1].unsqueeze(1)).repeat((1, nat))
+    V1[2,:,:] = (rN[:,2].unsqueeze(1) - rCa[:,2].unsqueeze(1)).repeat((1, nat))
+    # Ca - Cb # TODO - repeated computation
+    V2[0,:,:] = (rCa[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1)).repeat((1,nat))
+    V2[1,:,:] = (rCa[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1)).repeat((1, nat))
+    V2[2,:,:] = (rCa[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1)).repeat((1, nat))
+    # Cb1 - Cb2 # TODO - repeated computation
+    V3[0,:,:] = rCb[:,0].unsqueeze(1) - rCb[:,0].unsqueeze(1).t()
+    V3[1,:,:] = rCb[:,1].unsqueeze(1) - rCb[:,1].unsqueeze(1).t()
+    V3[2,:,:] = rCb[:,2].unsqueeze(1) - rCb[:,2].unsqueeze(1).t()
+
+    THETA = mask*ang2plainMat(V1, V2, V2, V3)
+    indnan = torch.isnan(THETA)
+    THETA[indnan] = 0.0
+
+    return OMEGA, PHI, THETA

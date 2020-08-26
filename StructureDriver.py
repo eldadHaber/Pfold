@@ -11,7 +11,7 @@ dataFile ='./Data/testing'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)
 L2np = pnetProcess.list2np()
 
-idx     = 1
+idx     = 5
 # get the coordinates of the 5th idx-protein
 Sh, S, E, rN, rCa, rCb, msk = L2np(seq[idx], pssm2[idx], entropy[idx],
                                    RN[idx], RCa[idx], RCb[idx], mask[idx])
@@ -20,12 +20,13 @@ rCa = torch.tensor(rCa)
 rCb = torch.tensor(rCb)
 msk = torch.tensor(msk)
 
-msk = msk*0+1
+mskF = msk*0+1
 #msk = msk != 0
 
 
 Dmm, Dma, Dmb, Dmn, M = pnetProcess.convertCoordToDistMaps(rN, rCa, rCb, mask=msk)
-OMEGA, THETA, PHI = pnetProcess.convertCoordToAngles(rN, rCa, rCb, M)
+#OMEGA, THETA, PHI = pnetProcess.convertCoordToAngles(rN, rCa, rCb, M)
+OMEGA, THETA, PHI = pnetProcess.convertCoordToAnglesVec(rN, rCa, rCb, mask=M)
 
 rN  = rN.double()
 rCa = rCa.double()
