@@ -1,20 +1,13 @@
-import string
-import numpy as np
-import copy
-import random
 import os
 import torch
 import torchvision.transforms as transforms
-import os.path as osp
 from torch.utils.data import Dataset
-from os import listdir
-from os.path import isfile, join
-from Bio.PDB import PDBParser
 
 from src.dataloader_a3m import Dataset_a3m
 from src.dataloader_lmdb import Dataset_lmdb
-from src.dataloader_pnet import Dataset_pnet, ConvertCoordToDistAnglesVec
-from src.dataloader_utils import SeqFlip, ConvertPnetFeaturesTo2D, ConvertDistAnglesToBins, ListToNumpy
+from src.dataloader_pnet import Dataset_pnet
+from src.dataloader_utils import SeqFlip, ConvertPnetFeaturesTo2D, ConvertDistAnglesToBins, ListToNumpy, \
+    ConvertCoordToDistAnglesVec
 
 
 def select_dataset(path_train,path_test,seq_len=300):

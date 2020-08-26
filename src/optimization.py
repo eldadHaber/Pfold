@@ -28,8 +28,8 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     t0 = time.time()
     t1 = time.time()
     loss_train = 0
+    losses_val = [0, 0, 0, 0]
     while True:
-        losses_val = [0, 0, 0, 0]
         for i,(seq, target, mask) in enumerate(dataloader_train):
             seq = seq.to(device)
             target = move_tuple_to(target, device)
@@ -52,10 +52,12 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                             ite + 1,int(max_iter), loss_train, losses_val[0], losses_val[1], losses_val[2], losses_val[3], loss_v, t2-t1, t3 - t2, t3 - t0))
                     t1 = time.time()
                     loss_train = 0
+                    losses_val = [0, 0, 0, 0]
             if (ite + 1) % checkpoint == 0:
-                filename = "{}{}_checkpoint.tar".format(save, ite + 1)
-                save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
-                LOG.info("Checkpoint saved: {}".format(filename))
+                pass
+                # filename = "{}{}_checkpoint.tar".format(save, ite + 1)
+                # save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
+                # LOG.info("Checkpoint saved: {}".format(filename))
             ite += 1
             if ite >= max_iter:
                 stop_run = True

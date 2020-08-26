@@ -1,20 +1,6 @@
-import os
 import os.path as osp
-import os, sys
-import os.path as osp
-from PIL import Image
-import six
-import string
-
 import lmdb
-import pickle
-import msgpack
-import tqdm
 import pyarrow as pa
-import re
-import numpy as np
-
-import torch
 import torch.utils.data as data
 
 
