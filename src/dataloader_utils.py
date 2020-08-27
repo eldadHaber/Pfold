@@ -112,7 +112,8 @@ class SeqFlip(object):
             new_args = ()
             for arg in args:
                 if isinstance(arg,list):
-                    new_args += (arg.reverse(),)
+                    arg.reverse()
+                    new_args += (arg,)
                 elif isinstance(arg,np.ndarray):
                     if arg.ndim == 1:
                         new_args += (np.flip(arg, axis=0),)
@@ -137,8 +138,7 @@ class ListToNumpy(object):
             args = args[0]
         args_array = ()
         for arg in args:
-            if type(arg[
-                        0]) == int:  # Note that this will only work for this particular list system, for deeper lists this will need to be looped.
+            if type(arg[0]) == int:  # Note that this will only work for this particular list system, for deeper lists this will need to be looped.
                 dtype = np.int
             elif type(arg[0]) == bool:
                 dtype = np.bool
@@ -186,7 +186,8 @@ class ConvertCoordToDistAnglesVec(object):
         V2y = V2y/V2n
         V2z = V2z/V2n
         # go for it
-        PHI = M*(V1x * V2x + V1y * V2y + V1z * V2z)
+        # PHI is the angle between v1 and -v2 the way the two vectors are defined.
+        PHI = M*(V1x * -V2x + V1y * -V2y + V1z * -V2z)
         PHI = np.degrees(np.arccos(PHI))
         indnan = np.isnan(PHI)
         PHI[indnan] = 0.0
@@ -209,7 +210,7 @@ class ConvertCoordToDistAnglesVec(object):
         V3[:,:,1] = ((rCb[:,1])[None,:] - (rCa[:,1])[None,:]).repeat(nat,axis=0)
         V3[:,:,2] = ((rCb[:,2])[None,:] - (rCa[:,2])[None,:]).repeat(nat,axis=0)
 
-        OMEGA     = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
+        OMEGA,OMEGA_DOT,OMEGA_DET = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
         indnan = np.isnan(OMEGA)
         OMEGA[indnan] = 0.0
 
@@ -230,9 +231,37 @@ class ConvertCoordToDistAnglesVec(object):
         V3[:,:,1] = rCb[:,1][:,None] - rCb[:,1][:,None].transpose()
         V3[:,:,2] = rCb[:,2][:,None] - rCb[:,2][:,None].transpose()
 
-        THETA = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
+        THETA, THETA_DOT, THETA_DET = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
         indnan = np.isnan(THETA)
         THETA[indnan] = 0.0
+        import matplotlib.pyplot as plt
+        plt.clf()
+        plt.subplot(1,3,1)
+        plt.imshow(OMEGA)
+        plt.colorbar()
+        plt.subplot(1,3,2)
+        plt.imshow(OMEGA_DOT)
+        plt.colorbar()
+        plt.subplot(1,3,3)
+        plt.imshow(OMEGA_DET)
+        plt.colorbar()
+
+
+        plt.clf()
+        plt.imshow(PHI)
+        plt.colorbar()
+
+        plt.clf()
+        plt.subplot(1,3,1)
+        plt.imshow(THETA)
+        plt.colorbar()
+        plt.subplot(1,3,2)
+        plt.imshow(THETA_DOT)
+        plt.colorbar()
+        plt.subplot(1,3,3)
+        plt.imshow(THETA_DET)
+        plt.colorbar()
+
         return D, OMEGA, PHI, THETA
 
 def crossProdMat(V1, V2):
@@ -252,10 +281,10 @@ def ang_between_planes_matrix_360(v1, v2, v3, v4):
     v2n = v2 / (np.sqrt(np.sum(v2 ** 2, axis=2))[:, :, None])
     det = np.sum(v2n * crossProdMat(nA, nB), axis=2)
     dot = np.sum(nA * nB, axis=2)
-    angle = np.degrees(np.arctan2(det, dot)) + 180
+    angle = (np.degrees(np.arctan2(det, dot))+360) % 360
 
     # Psi    = torch.acos(cosPsi)
-    return angle
+    return angle,dot,det
 
 
 
