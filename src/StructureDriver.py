@@ -1,11 +1,5 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
-import torch.nn as nn
-import pnetProcess
-import networks
-import optimizeNet
-import getStructure
+from src import getStructure, pnetProcess
 
 dataFile ='./Data/testing'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)

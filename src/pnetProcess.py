@@ -124,7 +124,7 @@ def parse_pnet(file):
 
     return id, seq, pssm2, entropy, dssp, r1,r2,r3, mask
 
-# Processing the data to maps
+################# Processing the data to maps
 
 def ang2plain(v1,v2,v3,v4):
     nA = torch.cross(v1,v2)
@@ -135,42 +135,6 @@ def ang2plain(v1,v2,v3,v4):
     cosPsi = torch.dot(nA,nB)
     #Psi    = torch.acos(cosPsi)
     return cosPsi
-
-
-def torsionAngle(r1,r2,r3,r4,M=1.0):
-
-    a = getPairwiseDiff(r2,r1)
-    b = getPairwiseDiff(r3,r2)
-    c = getPairwiseDiff(r4,r3)
-
-    #a = a/torch.sqrt(1e-8+dotProdMat(a,a).unsqueeze(0))
-    #b = b/torch.sqrt(1e-8+dotProdMat(b,b).unsqueeze(0))
-    #c = c/torch.sqrt(1e-8+dotProdMat(c,c).unsqueeze(0))
-
-    #bXc = crossProdMat(b, c)
-    #x = dotProdMat(a, c) + dotProdMat(a, b) * dotProdMat(b, c)
-    #y = dotProdMat(a, bXc)
-
-    #PHI = torch.acos(x/torch.sqrt(x**2 + y**2 + 1e-8))
-
-    # (b.((cxb)x(axb)) , |b|(axb).(cxb)
-    cs    = dotProdMat(b,crossProdMat(crossProdMat(c,b),crossProdMat(a,b)))
-    normb = torch.sqrt(dotProdMat(b,b))
-    sn    = normb * dotProdMat(crossProdMat(a,b),crossProdMat(c,b))
-    PHI = torch.atan2(cs,sn)
-    return M*PHI
-
-def getPairwiseDiff(rCa,rCb):
-    # Getting a matrix of rCa_i - rCb_j
-    n = rCa.shape[0]
-    m = rCb.shape[0]
-
-    V = torch.zeros(3,n,m)
-    V[0,:,:] = rCa[:, 0].unsqueeze(1) - rCb[:, 0].unsqueeze(0)
-    V[1,:,:] = rCa[:, 1].unsqueeze(1) - rCb[:, 1].unsqueeze(0)
-    V[2,:,:] = rCa[:, 2].unsqueeze(1) - rCb[:, 2].unsqueeze(0)
-
-    return V
 
 
 def crossProdMat(V1,V2):
@@ -191,8 +155,11 @@ def ang2plainMat(v1,v2,v3,v4):
     nB = nB/(torch.sqrt(torch.sum(nB**2,axis=0)).unsqueeze(0))
 
     cosPsi = torch.sum(nA*nB,axis=0)
-    #Psi    = torch.acos(cosPsi)
-    return cosPsi
+    Psi    = torch.acos(cosPsi)
+    indnan = torch.isnan(Psi)
+    Psi[indnan] = 0
+    return Psi
+
 
 def convertCoordToDistMaps(rN, rCa, rCb, mask=None):
 
@@ -237,19 +204,6 @@ def torsionAngleIJ(r1,r2,r3,r4,M=1.0):
     y = torch.norm(b) * torch.dot(torch.cross(a, b), torch.cross(c, b))
     ang = torch.atan2(x, y)
 
-    #bXc = torch.cross(b,c)
-    #x = torch.dot(a,c) + torch.dot(a,b)*torch.dot(b,c)
-    #y = torch.dot(a, bXc)
-    #ang = 0
-    #if (x != 0) & (y!=0):
-    #    c = x/torch.sqrt(x**2 + y**2)
-    #    ang = torch.sign(y) * torch.acos(c)
-    #elif(x==0):
-    #    if (y>0):
-    #        ang = pi/2
-    #    elif(y<0):
-    #        ang = -pi/2
-
     return ang
 
 
@@ -284,8 +238,6 @@ def convertCoordToAngles(rN, rCa, rCb, mask=1.0):
 
 
     return mask*OMEGA, mask*THETA, mask*PHI
-
-
 
 # Use the codes to process the data and get X and Y
 def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
@@ -359,12 +311,12 @@ def convertCoordToAnglesVec(rN, rCa, rCb, mask=1.0):
     V1[0,:,:] = rCb[:, 0].unsqueeze(1) - rCb[:, 0].unsqueeze(0)
     V1[1,:,:] = rCb[:, 1].unsqueeze(1) - rCb[:, 1].unsqueeze(0)
     V1[2,:,:] = rCb[:, 2].unsqueeze(1) - rCb[:, 2].unsqueeze(0)
-    V2[0,:,:] = rCb[:, 0].unsqueeze(1) - rCa[:, 0].repeat(1,nat)
-    V2[1,:,:] = rCb[:, 1].unsqueeze(1) - rCa[:, 1].repeat(1,nat)
-    V2[2,:,:] = rCb[:, 2].unsqueeze(1) - rCa[:, 2].repeat(1,nat)
-    V3[0,:,:] = rCa[:, 0].unsqueeze(1) - rN[:, 0].repeat(1,nat)
-    V3[1,:,:] = rCa[:, 1].unsqueeze(1) - rN[:, 1].repeat(1,nat)
-    V3[2,:,:] = rCa[:, 2].unsqueeze(1) - rN[:, 2].repeat(1,nat)
+    V2[0,:,:] = rCb[:, 0].unsqueeze(1) - rCa[:, 0].unsqueeze(1).repeat(1,nat)
+    V2[1,:,:] = rCb[:, 1].unsqueeze(1) - rCa[:, 1].unsqueeze(1).repeat(1,nat)
+    V2[2,:,:] = rCb[:, 2].unsqueeze(1) - rCa[:, 2].unsqueeze(1).repeat(1,nat)
+    V3[0,:,:] = rCa[:, 0].unsqueeze(1) - rN[:, 0].unsqueeze(1).repeat(1,nat)
+    V3[1,:,:] = rCa[:, 1].unsqueeze(1) - rN[:, 1].unsqueeze(1).repeat(1,nat)
+    V3[2,:,:] = rCa[:, 2].unsqueeze(1) - rN[:, 2].unsqueeze(1).repeat(1,nat)
     # Normalize them
     V1n = torch.sqrt(torch.sum(V1**2,dim=0) )
     V1 = V1/V1n.unsqueeze(0)
