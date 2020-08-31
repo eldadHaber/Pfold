@@ -1,9 +1,9 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import norm
 import re
 import os
 import torch
+import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 import os.path as osp
 from torch.utils.data import Dataset
@@ -279,7 +279,7 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     Mpad = torch.zeros(1, k, k)
     Mpad[0, :kp, :kp] = M
 
-    return X, Yobs, Mpad
+    return X, Yobs, Mpad, Sh, S
 
 def plotProteinData(Y,j):
 
