@@ -13,6 +13,11 @@ def sub2ind(asize, rows, cols):
     s1 = asize[1]
     return rows*s1 + cols
 
+def asignLinearIndex(A,I,V):
+    n = A.shape
+    A.view(-1)[I] = V
+    return A
+
 def createQuadTreeFromImage(A, tol):
 
     m1 = A.shape[0]

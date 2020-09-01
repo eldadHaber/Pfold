@@ -8,6 +8,9 @@ import math
 def conv2(X, Kernel):
     return F.conv2d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
 
+def conv1(X, Kernel):
+    return F.conv1d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
+
 def conv2T(X, Kernel):
     return F.conv_transpose2d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
 
@@ -213,7 +216,7 @@ class PositionalEncoding(nn.Module):
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
+    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5, ntokenOut=-1):
         super(TransformerModel, self).__init__()
         from torch.nn import TransformerEncoder, TransformerEncoderLayer
         self.model_type = 'Transformer'
@@ -221,9 +224,11 @@ class TransformerModel(nn.Module):
         self.pos_encoder = PositionalEncoding(ninp, dropout)
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = nn.Linear(ntoken, ninp)
+        self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
         self.ninp = ninp
-        self.decoder = nn.Linear(ninp, ntoken)
+        if ntokenOut < 0:
+            ntokenOut = ntoken
+        self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
 
         self.init_weights()
 
@@ -243,30 +248,37 @@ class TransformerModel(nn.Module):
             device = src.device
             mask = self._generate_square_subsequent_mask(len(src)).to(device)
             self.src_mask = mask
-
-        src = self.encoder(src) * math.sqrt(self.ninp)
-        src = self.pos_encoder(src)
+        #src = self.encoder(src) * math.sqrt(self.ninp)
+        src = self.encoder(src[0,:,:].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0) * math.sqrt(self.ninp)
+        #src = self.pos_encoder(src)
         output = self.transformer_encoder(src, self.src_mask)
-        output = self.decoder(output)
+        #output = self.decoder(output)
+        output = self.decoder(output[0, :, :].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0)
         return output
 
 
 def tr2Dist(Y):
 
     k = Y.shape[2]
+    #Z = Y[0,:,:]
+    #D = torch.sum(Z ** 2, dim=1).unsqueeze(0) + torch.sum(Z ** 2, dim=1).unsqueeze(1) - 2 * Z @ Z.t()
+    #D = D/Z.shape[1]
     D = 0.0
     for i in range(k):
         Z = Y[:,:,i]
         Z = Z - torch.mean(Z,dim=1,keepdim=True)
-        #Z = Z - torch.mean(Z)
-
-        #D += torch.exp(-Z@Z.t())
         D = D + torch.sum(Z**2,dim=1).unsqueeze(0) + torch.sum(Z**2,dim=1).unsqueeze(1) - 2*Z@Z.t()
     D = D/k
-    #D = torch.sum(Y,dim=2)
-    #D = 0.5*(D + D.t())
     return D
 
+def tr2DistSmall(Y):
+
+    k = Y.shape[2]
+    Z = Y[0,:,:]
+    Z = Z - torch.mean(Z, dim=0, keepdim=True)
+    D = torch.sum(Z**2, dim=1).unsqueeze(0) + torch.sum(Z**2, dim=1).unsqueeze(1) - 2*Z@Z.t()
+    D = 3*D/k
+    return torch.sqrt(torch.relu(D))
 
 ##### Hamiltonian Networks
 
