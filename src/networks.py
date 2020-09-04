@@ -196,39 +196,24 @@ def getFaceToCellAv2D(Ix, Iy):
 
 ##### Transformers =====
 
-class PositionalEncoding(nn.Module):
-
-    def __init__(self, d_model, dropout=0.1, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return self.dropout(x)
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5, ntokenOut=-1):
+    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5, ntokenOut=-1, stencilsize=7):
         super(TransformerModel, self).__init__()
         from torch.nn import TransformerEncoder, TransformerEncoderLayer
         self.model_type = 'Transformer'
         self.src_mask = None
-        self.pos_encoder = PositionalEncoding(ninp, dropout)
+        #self.pos_encoder = PositionalEncoding(ninp, dropout)
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
+        # self.encoder = nn.Linear(ntoken, ninp)
+        self.encoder = nn.Conv1d(ntoken, ninp, stencilsize, padding=stencilsize//2)
         self.ninp = ninp
         if ntokenOut < 0:
             ntokenOut = ntoken
-        self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
+        # self.decoder = nn.Linear(ninp, ntokenOut)
+        self.decoder = nn.Conv1d(ninp, ntokenOut, stencilsize, padding=stencilsize//2)
 
         self.init_weights()
 
@@ -248,11 +233,8 @@ class TransformerModel(nn.Module):
             device = src.device
             mask = self._generate_square_subsequent_mask(len(src)).to(device)
             self.src_mask = mask
-        #src = self.encoder(src) * math.sqrt(self.ninp)
-        src = self.encoder(src[0,:,:].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0) * math.sqrt(self.ninp)
-        #src = self.pos_encoder(src)
+        src = self.encoder(src[0,:,:].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0) #* math.sqrt(self.ninp)
         output = self.transformer_encoder(src, self.src_mask)
-        #output = self.decoder(output)
         output = self.decoder(output[0, :, :].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0)
         return output
 
@@ -260,9 +242,6 @@ class TransformerModel(nn.Module):
 def tr2Dist(Y):
 
     k = Y.shape[2]
-    #Z = Y[0,:,:]
-    #D = torch.sum(Z ** 2, dim=1).unsqueeze(0) + torch.sum(Z ** 2, dim=1).unsqueeze(1) - 2 * Z @ Z.t()
-    #D = D/Z.shape[1]
     D = 0.0
     for i in range(k):
         Z = Y[:,:,i]
