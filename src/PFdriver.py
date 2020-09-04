@@ -3,7 +3,7 @@ import torch
 from src import networks, optimizeNet, pnetProcess
 import matplotlib.pyplot as plt
 
-dataFile ='./../Data/testing'
+dataFile ='./../data/testing'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)
 
 idx     = np.arange(0,1)

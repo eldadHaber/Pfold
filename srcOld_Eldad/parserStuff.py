@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser(description='Distogram Predictor')
 parser.add_argument('--seed', default=123558, type=int, metavar='N', help='seed number')
 parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
 parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
-# Data
+# data
 parser.add_argument('--dataset-train', default='./data/pnet/train.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 # parser.add_argument('--dataset-test', default='./data/cameo.csv', type=str, metavar='N', help='Name of dataset to run, currently implemented: "bcell","synthetic"')
 parser.add_argument('--nsamples', default=10000, type=int, metavar='N', help='Number of datasamples, only used with synthetic now')
