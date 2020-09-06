@@ -3,7 +3,7 @@
 
 def convertCoordToDistAngles(rN, rCa, rCb, mask=None):
     '''
-    Data should be coordinate data in pnet format, meaning that each amino acid is characterized
+    data should be coordinate data in pnet format, meaning that each amino acid is characterized
     by a 3x3 matrix, which are the coordinates of r1,r2,r3=N,Calpha,Cbeta.
     This lite version, only computes the angles in along the sequence
     (upper one-off diagonal of the angle matrices of the full version)

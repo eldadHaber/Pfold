@@ -5,10 +5,6 @@ class ResNet(nn.Module):
     def __init__(self, nlayers,nf_in=526):
         super(ResNet, self).__init__()
         nf = 64
-        nbins_theta = 25
-        nbins_phi = 13
-        nbins_d = 37
-        nbins_omega = 25
         self.conv_init = nn.Conv2d(nf_in, nf, kernel_size=1)
         blocks = []
         dilations = [1,2,4,8,16]
@@ -18,23 +14,27 @@ class ResNet(nn.Module):
             blocks.append(block)
         self.blocks = nn.Sequential(*blocks)
         self.activation = nn.ELU()
-        self.conv_theta = nn.Conv2d(nf, nbins_theta, kernel_size=3, padding=1)
-        self.conv_phi = nn.Conv2d(nf, nbins_phi, kernel_size=3, padding=1)
-        self.conv_d = nn.Conv2d(nf, nbins_d, kernel_size=3, padding=1)
-        self.conv_omega = nn.Conv2d(nf, nbins_omega, kernel_size=3, padding=1)
-        self.softmax = nn.Softmax(dim=1)
+        # self.dNN = nn.Conv2d(nf, 1, kernel_size=3, padding=1)
+        # self.dCaCa = nn.Conv2d(nf, 1, kernel_size=3, padding=1)
+        self.dCbCb = nn.Conv2d(nf, 1, kernel_size=3, padding=1)
+        # self.dNCa = nn.Conv2d(nf, 1, kernel_size=3, padding=1)
+        # self.dNCb = nn.Conv2d(nf, 1, kernel_size=3, padding=1)
+        # self.dCaCb = nn.Conv2d(nf, 1, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = self.conv_init(x)
         for block in self.blocks:
             x = block(x)
         x = self.activation(x)
-        theta = self.conv_theta(x)
-        phi = self.conv_phi(x)
-        y = x + torch.transpose(x, -1, -2)
-        d = self.conv_d(y)
-        omega = self.conv_omega(y)
-        return d, omega, phi, theta
+        # dNCa = self.dNCa(x)
+        # dNCb = self.dNCb(x)
+        # dCaCb = self.dCaCb(x)
+        y = 0.5 * (x + torch.transpose(x, -1, -2))
+        # dNN = self.dNN(y)
+        # dCaCa = self.dCaCa(y)
+        dCbCb = self.dCbCb(y)
+        return dCbCb
+        # return dNN, dCaCa, dCbCb, dNCa, dNCb, dCaCb
 
 
 class ResidualBlock(nn.Module):

@@ -3,8 +3,10 @@ import lmdb
 import pyarrow as pa
 import re
 import time
+import numpy as np
 
 from src.dataloader_utils import ListToNumpy, AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, ConvertCoordToDistAnglesVec
+from srcOld.dataloader_utils import ConvertCoordToDists
 
 
 def raw_reader(path):
@@ -77,7 +79,7 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_pnet_into_lmdb(pnet_file, lmdb_file,max_seq_len=300,num_evo_entries=20,db_size=1e10,write_freq=5000,report_freq=5000):
+def read_pnet_into_lmdb(pnet_file, lmdb_file,max_seq_len=300,min_seq_len=80,num_evo_entries=20,db_size=1e10,write_freq=5000,report_freq=5000):
     """ Read all protein records from pnet file. """
 
     isdir = os.path.isdir(lmdb_file)
@@ -88,7 +90,7 @@ def read_pnet_into_lmdb(pnet_file, lmdb_file,max_seq_len=300,num_evo_entries=20,
                    meminit=False, map_async=True)
 
     txn = db.begin(write=True)
-
+    problems = 0
     t0 = time.time()
     cnt = 0
     n_excluded = 0
@@ -114,18 +116,25 @@ def read_pnet_into_lmdb(pnet_file, lmdb_file,max_seq_len=300,num_evo_entries=20,
                     coord = tertiary
                 elif case('[MASK]' + '\n'):
                     mask = letter_to_bool(f.readline()[:-1], MASK_DICT)
-                    if max_seq_len < len(seq):
+                    if max_seq_len < len(seq) or min_seq_len > len(seq):
                         n_excluded += 1
                         continue
 
                     features, target, mask = process_data(seq, pssm, entropy, coord, mask)
+
+                    if np.sum(mask[0]) == 0 or np.sum(target[0]) == 0:
+                        problems += 1
+                        n_excluded += 1
+                        continue
+
+
                     txn.put(u'{}'.format(cnt).encode('ascii'), dumps_pyarrow((features, target, mask)))
                     if (cnt+1) % write_freq == 0:
                         print("[%d]" % (cnt+1))
                         txn.commit()
                         txn = db.begin(write=True)
                     if (cnt+1) % report_freq == 0:
-                        print("loading sample: {:}, excluded: {:}, Time: {:2.2f}".format(cnt+1,n_excluded, time.time() - t0))
+                        print("loading sample: {:}, excluded: {:}, problems: {:} Time: {:2.2f}".format(cnt+1,n_excluded, problems, time.time() - t0))
                     cnt += 1
                 elif case(''):
                     # finish iterating through dataset
@@ -138,7 +147,9 @@ def read_pnet_into_lmdb(pnet_file, lmdb_file,max_seq_len=300,num_evo_entries=20,
                     print("Flushing database ...")
                     db.sync()
                     db.close()
-
+                    print("Done: {:}, excluded: {:}, problems: {:} Time: {:2.2f}".format(cnt + 1, n_excluded,
+                                                                                                   problems,
+                                                                                                   time.time() - t0))
                     return
 
 def process_data(seq,pssm,entropy,coord,mask):
@@ -147,14 +158,15 @@ def process_data(seq,pssm,entropy,coord,mask):
     r2 = separate_coords(coord, 1)
     r3 = separate_coords(coord, 2)
     ltn = ListToNumpy()
-    convert = ConvertCoordToDistAnglesVec()
+    convert = ConvertCoordToDists()
     seq, pssm, entropy, mask, r1, r2, r3 = ltn(seq, pssm, entropy, mask, r1, r2, r3)
 
-    dist, omega, phi, theta = convert(r1, r2, r3, mask)
+    dist = convert(r1, r2, r3, mask)
 
-    target = (dist, omega, phi, theta)
+    target = (dist,)
     features = (seq, pssm, entropy)
-    return features, target, mask
+
+    return features, target, (mask,)
 
 
 
@@ -167,13 +179,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # parser.add_argument("-f", "--folder", type=str, default='./../data/training_100.pnet')
+    # parser.add_argument("-f", "--folder", type=str, default='./../data/training_30.pnet')
     # parser.add_argument('-s', '--split', type=str, default="val")
     # parser.add_argument('--out', type=str, default="e:/test_lmdb")
     parser.add_argument("-f", "--folder", type=str, default='./../data/testing.pnet')
-    parser.add_argument('-s', '--split', type=str, default="val")
     parser.add_argument('--out', type=str, default="e:/testing")
     parser.add_argument('-p', '--procs', type=int, default=0)
-    seq_len = 100
+    max_seq_len = 320
+    min_seq_len = 80
     args = parser.parse_args()
-    lmdb_name = "{:}_{:}.lmdb".format(args.out,seq_len)
-    read_pnet_into_lmdb(args.folder, lmdb_name, max_seq_len=seq_len, db_size=1e9, report_freq=1000, write_freq=5000)
+    lmdb_name = "{:}_{:}_{:}.lmdb".format(args.out,min_seq_len,max_seq_len)
+    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=1e8, report_freq=1000, write_freq=5000)
