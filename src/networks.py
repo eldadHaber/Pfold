@@ -196,24 +196,57 @@ def getFaceToCellAv2D(Ix, Iy):
 
 ##### Transformers =====
 
+class CNN(nn.Module):
+
+    def __init__(self, nIn, nhid1, nhid2, nOut, stencilsize):
+        super(CNN, self).__init__()
+
+        self.K1 = nn.Conv1d(nIn,   nhid1, stencilsize, padding=stencilsize // 2)
+        self.K2 = nn.Conv1d(nhid1, nhid2, stencilsize, padding=stencilsize // 2)
+        self.K3 = nn.Conv1d(nhid2, nhid1, stencilsize, padding=stencilsize // 2)
+        self.K4 = nn.Conv1d(nhid1, nhid2, stencilsize, padding=stencilsize // 2)
+        self.K5 = nn.Conv1d(nhid2, nhid1, stencilsize, padding=stencilsize // 2)
+        self.K6 = nn.Conv1d(nhid1, nOut,  stencilsize, padding=stencilsize // 2)
+        self.init_weights()
+
+    def init_weights(self):
+        initrange  = 0.1
+        initrangeR = 0.001
+
+        nn.init.uniform_(self.K1.weight, -initrange, initrange)
+        nn.init.uniform_(self.K2.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K3.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K4.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K5.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K6.weight, -initrange, initrange)
+
+    def forward(self, src):
+        z1 = torch.relu(self.K1(src))
+        z2 = z1 + self.K3(torch.relu(self.K2(z1)))
+        z3 = z2 + self.K5(torch.relu(self.K4(z1)))
+        z3 = self.K6(z2)
+        return z3
 
 class TransformerModel(nn.Module):
+    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
-    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5, ntokenOut=-1, stencilsize=7):
+    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout, ntokenOut, stencilsize):
         super(TransformerModel, self).__init__()
         from torch.nn import TransformerEncoder, TransformerEncoderLayer
+
         self.model_type = 'Transformer'
         self.src_mask = None
-        #self.pos_encoder = PositionalEncoding(ninp, dropout)
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        # self.encoder = nn.Linear(ntoken, ninp)
-        self.encoder = nn.Conv1d(ntoken, ninp, stencilsize, padding=stencilsize//2)
+        ## Encoder
+        #self.encoder = nn.Linear(ntoken, ninp)
+        #self.encoder = nn.Conv1d(ntoken, ninp, stencilsize, padding=stencilsize // 2)
+        self.encoder = CNN(ntoken, 2*ntoken, 3*ntoken, ninp, stencilsize)
+
         self.ninp = ninp
-        if ntokenOut < 0:
-            ntokenOut = ntoken
-        # self.decoder = nn.Linear(ninp, ntokenOut)
-        self.decoder = nn.Conv1d(ninp, ntokenOut, stencilsize, padding=stencilsize//2)
+        #self.decoder = nn.Linear(ninp, ntoken)
+        #self.decoder = nn.Conv1d(ninp, ntokenOut, stencilsize, padding=stencilsize // 2)
+        self.decoder = CNN(ninp, 2*ninp, 3*ninp, ntokenOut, stencilsize)
 
         self.init_weights()
 
@@ -222,22 +255,39 @@ class TransformerModel(nn.Module):
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
+    def reshapeF(self,src):
+        return src.squeeze(1).t().unsqueeze(0)
+    def reshapeB(self,src):
+        return src.squeeze(0).t().unsqueeze(1)
+
     def init_weights(self):
         initrange = 0.1
-        self.encoder.weight.data.uniform_(-initrange, initrange)
-        self.decoder.bias.data.zero_()
-        self.decoder.weight.data.uniform_(-initrange, initrange)
+        #nn.init.uniform_(self.encoder.weight, -initrange, initrange)
+        #nn.init.zeros_(self.decoder.weight)
+        #nn.init.uniform_(self.decoder.weight, -initrange, initrange)
 
-    def forward(self, src):
-        if self.src_mask is None or self.src_mask.size(0) != len(src):
+    def forward(self, src, has_mask=True):
+        if has_mask:
             device = src.device
-            mask = self._generate_square_subsequent_mask(len(src)).to(device)
-            self.src_mask = mask
-        src = self.encoder(src[0,:,:].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0) #* math.sqrt(self.ninp)
+            if self.src_mask is None or self.src_mask.size(0) != len(src):
+                mask = self._generate_square_subsequent_mask(len(src)).to(device)
+                self.src_mask = mask
+        else:
+            self.src_mask = None
+
+        src = self.reshapeF(src)
+        src = self.encoder(src)
+        src = self.reshapeB(src)
+
         output = self.transformer_encoder(src, self.src_mask)
-        output = self.decoder(output[0, :, :].t().unsqueeze(0)).squeeze(0).t().unsqueeze(0)
+        output = output - torch.mean(output, dim=0).unsqueeze(0)
+
+        output = self.reshapeF(output)
+        output = self.decoder(output)
+        output = self.reshapeB(output)
         return output
 
+######
 
 def tr2Dist(Y):
 
