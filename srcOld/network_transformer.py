@@ -41,28 +41,24 @@ class TransformerModel(nn.Module):
 
         self.init_weights()
 
-    def _generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
-
     def init_weights(self):
         initrange = 0.1
         self.encoder.weight.data.uniform_(-initrange, initrange)
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, src):
-        if self.src_mask is None or self.src_mask.size(0) != len(src):
-            device = src.device
-            mask = self._generate_square_subsequent_mask(len(src)).to(device)
-            self.src_mask = mask
+    def forward(self, src, mask):
+        # if self.src_mask is None or self.src_mask.size(0) != len(src):
+        #     device = src.device
+        #     maske = self._generate_square_subsequent_mask(len(src)).to(device)
+        #     self.src_mask = maske
         #src = self.encoder(src) * math.sqrt(self.ninp)
-        src = self.encoder(src) * math.sqrt(self.ninp)
+        src = self.encoder(src) * math.sqrt(self.ninp) * mask[:,None,:]
+
         #src = self.pos_encoder(src)
-        output = self.transformer_encoder(src.squeeze(0).t().unsqueeze(0), self.src_mask)
+        output = self.transformer_encoder(src.permute(2,0,1), src_key_padding_mask=(mask==0))
         #output = self.decoder(output)
-        output = self.decoder(output.squeeze(0).t().unsqueeze(0))
+        output = self.decoder(output.permute(1,2,0)) * mask[:,None,:]
 
         D = tr2DistSmall(output)
 

@@ -5,13 +5,13 @@ import numpy as np
 
 from srcOld.utils import move_tuple_to
 from srcOld.visualization import compare_distogram
-from torch_lr_finder import LRFinder
+# from torch_lr_finder import LRFinder
 
 matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, batch_size=1):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -40,23 +40,19 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
 
 
     while True:
-        for i,(seq, target) in enumerate(dataloader_train):
+        for i,(seq, target,mask) in enumerate(dataloader_train):
             seq = seq.to(device, non_blocking=True)
-            target = move_tuple_to(target, device)
+            mask = mask.to(device, non_blocking=True)
+            target = target.to(device, non_blocking=True)
             optimizer.zero_grad()
-            outputs = net(seq)
+            outputs = net(seq,mask)
             loss += loss_fnc(outputs, target)
 
-            if batch < batch_size:
-                batch += 1
-                continue
-            else:
-                loss.backward()
-                optimizer.step()
-                loss_train += loss.cpu().detach()
-                scheduler.step()
-                loss = 0
-                batch = 1
+            loss.backward()
+            optimizer.step()
+            loss_train += loss.cpu().detach()
+            scheduler.step()
+            loss = 0
 
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:

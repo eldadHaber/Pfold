@@ -41,7 +41,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.seq_len,c.feature_type)
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.seq_len,c.feature_type,batch_size=c.batch_size)
     c.LOG.info('Dataset loaded, which has {} samples.'.format(len(dl_train.dataset)))
 
     # Select loss function for training
@@ -56,8 +56,8 @@ def main(c):
     ntokens = 42  # the size of vocabulary
     emsize = 600 # embedding dimension
     nhid = 768  # the dimension of the feedforward network model in nn.TransformerEncoder
-    nlayers = 20  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-    nhead = 24  # the number of heads in the multiheadattention models
+    nlayers = 5  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    nhead = 10  # the number of heads in the multiheadattention models
     dropout = 0.1  # 0.2 # the dropout value
     ntokenOut = 20  # negative ntokenOut = ntoken
 
@@ -69,4 +69,4 @@ def main(c):
     scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter,scheduler=scheduler,batch_size=c.batch_size)
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter,scheduler=scheduler)

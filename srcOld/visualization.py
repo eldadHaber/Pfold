@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from scipy.special import softmax
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+# from scipy.special import softmax
+# from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def compare_distogram(outputs, targets):
 

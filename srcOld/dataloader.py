@@ -10,7 +10,7 @@ from srcOld.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
-def select_dataset(path_train,path_test,seq_len=300,type='2D'):
+def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1):
     '''
     This is a wrapper routine for various dataloaders.
     Currently supports:
@@ -69,9 +69,74 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D'):
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
-    dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=1, shuffle=True, num_workers=0,
+    dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=PadCollate(),
                                            drop_last=True)
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0,
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, shuffle=False, num_workers=0,
                                            drop_last=False)
 
     return dl_train, dl_test
+
+
+
+def pad_numpy_array_to_tensor(vec, pad, dim):
+    """
+    args:
+        vec - tensor to pad
+        pad - the size to pad to
+        dim - dimension to pad
+
+    return:
+        a new tensor padded to 'pad' in dimension 'dim'
+    """
+    pad_size = list(vec.shape)
+    pad_size[dim] = pad - vec.shape[dim]
+    return torch.cat([torch.from_numpy(vec), torch.zeros(*pad_size)], dim=dim)
+
+
+class PadCollate:
+    """
+    a variant of callate_fn that pads according to the longest sequence in
+    a batch of sequences
+    """
+
+    def __init__(self, dim=1):
+        """
+        args:
+            dim - the dimension to be padded (dimension of time in sequences)
+        """
+        self.dim = dim
+
+    def pad_collate(self, batch):
+        """
+        args:
+            batch - list of (tensor, label)
+
+        return:
+            xs - a tensor of all examples in 'batch' after padding
+            ys - a LongTensor of all labels in batch
+        """
+        # find longest sequence
+        nb = len(batch)
+        nf = batch[0][0].shape[0]
+        max_len = max(map(lambda x: x[0].shape[self.dim], batch))
+
+        features = torch.empty((nb,nf,max_len),dtype=torch.float32)
+        targets = torch.empty((nb,max_len,max_len),dtype=torch.float32)
+        masks = torch.ones((nb,max_len),dtype=torch.int64)
+        for i,batchi in enumerate(batch):
+            feature = batchi[0]
+            pad_size = list(feature.shape)
+            pad_size[self.dim] = max_len - pad_size[self.dim]
+            features[i,:,:] = torch.cat([torch.from_numpy(feature), torch.zeros(*pad_size)],dim=self.dim)
+
+            target = batchi[1]
+            pad_size = list(target.shape)
+            pad_size[0] = max_len - pad_size[0]
+            targets[i,:,:] = torch.cat([torch.cat([torch.from_numpy(target), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
+
+            masks[i,feature.shape[self.dim]:] = 0
+
+        return features, targets, masks
+
+    def __call__(self, batch):
+        return self.pad_collate(batch)
