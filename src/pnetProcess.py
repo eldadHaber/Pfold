@@ -4,11 +4,11 @@ import re
 import os
 import torch
 import matplotlib.pyplot as plt
-import torchvision.transforms as transforms
-import os.path as osp
-from torch.utils.data import Dataset
-from os import listdir
-from os.path import isfile, join
+#import torchvision.transforms as transforms
+#import os.path as osp
+#from torch.utils.data import Dataset
+#from os import listdir
+#from os.path import isfile, join
 #from Bio.PDB import PDBParser
 from src.dataloader_utils import AA_DICT, MASK_DICT, DSSP_DICT, NUM_DIMENSIONS, AA_PAD_VALUE, MASK_PAD_VALUE, \
     DSSP_PAD_VALUE, SeqFlip, PSSM_PAD_VALUE, ENTROPY_PAD_VALUE, COORDS_PAD_VALUE, ListToNumpy
@@ -182,7 +182,7 @@ def convertCoordToDistMaps(rN, rCa, rCb, mask=None):
     D = torch.sum(rM ** 2, dim=1).unsqueeze(1) + torch.sum(rN ** 2, dim=1).unsqueeze(0) - 2 * (rM @ rN.t())
     DmN = torch.sqrt(torch.relu(M*D))
 
-    return Dmm, Dma, Dmb, DmN, M
+    return Dmm, Dma, Dmb, DmN, M, rM
 
 def torsionAngleIJ(r1,r2,r3,r4,M=1.0):
 
@@ -266,7 +266,7 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
 
     # Define model and data Y
     #D, OMEGA, PHI, THETA, M = convertCoordToDistAnglesVec(rN,rCa,rCb,mask=msk)
-    Dmm, Dma, Dmb, DmN, M = convertCoordToDistMaps(rN, rCa, rCb, mask=msk)
+    Dmm, Dma, Dmb, DmN, M, rM = convertCoordToDistMaps(rN, rCa, rCb, mask=msk)
 
     Yobs = torch.zeros(4, k, k)
     Yobs[0, :kp, :kp] = Dmm
@@ -279,7 +279,7 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     Mpad = torch.zeros(1, k, k)
     Mpad[0, :kp, :kp] = M
 
-    return X, Yobs, Mpad, Sh, S
+    return X, Yobs, Mpad, Sh, S, rM
 
 def plotProteinData(Y,j):
 

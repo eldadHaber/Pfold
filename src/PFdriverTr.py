@@ -4,7 +4,6 @@ import torch.nn as nn
 from src import networks, optimizeNet, pnetProcess
 import matplotlib.pyplot as plt
 import torch.optim as optim
-import tr
 
 
 def imagesc(X):
@@ -23,14 +22,15 @@ X = []
 Yobs = []
 M = []
 S = []
+rM = []
 for i in idx:
-    Xi, Yobsi, Mi, Shi, Si = pnetProcess.getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, i, ncourse)
+    Xi, Yobsi, Mi, Shi, Si, rMi = pnetProcess.getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, i, ncourse)
     X.append(Xi)
     ns = Si.shape[0]
     Yobs.append(Yobsi[0,0,:ns,:ns]/5000)
     M.append(Mi[0,:ns,:ns])
     S.append(Si.unsqueeze(0).type(torch.FloatTensor))
-
+    rM.append(rMi.type(torch.FloatTensor))
     print('Image ', i, 'imsize ', Xi.shape)
 
 
@@ -41,7 +41,7 @@ nlayers = 4 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
 nhead   = 10 # the number of heads in the multiheadattention models
 dropout = 1e-6 #0.2 # the dropout value
 ntokenOut = 3 # negative ntokenOut = ntoken
-stencil   = 3
+stencil   = 5
 model   = networks.TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout, ntokenOut, stencil) #.to(device)
 
 #model   = tr.TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout, ntokenOut, stencil) #.to(device)
@@ -49,7 +49,7 @@ model   = networks.TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropo
 total_params = sum(p.numel() for p in model.parameters())
 print('Number of parameters ',total_params)
 
-id = 16
+id = 0
 Z = S[id].squeeze(0).unsqueeze(1) #[0,:,:]
 Yp = model(Z)
 Yp = Yp.squeeze(1).unsqueeze(0)
