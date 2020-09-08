@@ -34,19 +34,16 @@ for i in idx:
     print('Image ', i, 'imsize ', Xi.shape)
 
 
-Arch = torch.tensor([[20,32,1,3],[32,32,5,3],[32,64,1,3],[64,64,5,3],[64,128,1,3]])
-model = networks.vnet1D(Arch,3)
-total_params = sum(p.numel() for p in model.parameters())
-print('Number of parameters ',total_params)
+Arch = torch.tensor([[20,64,1,5],[64,64,5,5],[64,128,1,5],[128,128,15,5],[128,256,1,5]])
+model = networks.vnet1D(Arch,32)
 
-id = 0
-Z = S[id].squeeze(0).t()
-n = 8*(Z.shape[1]//8 + 1)
-Zp = torch.zeros(1,Z.shape[0],n)
-Zp[:,:,:Z.shape[1]] = Z
-Yp = model(Zp)
-
-Dp = networks.tr2DistSmall(Yp.squeeze(0).t().unsqueeze(0))
+#id = 0
+#Z = S[id].squeeze(0).t()
+#n = 8*(Z.shape[1]//8 + 1)
+#Zp = torch.zeros(1,Z.shape[0],n)
+#Zp[:,:,:Z.shape[1]] = Z
+#Yp = model(Zp)
+#Dp = networks.tr2DistSmall(Yp.squeeze(0).t().unsqueeze(0))
 #plt.imshow(Dp.detach())
 #plt.colorbar()
 
@@ -54,11 +51,11 @@ lr = 1e-3 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam([{'params': model.K, 'lr': lr},{'params': model.W, 'lr': lr}], lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 300
+iters = 40
 hist = []
 model.train() # Turn on the train mode
 for itr in range(iters):
-    idx = id #torch.randint(0,40,(1,))
+    idx = torch.randint(0,40,(1,))
     # Arrange the data for a convolution
     Z  = S[idx].transpose(1,2)
     no = Z.shape[2]
@@ -86,4 +83,10 @@ for itr in range(iters):
 
 
 plt.figure(2)
-plt.imshow(output[:no,:no].detach())
+plt.subplot(2,2,1)
+imagesc(Msk*output.detach())
+plt.subplot(2,2,2)
+imagesc(Msk*targets)
+plt.subplot(2,2,3)
+imagesc(torch.abs(Msk*(targets-output.detach())))
+

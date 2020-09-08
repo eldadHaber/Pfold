@@ -333,7 +333,7 @@ class CNN(nn.Module):
         z1 = torch.relu(self.K1(src))
         z2 = z1 + self.K3(torch.relu(self.K2(z1)))
         z3 = z2 + self.K5(torch.relu(self.K4(z1)))
-        z3 = self.K6(z2)
+        z3 = self.K6(z3)
         return z3
 
 class TransformerModel(nn.Module):

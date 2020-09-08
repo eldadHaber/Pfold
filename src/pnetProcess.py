@@ -251,7 +251,7 @@ def interpolateRes(rCa,M):
     y = rCa
     y = y[M != 0, :]
 
-    f = interpolate.interp1d(x.numpy(), y.numpy(), kind='quadratic', axis=0, copy=True, bounds_error=False, fill_value="extrapolate")
+    f = interpolate.interp1d(x.numpy(), y.numpy(), kind='linear', axis=0, copy=True, bounds_error=False, fill_value="extrapolate")
     ys = f(xs)
     rCa = torch.tensor(ys,dtype=torch.float64)
     return rCa

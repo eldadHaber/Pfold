@@ -64,7 +64,7 @@ lr = 1e-4 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 1000
+iters = 200
 hist = []
 ids = [0]
 model.train() # Turn on the train mode
@@ -85,7 +85,7 @@ for itr in range(iters):
     Wt = 1 /(targets + 1e-3)
     misfit = torch.norm(Wt*(Msk*(output - targets)))**2/torch.norm(Wt*(Msk*targets))**2
     tv, tt = networks.TVreg(output.unsqueeze(0).unsqueeze(0))
-    loss = misfit + 0.01*tv
+    loss = misfit + 1e-5*tv
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
     optimizer.step()
