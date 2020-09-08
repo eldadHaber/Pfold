@@ -51,7 +51,7 @@ lr = 1e-3 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam([{'params': model.K, 'lr': lr},{'params': model.W, 'lr': lr}], lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 400
+iters = 200
 hist = []
 model.train() # Turn on the train mode
 for itr in range(iters):
