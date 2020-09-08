@@ -54,12 +54,12 @@ def main(c):
     # layers = [(c.nlayers, None),]
     # net = HyperNet(dl_train.dataset.nfeatures, nclasses=1, layers_per_unit=layers, h=1e-1, verbose=False, clear_grad=True, classifier_type='conv')
     ntokens = 42  # the size of vocabulary
-    emsize = 600 # embedding dimension
-    nhid = 768  # the dimension of the feedforward network model in nn.TransformerEncoder
-    nlayers = 5  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-    nhead = 10  # the number of heads in the multiheadattention models
+    emsize = 512 # embedding dimension
+    nhid = 2048  # the dimension of the feedforward network model in nn.TransformerEncoder
+    nlayers = 15  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    nhead = 8  # the number of heads in the multiheadattention models
     dropout = 0.1  # 0.2 # the dropout value
-    ntokenOut = 20  # negative ntokenOut = ntoken
+    ntokenOut = 3  # negative ntokenOut = ntoken
 
     net = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout, ntokenOut)  # .to(device)
 
@@ -70,3 +70,5 @@ def main(c):
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter,scheduler=scheduler)
+
+    print("Done")

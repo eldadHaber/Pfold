@@ -69,9 +69,10 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1):
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
+    assert len(dataset_train) >= batch_size
     dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=PadCollate(),
                                            drop_last=True)
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, shuffle=False, num_workers=0,
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=PadCollate(),
                                            drop_last=False)
 
     return dl_train, dl_test
@@ -129,7 +130,7 @@ class PadCollate:
             pad_size[self.dim] = max_len - pad_size[self.dim]
             features[i,:,:] = torch.cat([torch.from_numpy(feature), torch.zeros(*pad_size)],dim=self.dim)
 
-            target = batchi[1]
+            target = batchi[1][0]
             pad_size = list(target.shape)
             pad_size[0] = max_len - pad_size[0]
             targets[i,:,:] = torch.cat([torch.cat([torch.from_numpy(target), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)

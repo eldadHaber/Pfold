@@ -61,7 +61,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     t3 = time.time()
                     LOG.info(
                         '{:6d}/{:6d}  Loss(training): {:6.2f}   Loss(test): {:6.2f}  LR: {:.8}  Time(train): {:.2f}  Time(test): {:.2f}  Time(total): {:.2f}  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/(report_iter*batch_size), loss_v/len(dl_test), scheduler.get_last_lr()[0], t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                            ite + 1,int(max_iter), loss_train/report_iter, loss_v/len(dl_test), scheduler.get_last_lr()[0], t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train = 0
             if (ite + 1) % checkpoint == 0:
@@ -94,11 +94,12 @@ def eval_net(net, dl, loss_fnc, device='cpu'):
     net.eval()
     with torch.no_grad():
         loss_v = 0
-        for i,(seq, target) in enumerate(dl):
+        for i,(seq, target, mask) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
-            target = move_tuple_to(target, device)
+            mask = mask.to(device, non_blocking=True)
+            target = target.to(device, non_blocking=True)
 
-            output = net(seq)
+            output = net(seq,mask)
             loss = loss_fnc(output, target)
             loss_v += loss.cpu().detach()
     compare_distogram(output, target)

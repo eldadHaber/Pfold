@@ -28,15 +28,20 @@ class TransformerModel(nn.Module):
     def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.1, ntokenOut=-1):
         super(TransformerModel, self).__init__()
         from torch.nn import TransformerEncoder, TransformerEncoderLayer
+
+
         self.model_type = 'Transformer'
         self.src_mask = None
         self.pos_encoder = PositionalEncoding(ninp, dropout)
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        # self.encoder = nn.Embedding(ntoken, ninp)
         self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
+        # self.encoder = nn.Linear(ntoken, ninp)
         self.ninp = ninp
         if ntokenOut < 0:
             ntokenOut = ntoken
+        # self.decoder = nn.Linear(ninp, ntoken)
         self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
 
         self.init_weights()
@@ -48,18 +53,24 @@ class TransformerModel(nn.Module):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, mask):
-        # if self.src_mask is None or self.src_mask.size(0) != len(src):
-        #     device = src.device
-        #     maske = self._generate_square_subsequent_mask(len(src)).to(device)
-        #     self.src_mask = maske
+        # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
+        src = src.permute(2,0,1)
+
         #src = self.encoder(src) * math.sqrt(self.ninp)
-        src = self.encoder(src) * math.sqrt(self.ninp) * mask[:,None,:]
+        # src = self.encoder(src)
+        src = self.encoder(src.permute(1,2,0))
+        src = src.permute(2,0,1)
+        src = self.pos_encoder(src)
 
         #src = self.pos_encoder(src)
-        output = self.transformer_encoder(src.permute(2,0,1), src_key_padding_mask=(mask==0))
+        output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
         #output = self.decoder(output)
-        output = self.decoder(output.permute(1,2,0)) * mask[:,None,:]
+        # output = self.decoder(output) # * mask[:,None,:]
+        output = self.decoder(output.permute(1,2,0)) # * mask[:,None,:]
+        output = output.permute(2,0,1)
 
+        # Now we change the shape back to normal again.
+        output = output.permute(1,2,0)
         D = tr2DistSmall(output)
 
         return (D,)
