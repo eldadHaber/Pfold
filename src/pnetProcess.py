@@ -240,21 +240,24 @@ def convertCoordToAngles(rN, rCa, rCb, mask=1.0):
 
     return mask*OMEGA, mask*THETA, mask*PHI
 
-def interpolateRes(rCa,M):
+def interpolateRes(Z, M):
 
     M = torch.tensor(M)
-    rCa = torch.tensor(rCa,dtype=torch.float64)
+    Z = torch.tensor(Z, dtype=torch.float64)
     n = M.shape[0]
     x = torch.linspace(0, n - 1, n)
     x = x[M != 0]
     xs = torch.linspace(0, n - 1, n)
-    y = rCa
+    y = Z
     y = y[M != 0, :]
 
     f = interpolate.interp1d(x.numpy(), y.numpy(), kind='linear', axis=0, copy=True, bounds_error=False, fill_value="extrapolate")
     ys = f(xs)
-    rCa = torch.tensor(ys,dtype=torch.float64)
-    return rCa
+    ys  = torch.tensor(ys,dtype=torch.float64)
+    ii  = torch.isnan(ys[:,0])
+    msk = 1 - 1*ii
+    Z = ys #torch.tensor(ys,dtype=torch.float64)
+    return Z, msk
 
 # Use the codes to process the data and get X and Y
 def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
@@ -264,7 +267,6 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     Sh, S, E, rN, rCa, rCb, msk = L2np(seq[idx], pssm2[idx], entropy[idx],
                                        RN[idx], RCa[idx], RCb[idx], mask[idx])
 
-    rCa = interpolateRes(rCa,msk)
     S   = torch.tensor(S)
     Sh  = torch.tensor(Sh)
     E   = torch.tensor(E)
@@ -278,11 +280,11 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     X[-1,:kp,:kp] = E.unsqueeze(1)@E.unsqueeze(1).t()
     X = X.unsqueeze(0)
 
-    rN  = interpolateRes(rN,msk) #torch.tensor(rN)
-    rCa = interpolateRes(rCa,msk) #torch.tensor(rCa)
-    rCb = interpolateRes(rCb,msk) #torch.tensor(rCb)
-    msk = torch.tensor(msk)
-    msk[:] = True
+    rN, m  = interpolateRes(rN,msk) #torch.tensor(rN)
+    rCa, m = interpolateRes(rCa,msk) #torch.tensor(rCa)
+    rCb, m = interpolateRes(rCb,msk) #torch.tensor(rCb)
+    msk = torch.tensor(m)
+    #msk[:] = True
 
     # Define model and data Y
     #D, OMEGA, PHI, THETA, M = convertCoordToDistAnglesVec(rN,rCa,rCb,mask=msk)
