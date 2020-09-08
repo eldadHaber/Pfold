@@ -224,7 +224,7 @@ class ConvertCoordToDists(object):
         # dCaCb = V1[:,:,0]**2+V1[:,:,1]**2+V1[:,:,2]**2
         # dCaCb = np.sqrt(np.maximum(M*dCaCb,0))
 
-        return dCbCb
+        return (dCbCb,)
 
         # return dNN, dCaCa, dCbCb, dNCa, dNCb, dCaCb
 

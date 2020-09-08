@@ -51,7 +51,8 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             loss.backward()
             optimizer.step()
             loss_train += loss.cpu().detach()
-            scheduler.step()
+            if scheduler is not None:
+                scheduler.step()
             loss = 0
 
             if (ite + 1) % report_iter == 0:
@@ -59,9 +60,13 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     t2 = time.time()
                     loss_v = eval_net(net, dl_test, loss_fnc, device=device)
                     t3 = time.time()
+                    if scheduler is None:
+                        lr = optimizer.param_groups[0]['lr']
+                    else:
+                        lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.2f}   Loss(test): {:6.2f}  LR: {:.8}  Time(train): {:.2f}  Time(test): {:.2f}  Time(total): {:.2f}  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter, loss_v/len(dl_test), scheduler.get_last_lr()[0], t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{:6d}/{:6d}  Loss(training): {:6.4f}%   Loss(test): {:6.4f}%  LR: {:.8}  Time(train): {:.2f}  Time(test): {:.2f}  Time(total): {:.2f}  ETA: {:.2f}h'.format(
+                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v/len(dl_test)*100, lr, t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train = 0
             if (ite + 1) % checkpoint == 0:

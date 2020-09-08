@@ -25,7 +25,7 @@ class PositionalEncoding(nn.Module):
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.1, ntokenOut=-1):
+    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.1, ntokenOut=-1, stencilsize=7):
         super(TransformerModel, self).__init__()
         from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
@@ -36,21 +36,23 @@ class TransformerModel(nn.Module):
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         # self.encoder = nn.Embedding(ntoken, ninp)
-        self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
+        self.encoder = CNN(ntoken, 2*ntoken, 3*ntoken, ninp, stencilsize)
+        # self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
         # self.encoder = nn.Linear(ntoken, ninp)
         self.ninp = ninp
         if ntokenOut < 0:
             ntokenOut = ntoken
         # self.decoder = nn.Linear(ninp, ntoken)
-        self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
+        self.decoder = CNN(ninp, 2*ninp, 3*ninp, ntokenOut, stencilsize)
+        # self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
 
         self.init_weights()
 
     def init_weights(self):
         initrange = 0.1
-        self.encoder.weight.data.uniform_(-initrange, initrange)
-        self.decoder.bias.data.zero_()
-        self.decoder.weight.data.uniform_(-initrange, initrange)
+        # self.encoder.weight.data.uniform_(-initrange, initrange)
+        # self.decoder.bias.data.zero_()
+        # self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, mask):
         # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
@@ -74,6 +76,39 @@ class TransformerModel(nn.Module):
         D = tr2DistSmall(output)
 
         return (D,)
+
+
+
+class CNN(nn.Module):
+
+    def __init__(self, nIn, nhid1, nhid2, nOut, stencilsize):
+        super(CNN, self).__init__()
+
+        self.K1 = nn.Conv1d(nIn,   nhid1, stencilsize, padding=stencilsize // 2)
+        self.K2 = nn.Conv1d(nhid1, nhid2, stencilsize, padding=stencilsize // 2)
+        self.K3 = nn.Conv1d(nhid2, nhid1, stencilsize, padding=stencilsize // 2)
+        self.K4 = nn.Conv1d(nhid1, nhid2, stencilsize, padding=stencilsize // 2)
+        self.K5 = nn.Conv1d(nhid2, nhid1, stencilsize, padding=stencilsize // 2)
+        self.K6 = nn.Conv1d(nhid1, nOut,  stencilsize, padding=stencilsize // 2)
+        self.init_weights()
+
+    def init_weights(self):
+        initrange  = 0.1
+        initrangeR = 0.001
+
+        nn.init.uniform_(self.K1.weight, -initrange, initrange)
+        nn.init.uniform_(self.K2.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K3.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K4.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K5.weight, -initrangeR, initrangeR)
+        nn.init.uniform_(self.K6.weight, -initrange, initrange)
+
+    def forward(self, src):
+        z1 = torch.relu(self.K1(src))
+        z2 = z1 + self.K3(torch.relu(self.K2(z1)))
+        z3 = z2 + self.K5(torch.relu(self.K4(z1)))
+        z3 = self.K6(z2)
+        return z3
 
 
 def tr2DistSmall(Y):

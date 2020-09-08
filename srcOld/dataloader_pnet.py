@@ -24,7 +24,7 @@ class Dataset_pnet(Dataset):
         self.transform = transform
         self.transform_target = transform_target
         self.transform_mask = transform_mask
-        self.nfeatures = 84
+        # self.nfeatures = 84
 
     def __getitem__(self, index):
         features = (self.seq[index], self.pssm[index], self.entropy[index])
