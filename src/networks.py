@@ -10,6 +10,8 @@ def conv2(X, Kernel):
 
 def conv1(X, Kernel):
     return F.conv1d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
+def conv1T(X, Kernel):
+    return F.conv_transpose1d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
 
 def conv2T(X, Kernel):
     return F.conv_transpose2d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
@@ -37,10 +39,117 @@ def initVnetParams(A,device='cpu'):
             Ki.to(device)
             K.append(Ki)
 
-    W = nn.Parameter(torch.randn(4, 64, 1, 1))
+    W = nn.Parameter(1e-4*torch.randn(4, 64, 1, 1))
     npar += W.numel()
     print('Number of parameters  ', npar)
     return K, W
+
+class vnet1D(nn.Module):
+    """ VNet """
+    def __init__(self, Arch,nout):
+        super(vnet1D, self).__init__()
+        K, W = self.init_weights(Arch,nout)
+        self.K = K
+        self.W = W
+        self.h = 0.1
+
+    def init_weights(self,A,nout):
+        print('Initializing network  ')
+        nL = A.shape[0]
+        K = []
+        npar = 0
+        cnt = 1
+        for i in range(nL):
+            for j in range(A[i, 2]):
+                if A[i, 1] == A[i, 0]:
+                    stdv = 1e-3
+                else:
+                    stdv = 1e-2 * A[i, 0] / A[i, 1]
+
+                Ki = torch.zeros(A[i, 1], A[i, 0], A[i, 3])
+                Ki.data.uniform_(-stdv, stdv)
+                Ki = nn.Parameter(Ki)
+                print('layer number', cnt, 'layer size', Ki.shape[0], Ki.shape[1], Ki.shape[2])
+                cnt += 1
+                npar += np.prod(Ki.shape)
+                #Ki.to(device)
+                K.append(Ki)
+
+        W = nn.Parameter(1e-4*torch.randn(nout, A[0,1], 1))
+        npar += W.numel()
+        print('Number of parameters  ', npar)
+        return K, W
+
+    def forward(self, x):
+        """ Forward propagation through the network """
+
+        # Number of layers
+        nL = len(self.K)
+
+        # Store the output at different scales to add back later
+        xS = []
+
+        # Opening layer
+        z = conv1(x, self.K[0])
+        z = F.instance_norm(z)
+        x = F.relu(z)
+
+        # Step through the layers (down cycle)
+        for i in range(1, nL):
+
+            # First case - Residual blocks
+            # (same number of input and output kernels)
+
+            sK = self.K[i].shape
+
+            if sK[0] == sK[1]:
+                z  = conv1(x, self.K[i])
+                z  = F.instance_norm(z)
+                z  = F.relu(z)
+                z  = conv1T(z, self.K[i])
+                x  = x - self.h*z
+
+            # Change number of channels/resolution
+            else:
+                # Store the features
+                xS.append(x)
+
+                z  = conv1(x, self.K[i])
+                z  = F.instance_norm(z)
+                x  = F.relu(z)
+
+                # Downsample by factor of 2
+                x = F.avg_pool1d(x, 3, stride=2, padding=1)
+
+        # Number of scales being computed (how many downsampling)
+        n_scales = len(xS)
+
+        # Step back through the layers (up cycle)
+        for i in reversed(range(1, nL)):
+
+            # First case - Residual blocks
+            # (same number of input and output kernels)
+            sK = self.K[i].shape
+            if sK[0] == sK[1]:
+                z  = conv1T(x, self.K[i])
+                z  = F.instance_norm(z)
+                z  = F.relu(z)
+                z  = conv1(z, self.K[i])
+                x  = x - self.h*z
+
+            # Change number of channels/resolution
+            else:
+                n_scales -= 1
+                # Upsample by factor of 2
+                x = F.interpolate(x, scale_factor=2)
+
+                z  = conv1T(x, self.K[i])
+                z  = F.instance_norm(z)
+                x  = F.relu(z) + xS[n_scales]
+
+        x = conv1(x, self.W)
+        return x
+
 
 class vnet2D(nn.Module):
     """ VNet """
