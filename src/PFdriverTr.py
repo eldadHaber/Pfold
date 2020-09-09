@@ -37,7 +37,7 @@ for i in idx:
 ntokens = 20 # the size of vocabulary
 emsize  = 250 # embedding dimension
 nhid    = 250 # the dimension of the feedforward network model in nn.TransformerEncoder
-nlayers = 4 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+nlayers = 8 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
 nhead   = 10 # the number of heads in the multiheadattention models
 dropout = 1e-6 #0.2 # the dropout value
 ntokenOut = 3 # negative ntokenOut = ntoken
@@ -55,8 +55,8 @@ Yp = model(Z)
 Yp = Yp.squeeze(1).unsqueeze(0)
 #Dp = torch.relu(torch.sum(Yp**2,2) + torch.sum(Yp**2,2).t() - 2*Yp.squeeze(1)@Yp.squeeze(1).t())
 Dp = networks.tr2DistSmall(Yp)
-plt.imshow(Dp.detach())
-plt.colorbar()
+#plt.imshow(Dp.detach())
+#plt.colorbar()
 
 #error
 
@@ -64,11 +64,12 @@ lr = 1e-4 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 500
+iters = 200
 hist = []
+ids = [0]
 model.train() # Turn on the train mode
 for itr in range(iters):
-    idx = id #torch.randint(0,40,(1,))
+    idx = ids[0] #ids[torch.randint(0,8,(1,))]
     data = S[idx].squeeze(0).unsqueeze(1) #[0,:,:]
     targets = Yobs[idx]
     Msk     = M[idx]
@@ -80,14 +81,19 @@ for itr in range(iters):
     #output = torch.sqrt(torch.relu(torch.sum(output ** 2, 2) + torch.sum(output ** 2, 2).t() - 2 *
     #                   output.squeeze(1) @ output.squeeze(1).t()))
 
-    loss = torch.norm(Msk*(output - targets))**2/torch.norm(Msk*targets)**2
+    #Wt  = 1/torch.sqrt(targets + 0.01)
+    Wt = 1 /(targets + 1e-3)
+    misfit = torch.norm(Wt*(Msk*(output - targets)))**2/torch.norm(Wt*(Msk*targets))**2
+    tv, tt = networks.TVreg(output.unsqueeze(0).unsqueeze(0))
+    loss = misfit + 1e-5*tv
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
     optimizer.step()
 
-    print("% 2d, % 10.3E"% (itr, torch.sqrt(loss).item()))
+    print("% 2d  % 10.3E  % 10.3E"% (itr, torch.sqrt(misfit).item(), tv.item()))
     hist.append(torch.sqrt(loss).item())
 
+idx = 0
 Yp = model(S[idx].squeeze(0).unsqueeze(1))
 Yp = Yp.squeeze(1).unsqueeze(0)
 Dp = networks.tr2DistSmall(Yp)
@@ -100,3 +106,9 @@ plt.colorbar()
 plt.subplot(2,2,3)
 plt.imshow(torch.abs(M[idx]*Dp.detach() - Yobs[idx]))
 plt.colorbar()
+plt.subplot(2,2,4)
+plt.imshow(Dp.detach())
+plt.colorbar()
+
+r = M[idx]*(Dp.detach()-Yobs[idx])
+print('verror  ',torch.norm(r)/torch.norm(M[idx]*Yobs[idx]))
