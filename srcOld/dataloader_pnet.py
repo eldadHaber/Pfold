@@ -103,7 +103,6 @@ def letter_to_bool(string, dict_):
 
 def read_record(file_, num_evo_entries):
     """ Read all protein records from pnet file. """
-    PicoMetersToAng = 0.01
     id = []
     seq = []
     pssm = []
@@ -132,7 +131,7 @@ def read_record(file_, num_evo_entries):
                 dssp.append(letter_to_num(file_.readline()[:-1], DSSP_DICT))
             elif case('[TERTIARY]' + '\n'):
                 tertiary = []
-                for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord)*PicoMetersToAng for coord in file_.readline().split()])
+                for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord) for coord in file_.readline().split()])
                 coord.append(tertiary)
             elif case('[MASK]' + '\n'):
                 mask.append(letter_to_bool(file_.readline()[:-1], MASK_DICT))

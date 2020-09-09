@@ -72,7 +72,7 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1):
     assert len(dataset_train) >= batch_size
     dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=PadCollate(),
                                            drop_last=True)
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=PadCollate(),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=False, num_workers=0, collate_fn=PadCollate(),
                                            drop_last=False)
 
     return dl_train, dl_test
@@ -137,7 +137,7 @@ class PadCollate:
 
             masks[i,feature.shape[self.dim]:] = 0
 
-        return features, targets, masks
+        return features, (targets,), masks
 
     def __call__(self, batch):
         return self.pad_collate(batch)

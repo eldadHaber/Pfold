@@ -13,11 +13,10 @@ def compare_distogram(outputs, targets):
     n = len(targets)
     for i,(output,target,name) in enumerate(zip(outputs,targets,names)):
         if isinstance(output, torch.Tensor):
-            output = torch.squeeze(output).cpu().detach().numpy()
-            if output.ndim == 3:
-                output = np.argmax(output,axis=0)
+            output = torch.squeeze(output[-1,:,:]).cpu().detach().numpy()
+
         if isinstance(target, torch.Tensor):
-            target = torch.squeeze(target).cpu().detach().numpy()
+            target = torch.squeeze(target[-1,:,:]).cpu().detach().numpy()
             mask = target > 0
 
         plt.subplot(n,3, i*2+1)

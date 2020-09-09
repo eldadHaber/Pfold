@@ -42,11 +42,12 @@ def main(c):
 
     # Load Dataset
     dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.seq_len,c.feature_type,batch_size=c.batch_size)
-    c.LOG.info('Dataset loaded, which has {} samples.'.format(len(dl_train.dataset)))
+    c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training
     loss_inner_fnc = MSELoss()
     loss_fnc = LossMultiTargets(loss_inner_fnc)
+    # loss_fnc = MSELoss()
 
     c.LOG.info('Date:{}'.format(datetime.now()))
 
@@ -62,8 +63,8 @@ def main(c):
     # ntokenOut = 3  # negative ntokenOut = ntoken
 
     ntokens = 42  # the size of vocabulary
-    emsize = 1024  # embedding dimension
-    nhid = 2048  # the dimension of the feedforward network model in nn.TransformerEncoder
+    emsize = 512  # embedding dimension
+    nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
     nlayers = 4  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
     nhead = 8  # the number of heads in the multiheadattention models
     dropout = 1e-6  # 0.2 # the dropout value
@@ -75,9 +76,9 @@ def main(c):
     c.LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
     net.to(c.device)
     optimizer = optim.Adam(list(net.parameters()), lr=c.SL_lr)
-    # scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
-    #                                     max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
+    scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
+                                        max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter)
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
 
     print("Done")
