@@ -36,15 +36,15 @@ class TransformerModel(nn.Module):
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         # self.encoder = nn.Embedding(ntoken, ninp)
-        self.encoder = CNN(ntoken, 2*ntoken, 3*ntoken, ninp, stencilsize)
-        # self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
+        # self.encoder = CNN(ntoken, 2*ntoken, 3*ntoken, ninp, stencilsize)
+        self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
         # self.encoder = nn.Linear(ntoken, ninp)
         self.ninp = ninp
         if ntokenOut < 0:
             ntokenOut = ntoken
         # self.decoder = nn.Linear(ninp, ntoken)
-        self.decoder = CNN(ninp, 2*ninp, 3*ninp, ntokenOut, stencilsize)
-        # self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
+        # self.decoder = CNN(ninp, 2*ninp, 3*ninp, ntokenOut, stencilsize)
+        self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
 
         self.init_weights()
 
@@ -59,16 +59,16 @@ class TransformerModel(nn.Module):
         src = src.permute(2,0,1)
 
         #src = self.encoder(src) * math.sqrt(self.ninp)
-        # src = self.encoder(src)
-        src = self.encoder(src.permute(1,2,0))
+        src = self.encoder(src.permute(1,2,0)) * mask[:,None,:]
+        # src = self.encoder(src.permute(1,2,0), mask)
         src = src.permute(2,0,1)
         src = self.pos_encoder(src)
 
         #src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
         #output = self.decoder(output)
-        # output = self.decoder(output) # * mask[:,None,:]
-        output = self.decoder(output.permute(1,2,0)) # * mask[:,None,:]
+        output = self.decoder(output.permute(1,2,0)) * mask[:,None,:]
+        # output = self.decoder(output.permute(1,2,0), mask) # * mask[:,None,:]
         output = output.permute(2,0,1)
 
         # Now we change the shape back to normal again.
@@ -103,12 +103,19 @@ class CNN(nn.Module):
         nn.init.uniform_(self.K5.weight, -initrangeR, initrangeR)
         nn.init.uniform_(self.K6.weight, -initrange, initrange)
 
-    def forward(self, src):
+    def forward(self, src, mask):
         z1 = torch.relu(self.K1(src))
         z2 = z1 + self.K3(torch.relu(self.K2(z1)))
         z3 = z2 + self.K5(torch.relu(self.K4(z1)))
         z3 = self.K6(z3)
         return z3
+
+    # def forward(self, src, mask):
+    #     z1 = torch.relu(self.K1(src)) * mask
+    #     z2 = z1 + self.K3(torch.relu(self.K2(z1)) * mask) * mask
+    #     z3 = z2 + self.K5(torch.relu(self.K4(z1)) * mask) * mask
+    #     z3 = self.K6(z3) * mask
+    #     return z3
 
 
 def tr2DistSmall(Y):

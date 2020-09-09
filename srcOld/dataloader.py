@@ -10,7 +10,7 @@ from srcOld.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
-def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1):
+def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1, network=None):
     '''
     This is a wrapper routine for various dataloaders.
     Currently supports:
@@ -70,9 +70,15 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1):
         raise NotImplementedError("dataset not implemented yet.")
 
     assert len(dataset_train) >= batch_size
-    dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=PadCollate(),
+
+    if network.lower() == 'vnet':
+        pad_modulo = 8
+    else:
+        pad_modulo = 1
+
+    dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=True)
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=False, num_workers=0, collate_fn=PadCollate(),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=False)
 
     return dl_train, dl_test
@@ -100,12 +106,13 @@ class PadCollate:
     a batch of sequences
     """
 
-    def __init__(self, dim=1):
+    def __init__(self, dim=1, pad_modulo=1):
         """
         args:
             dim - the dimension to be padded (dimension of time in sequences)
         """
         self.dim = dim
+        self.pad_mod = pad_modulo
 
     def pad_collate(self, batch):
         """
@@ -120,6 +127,8 @@ class PadCollate:
         nb = len(batch)
         nf = batch[0][0].shape[0]
         max_len = max(map(lambda x: x[0].shape[self.dim], batch))
+        max_len = self.pad_mod * (max_len // self.pad_mod + 1)
+
 
         features = torch.empty((nb,nf,max_len),dtype=torch.float32)
         targets = torch.empty((nb,max_len,max_len),dtype=torch.float32)

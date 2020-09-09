@@ -10,6 +10,8 @@ from src.utils import determine_network_param
 from srcOld import log
 from srcOld.dataloader import select_dataset
 from srcOld.loss import MSELoss, LossMultiTargets
+from srcOld.network import select_network
+from srcOld.network_vnet import vnet1D
 from srcOld.network_transformer import TransformerModel
 from srcOld.optimization import train
 from srcOld.utils import fix_seed
@@ -41,7 +43,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.seq_len,c.feature_type,batch_size=c.batch_size)
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.seq_len,c.feature_type,batch_size=c.batch_size, network=c.network)
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training
@@ -52,26 +54,7 @@ def main(c):
     c.LOG.info('Date:{}'.format(datetime.now()))
 
     # net = ResNet(c.nlayers,dl_train.dataset.nfeatures)
-    # layers = [(c.nlayers, None),]
-    # net = HyperNet(dl_train.dataset.nfeatures, nclasses=1, layers_per_unit=layers, h=1e-1, verbose=False, clear_grad=True, classifier_type='conv')
-    # ntokens = 42  # the size of vocabulary
-    # emsize = 512 # embedding dimension
-    # nhid = 2048  # the dimension of the feedforward network model in nn.TransformerEncoder
-    # nlayers = 15  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-    # nhead = 8  # the number of heads in the multiheadattention models
-    # dropout = 0.1  # 0.2 # the dropout value
-    # ntokenOut = 3  # negative ntokenOut = ntoken
-
-    ntokens = 42  # the size of vocabulary
-    emsize = 512  # embedding dimension
-    nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
-    nlayers = 4  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-    nhead = 8  # the number of heads in the multiheadattention models
-    dropout = 1e-6  # 0.2 # the dropout value
-    ntokenOut = 3  # negative ntokenOut = ntoken
-    stencil = 5
-
-    net = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout, ntokenOut, stencilsize=stencil)  # .to(device)
+    net = select_network(c.network)
 
     c.LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
     net.to(c.device)
