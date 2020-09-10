@@ -13,7 +13,7 @@ def imagesc(X):
 def plot(X):
     plt.plot(X)
 
-dataFile = './../data/testing'
+dataFile = './../data/testing.pnet'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)
 
 idx = np.arange(0, 40)
@@ -106,6 +106,7 @@ plt.colorbar()
 plt.subplot(2,2,3)
 plt.imshow(torch.abs(M[idx]*Dp.detach() - Yobs[idx]))
 plt.colorbar()
+print("Done")
 plt.subplot(2,2,4)
 plt.imshow(Dp.detach())
 plt.colorbar()

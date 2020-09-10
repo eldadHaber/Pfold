@@ -4,7 +4,8 @@ import matplotlib
 import numpy as np
 
 from srcOld.utils import move_tuple_to
-from srcOld.visualization import compare_distogram
+from srcOld.visualization import compare_distogram, plotcoordinates
+
 # from torch_lr_finder import LRFinder
 
 matplotlib.use('Agg')
@@ -39,13 +40,15 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
 
 
     while True:
-        for i,(seq, target,mask) in enumerate(dataloader_train):
+        for i,(seq, target,mask, coords) in enumerate(dataloader_train):
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)
             target = move_tuple_to(target, device, non_blocking=True)
+            coords = coords.to(device, non_blocking=True)
             optimizer.zero_grad()
-            outputs = net(seq,mask)
-            loss += loss_fnc(outputs, target)
+            outputs, coords_pred = net(seq,mask)
+            loss, pred,target_coord = OT(coords_pred, coords)
+            # loss += loss_fnc(outputs, target)
 
             loss.backward()
             optimizer.step()
@@ -57,7 +60,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v = eval_net(net, dl_test, loss_fnc, device=device)
+                    # loss_v = eval_net(net, dl_test, loss_fnc, device=device)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
@@ -65,8 +68,9 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
                         '{:6d}/{:6d}  Loss(training): {:6.4f}%   Loss(test): {:6.4f}%  LR: {:.8}  Time(train): {:.2f}  Time(test): {:.2f}  Time(total): {:.2f}  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v/len(dl_test)*100, lr, t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                            ite + 1,int(max_iter), loss_train/report_iter*100, 0, lr, t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
+                    # plotcoordinates(pred, target_coord)
                     loss_train = 0
             if (ite + 1) % checkpoint == 0:
                 pass
@@ -79,6 +83,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 break
         if stop_run:
             break
+    print(net.decoder.K6.weight[0,40:70,3])
     return net
 
 
@@ -111,3 +116,45 @@ def eval_net(net, dl, loss_fnc, device='cpu'):
     net.train()
     return loss_v
 
+
+
+def OT(r1,r2):
+    '''
+    We try to do optimal transport of a point cloud into a reference point cloud.
+    The transport is done with translation and rotation only.
+    '''
+
+    #r2 gives the mask
+    mask = r2 != 0
+    nb = r1.shape[0]
+
+    r1s = r1[mask].reshape(nb,3,-1)
+    r2s = r2[mask].reshape(nb,3,-1)
+
+    #First we translate the two sets, by setting both their centroids to origin
+    r1centroid = torch.mean(r1s,dim=2)
+    r2centroid = torch.mean(r2s,dim=2)
+
+    r1c = r1s - r1centroid[:,:,None]
+    r2c = r2s - r2centroid[:,:,None]
+
+    H = r1c @ r2c.transpose(1,2)
+
+    #R = torch.matrix_power(H.transpose(1,2) @ H,0.5) @ torch.inverse(H)
+    U, S, V = torch.svd(H)
+
+    d = torch.det(V @ U.transpose(1,2))
+
+    tt = torch.tensor([1, 1, d])
+    tmp = torch.diag_embed(tt).to(device=V.get_device())
+    R = V @ tmp @ U.transpose(1,2)
+
+    r1c_rotated = R @ r1c
+
+    assert torch.norm(r2c) > 0
+    result = torch.norm(r1c_rotated - r2c) ** 2 / torch.norm(r2c) ** 2
+
+    pred = r1c_rotated.squeeze().cpu().detach().numpy()
+    target = r2c.squeeze().cpu().detach().numpy()
+
+    return result, pred,target

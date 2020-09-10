@@ -76,7 +76,7 @@ class TransformerModel(nn.Module):
         output = output.permute(1,2,0)
         D = tr2DistSmall(output)
 
-        return (D,)
+        return (D,), output
 
 
 

@@ -18,8 +18,8 @@ if __name__ == '__main__':
     # parser.add_argument('--dataset-test', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/pnet/train.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/pnet/synthetic.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/testing_small2.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/testing_small2.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/cameo.csv', type=str, metavar='N', help='Name of dataset to run, currently implemented: "bcell","synthetic"')
@@ -31,10 +31,10 @@ if __name__ == '__main__':
     # Learning
 
     parser.add_argument('--nlayers', default=20, type=int, metavar='N', help='Number of residual layers in network')
-    parser.add_argument('--SL-lr', default=1e-2, type=float, metavar='N', help='Learning Rate')
+    parser.add_argument('--SL-lr', default=1e-4, type=float, metavar='N', help='Learning Rate')
     # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--max-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=50, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--epochs', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='./results/checkpoints/790000_checkpoint.tar', type=str, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='', type=str, metavar='N', help='select the neural network to train (resnet)')

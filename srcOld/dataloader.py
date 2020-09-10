@@ -1,6 +1,7 @@
 import os
 import torch
 import torchvision.transforms as transforms
+import numpy as np
 from torch.utils.data import Dataset
 
 from srcOld.dataloader_a3m import Dataset_a3m
@@ -76,6 +77,7 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1, netw
     else:
         pad_modulo = 1
 
+
     dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=True)
     dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
@@ -127,11 +129,12 @@ class PadCollate:
         nb = len(batch)
         nf = batch[0][0].shape[0]
         max_len = max(map(lambda x: x[0].shape[self.dim], batch))
-        max_len = self.pad_mod * (max_len // self.pad_mod + 1)
+        max_len = int(self.pad_mod * np.ceil(max_len / self.pad_mod))
 
 
         features = torch.empty((nb,nf,max_len),dtype=torch.float32)
         targets = torch.empty((nb,max_len,max_len),dtype=torch.float32)
+        coords = torch.empty((nb,max_len,3),dtype=torch.float32)
         masks = torch.ones((nb,max_len),dtype=torch.int64)
         for i,batchi in enumerate(batch):
             feature = batchi[0]
@@ -144,9 +147,14 @@ class PadCollate:
             pad_size[0] = max_len - pad_size[0]
             targets[i,:,:] = torch.cat([torch.cat([torch.from_numpy(target), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
 
-            masks[i,feature.shape[self.dim]:] = 0
+            coord = torch.tensor(batchi[3])
+            pad_size = list(coord.shape)
+            pad_size[0] = max_len - pad_size[0]
+            coords[i,:,:] = torch.cat([coord, torch.zeros(*pad_size)], dim=0)
 
-        return features, (targets,), masks
+            masks[i,feature.shape[self.dim]:] = 0
+        coords = coords.transpose(1,2)
+        return features, (targets,), masks, coords
 
     def __call__(self, batch):
         return self.pad_collate(batch)

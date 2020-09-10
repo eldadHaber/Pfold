@@ -21,6 +21,15 @@ class Dataset_pnet(Dataset):
         self.r2 = r2
         self.r3 = r3
 
+        # R = np.array([[0, 0, 1],[1,0,0],[0,1,0]])
+        # r3n = np.transpose(np.array(r3).squeeze())
+        # rr3 = R @ r3n
+        # # rr3 *= 1.1
+        # rr3t = np.transpose(rr3)
+        # lr3 = rr3t[None,:,:].tolist()
+        #
+        # self.r3 = lr3
+
         self.transform = transform
         self.transform_target = transform_target
         self.transform_mask = transform_mask
@@ -39,7 +48,7 @@ class Dataset_pnet(Dataset):
         if self.transform_mask is not None:
             mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
 
-        return features, target, mask
+        return features, target, mask, self.r3[index]
 
     def __len__(self):
         return len(self.seq)
@@ -110,6 +119,7 @@ def read_record(file_, num_evo_entries):
     dssp = []
     coord = []
     mask = []
+    scaling = 0.001 # converts from pico meters to nanometers
 
     t0 = time.time()
     while True:
@@ -131,7 +141,7 @@ def read_record(file_, num_evo_entries):
                 dssp.append(letter_to_num(file_.readline()[:-1], DSSP_DICT))
             elif case('[TERTIARY]' + '\n'):
                 tertiary = []
-                for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord) for coord in file_.readline().split()])
+                for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord)*scaling for coord in file_.readline().split()])
                 coord.append(tertiary)
             elif case('[MASK]' + '\n'):
                 mask.append(letter_to_bool(file_.readline()[:-1], MASK_DICT))

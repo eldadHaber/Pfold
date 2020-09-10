@@ -41,16 +41,16 @@ def compare_distogram(outputs, targets):
 
     return
 
+def plotcoordinates(pred,target):
+    plt.figure(num=1, figsize=[15, 10])
+    plt.clf()
 
-    #     plt.subplot(len(names), 2, i*2+1)
-    #     plt.imshow(output, vmin=0)
-    #     plt.colorbar()
-    #     tit = name + "(prediction)"
-    #     plt.title(tit)
-    #
-    #     plt.subplot(len(names), 2, i*2+2)
-    #     plt.imshow(target, vmin=0)
-    #     plt.colorbar()
-    #     tit = name + "(target)"
-    #     plt.title(tit)
-    # plt.pause(0.5)
+    axes = plt.axes(projection='3d')
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    axes.set_zlabel("z")
+    line = axes.plot3D(pred[0,:],pred[1,:], pred[2,:], 'green', marker='x')
+    line2 = axes.plot3D(target[0,:],target[1,:], target[2,:], 'red', marker='x')
+    plt.pause(2.5)
+
+    return
