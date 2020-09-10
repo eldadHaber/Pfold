@@ -161,9 +161,8 @@ def process_data(seq,pssm,entropy,coord,mask):
     convert = ConvertCoordToDists()
     seq, pssm, entropy, mask, r1, r2, r3 = ltn(seq, pssm, entropy, mask, r1, r2, r3)
 
-    dist = convert(r1, r2, r3, mask)
+    target = convert(r1, r2, r3, mask)
 
-    target = (dist/1000,)
     features = (seq, pssm, entropy)
 
     return features, target, (mask,)
@@ -179,14 +178,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # parser.add_argument("-f", "--folder", type=str, default='./../data/training_100.pnet')
-    parser.add_argument("-f", "--folder", type=str, default='./../data/training_30.pnet')
+    # parser.add_argument("-f", "--folder", type=str, default='./../data/training_30.pnet')
     # parser.add_argument('-s', '--split', type=str, default="val")
     # parser.add_argument('--out', type=str, default="e:/test_lmdb")
-    # parser.add_argument("-f", "--folder", type=str, default='./../data/testing.pnet')
-    parser.add_argument('--out', type=str, default="e:/training")
+    parser.add_argument("-f", "--folder", type=str, default='./../data/testing.pnet')
+    parser.add_argument('--out', type=str, default="e:/test")
     parser.add_argument('-p', '--procs', type=int, default=0)
     max_seq_len = 320
     min_seq_len = 80
     args = parser.parse_args()
     lmdb_name = "{:}_{:}_{:}.lmdb".format(args.out,min_seq_len,max_seq_len)
-    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=5e9, report_freq=1000, write_freq=5000)
+    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=1e8, report_freq=1000, write_freq=5000)

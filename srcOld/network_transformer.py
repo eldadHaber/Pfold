@@ -57,10 +57,11 @@ class TransformerModel(nn.Module):
     def forward(self, src, mask):
         # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
         src = src.permute(2,0,1)
+        mask_e = mask.unsqueeze(1)
 
         #src = self.encoder(src) * math.sqrt(self.ninp)
         # src = self.encoder(src)
-        src = self.encoder(src.permute(1,2,0))
+        src = self.encoder(src.permute(1,2,0), mask_e)
         src = src.permute(2,0,1)
         src = self.pos_encoder(src)
 
@@ -68,7 +69,7 @@ class TransformerModel(nn.Module):
         output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
         #output = self.decoder(output)
         # output = self.decoder(output) # * mask[:,None,:]
-        output = self.decoder(output.permute(1,2,0)) # * mask[:,None,:]
+        output = self.decoder(output.permute(1,2,0), mask_e) # * mask[:,None,:]
         output = output.permute(2,0,1)
 
         # Now we change the shape back to normal again.
@@ -103,19 +104,19 @@ class CNN(nn.Module):
         nn.init.uniform_(self.K5.weight, -initrangeR, initrangeR)
         nn.init.uniform_(self.K6.weight, -initrange, initrange)
 
-    def forward(self, src):
-        z1 = torch.relu(self.K1(src))
-        z2 = z1 + self.K3(torch.relu(self.K2(z1)))
-        z3 = z2 + self.K5(torch.relu(self.K4(z1)))
-        z3 = self.K6(z2)
+    def forward(self, src, mask):
+        z1 = torch.relu(self.K1(src) * mask)
+        z2 = z1 + self.K3(torch.relu(self.K2(z1)) * mask) * mask
+        z3 = z2 + self.K5(torch.relu(self.K4(z1)) * mask) * mask
+        z3 = self.K6(z2) * mask
         return z3
 
 
 def tr2DistSmall(Y):
 
     k = Y.shape[1]
-    Z = Y[0,:,:]
-    Z = Z - torch.mean(Z, dim=1, keepdim=True)
-    D = torch.sum(Z**2, dim=0).unsqueeze(0) + torch.sum(Z**2, dim=0).unsqueeze(1) - 2*Z.t() @ Z
+    Z = Y - torch.mean(Y, dim=2, keepdim=True)
+    D = torch.sum(Z**2, dim=1).unsqueeze(1) + torch.sum(Z**2, dim=1).unsqueeze(2) - 2*Z.transpose(1,2) @ Z
     D = 3*D/k
     return torch.sqrt(torch.relu(D))
+

@@ -27,14 +27,20 @@ class MSELoss(torch.nn.Module):
         super(MSELoss,self).__init__()
 
     def forward(self, input, target):
-        input = torch.squeeze(input)
-        target = torch.squeeze(target)
         #We only want places where the target is larger than zero (remember this is for distances)
         mask = target > 0
         # result = torch.mean((input[mask] - target[mask])**2)
-        assert torch.norm(target[mask]) > 0
-        result = torch.norm((input[mask] - target[mask])) ** 2 / torch.norm(target[mask]) ** 2
-        return result
+        # result = torch.norm((input[mask] - target[mask])) ** 2 / torch.norm(target[mask]) ** 2
+        nb = target.shape[0]
+        result = 0
+        for i in range(nb):
+            inputi = input[i,:,:]
+            targeti = target[i,:,:]
+            maski = targeti > 0
+            assert torch.norm(targeti[maski]) > 0
+            result += torch.norm((inputi[maski] - targeti[maski])) ** 2 / torch.norm(targeti[maski]) ** 2
+
+        return result/nb
 
 
 

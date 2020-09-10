@@ -30,7 +30,6 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     t1 = time.time()
     loss_train = 0
     loss = 0
-    batch =1
     # lr_finder = LRFinder(net, optimizer, loss_fnc, device=device)
     # lr_finder.range_test(dataloader_train, end_lr=100, num_iter=100)
     # lr_finder.plot()  # to inspect the loss-learning rate graph
@@ -43,7 +42,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
         for i,(seq, target,mask) in enumerate(dataloader_train):
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)
-            target = target.to(device, non_blocking=True)
+            target = move_tuple_to(target, device, non_blocking=True)
             optimizer.zero_grad()
             outputs = net(seq,mask)
             loss += loss_fnc(outputs, target)
@@ -102,7 +101,7 @@ def eval_net(net, dl, loss_fnc, device='cpu'):
         for i,(seq, target, mask) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)
-            target = target.to(device, non_blocking=True)
+            target = move_tuple_to(target, device, non_blocking=True)
 
             output = net(seq,mask)
             loss = loss_fnc(output, target)
