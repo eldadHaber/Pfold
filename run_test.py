@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # Learning
 
     parser.add_argument('--nlayers', default=20, type=int, metavar='N', help='Number of residual layers in network')
-    parser.add_argument('--SL-lr', default=1e-4, type=float, metavar='N', help='Learning Rate')
+    parser.add_argument('--SL-lr', default=1e-2, type=float, metavar='N', help='Learning Rate')
     # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--max-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=50, type=int, metavar='N', help='select the neural network to train (resnet)')
