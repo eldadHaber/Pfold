@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import interpolate
 from numpy.linalg import norm
 import re
 import os
@@ -164,25 +165,25 @@ def ang2plainMat(v1,v2,v3,v4):
 def convertCoordToDistMaps(rN, rCa, rCb, mask=None):
 
     # Central coordinate
-    rM = (rN + rCa + rCb)/3
+    #rM = (rN + rCa + rCb)/3
     M = mask.unsqueeze(1) @ mask.unsqueeze(0)
-    # Get Dmm
-    D = torch.sum(rM**2, dim=1).unsqueeze(1) + torch.sum(rM**2, dim=1).unsqueeze(0) - 2*(rM@rM.t())
-    Dmm = torch.sqrt(torch.relu(M * D))
+    # Get Daa
+    D = torch.sum(rCa**2, dim=1).unsqueeze(1) + torch.sum(rCa**2, dim=1).unsqueeze(0) - 2*(rCa@rCa.t())
+    Daa = torch.sqrt(torch.relu(M * D))
 
-    # Get Dmb
-    D = torch.sum(rM**2, dim=1).unsqueeze(1) + torch.sum(rCb**2, dim=1).unsqueeze(0) - 2*(rM@rCb.t())
-    Dmb = torch.sqrt(torch.relu(M*D))
+    # Get Dab
+    D = torch.sum(rCa**2, dim=1).unsqueeze(1) + torch.sum(rCb**2, dim=1).unsqueeze(0) - 2*(rCa@rCb.t())
+    Dab = torch.sqrt(torch.relu(M*D))
 
-    # Get Dma
-    D = torch.sum(rM**2, dim=1).unsqueeze(1) + torch.sum(rCa**2, dim=1).unsqueeze(0) - 2 * (rM@rCa.t())
-    Dma = torch.sqrt(torch.relu(M*D))
+    # Get DaN
+    D = torch.sum(rCa**2, dim=1).unsqueeze(1) + torch.sum(rN**2, dim=1).unsqueeze(0) - 2 * (rCa@rN.t())
+    DaN = torch.sqrt(torch.relu(M*D))
 
-    # Get DmN
-    D = torch.sum(rM ** 2, dim=1).unsqueeze(1) + torch.sum(rN ** 2, dim=1).unsqueeze(0) - 2 * (rM @ rN.t())
-    DmN = torch.sqrt(torch.relu(M*D))
+    # Get DbN
+    D = torch.sum(rCb ** 2, dim=1).unsqueeze(1) + torch.sum(rN ** 2, dim=1).unsqueeze(0) - 2 * (rCb @ rN.t())
+    DbN = torch.sqrt(torch.relu(M*D))
 
-    return Dmm, Dma, Dmb, DmN, M, rM
+    return Daa, Dab, DaN, DbN, M, rCa
 
 def torsionAngleIJ(r1,r2,r3,r4,M=1.0):
 
@@ -239,6 +240,25 @@ def convertCoordToAngles(rN, rCa, rCb, mask=1.0):
 
     return mask*OMEGA, mask*THETA, mask*PHI
 
+def interpolateRes(Z, M):
+
+    M = torch.tensor(M)
+    Z = torch.tensor(Z, dtype=torch.float64)
+    n = M.shape[0]
+    x = torch.linspace(0, n - 1, n)
+    x = x[M != 0]
+    xs = torch.linspace(0, n - 1, n)
+    y = Z
+    y = y[M != 0, :]
+
+    f = interpolate.interp1d(x.numpy(), y.numpy(), kind='linear', axis=0, copy=True, bounds_error=False, fill_value="extrapolate")
+    ys = f(xs)
+    ys  = torch.tensor(ys,dtype=torch.float64)
+    ii  = torch.isnan(ys[:,0])
+    msk = 1 - 1*ii
+    Z = ys #torch.tensor(ys,dtype=torch.float64)
+    return Z, msk
+
 # Use the codes to process the data and get X and Y
 def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
 
@@ -246,6 +266,7 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
 
     Sh, S, E, rN, rCa, rCb, msk = L2np(seq[idx], pssm2[idx], entropy[idx],
                                        RN[idx], RCa[idx], RCb[idx], mask[idx])
+
     S   = torch.tensor(S)
     Sh  = torch.tensor(Sh)
     E   = torch.tensor(E)
@@ -259,10 +280,11 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     X[-1,:kp,:kp] = E.unsqueeze(1)@E.unsqueeze(1).t()
     X = X.unsqueeze(0)
 
-    rN  = torch.tensor(rN)
-    rCa = torch.tensor(rCa)
-    rCb = torch.tensor(rCb)
-    msk = torch.tensor(msk)
+    rN, m  = interpolateRes(rN,msk) #torch.tensor(rN)
+    rCa, m = interpolateRes(rCa,msk) #torch.tensor(rCa)
+    rCb, m = interpolateRes(rCb,msk) #torch.tensor(rCb)
+    msk = torch.tensor(m)
+    #msk[:] = True
 
     # Define model and data Y
     #D, OMEGA, PHI, THETA, M = convertCoordToDistAnglesVec(rN,rCa,rCb,mask=msk)
