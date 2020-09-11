@@ -131,10 +131,16 @@ class PadCollate:
         max_len = max(map(lambda x: x[0].shape[self.dim], batch))
         max_len = int(self.pad_mod * np.ceil(max_len / self.pad_mod))
 
+        targets = ()
+        nt = len(batch[0][1]) # Number of targets
+        tt = torch.empty((nt,nb,max_len,max_len),dtype=torch.float32)
+
+        coords = ()
+        nc = len(batch[0][3]) # Number of coordinates
+        cc = torch.empty((nc,nb,max_len,3),dtype=torch.float32)
 
         features = torch.empty((nb,nf,max_len),dtype=torch.float32)
-        targets = torch.empty((nb,max_len,max_len),dtype=torch.float32)
-        coords = torch.empty((nb,max_len,3),dtype=torch.float32)
+        # targets = torch.empty((nb,max_len,max_len),dtype=torch.float32)
         masks = torch.ones((nb,max_len),dtype=torch.int64)
         for i,batchi in enumerate(batch):
             feature = batchi[0]
@@ -142,19 +148,24 @@ class PadCollate:
             pad_size[self.dim] = max_len - pad_size[self.dim]
             features[i,:,:] = torch.cat([torch.from_numpy(feature), torch.zeros(*pad_size)],dim=self.dim)
 
-            target = batchi[1][0]
-            pad_size = list(target.shape)
-            pad_size[0] = max_len - pad_size[0]
-            targets[i,:,:] = torch.cat([torch.cat([torch.from_numpy(target), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
+            for j in range(nt):
+                target = batchi[1][j]
+                pad_size = list(target.shape)
+                pad_size[0] = max_len - pad_size[0]
+                tt[j,i,:,:] = torch.cat([torch.cat([torch.from_numpy(target), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
 
-            coord = torch.tensor(batchi[3])
-            pad_size = list(coord.shape)
-            pad_size[0] = max_len - pad_size[0]
-            coords[i,:,:] = torch.cat([coord, torch.zeros(*pad_size)], dim=0)
+            for j in range(nc):
+                coord = torch.tensor(batchi[3][j])
+                pad_size = list(coord.shape)
+                pad_size[0] = max_len - pad_size[0]
+                cc[j,i,:,:] = torch.cat([coord, torch.zeros(*pad_size)], dim=0)
 
             masks[i,feature.shape[self.dim]:] = 0
-        coords = coords.transpose(1,2)
-        return features, (targets,), masks, coords
+        for i in range(nt):
+            targets += (tt[i,:,:,:],)
+        for i in range(nc):
+            coords += (cc[i,:,:,:].transpose(1,2),)
+        return features, targets, masks, coords
 
     def __call__(self, batch):
         return self.pad_collate(batch)

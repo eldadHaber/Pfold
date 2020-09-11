@@ -25,7 +25,7 @@ def select_network(network):
         nlayers = 2
         nhead = 8  # the number of heads in the multiheadattention models
         dropout = 1e-6  # 0.2 # the dropout value
-        ntokenOut = 3  # negative ntokenOut = ntoken
+        ntokenOut = 9  # negative ntokenOut = ntoken
         stencil = 5
 
         net = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout, ntokenOut, stencilsize=stencil)  # .to(device)

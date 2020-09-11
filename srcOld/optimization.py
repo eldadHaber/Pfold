@@ -4,7 +4,7 @@ import matplotlib
 import numpy as np
 
 from srcOld.utils import move_tuple_to
-from srcOld.visualization import compare_distogram, plotcoordinates
+from srcOld.visualization import compare_distogram, plotcoordinates, plotfullprotein
 
 # from torch_lr_finder import LRFinder
 
@@ -45,20 +45,24 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)
             target = move_tuple_to(target, device, non_blocking=True)
-            coords = coords.to(device, non_blocking=True)
+            coords = move_tuple_to(coords, device, non_blocking=True)
             optimizer.zero_grad()
             outputs, coords_pred = net(seq,mask)
-            loss_ot, pred,target_coord = OT(coords_pred, coords)
+            loss_cnn, cnn_pred,cnn_target = OT(coords_pred[:,0:3,:], coords[0])
+            loss_caa, caa_pred,caa_target = OT(coords_pred[:,3:6,:], coords[1])
+            loss_cbb, cbb_pred,cbb_target = OT(coords_pred[:,6:9,:], coords[2])
             loss_d = loss_fnc(outputs, target)
+            loss_c = loss_cnn + loss_caa + loss_cbb
+
             if ite > 250:
-                loss = loss_ot + loss_d
+                loss = loss_d + loss_c
             else:
                 loss = loss_d
 
             loss.backward()
             optimizer.step()
             loss_train_d += loss_d.cpu().detach()
-            loss_train_ot += loss_ot.cpu().detach()
+            loss_train_ot += loss_c.cpu().detach()
             if scheduler is not None:
                 scheduler.step()
 
@@ -89,7 +93,8 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 break
         if stop_run:
             break
-    plotcoordinates(pred, target_coord)
+    plotfullprotein(cnn_pred, caa_pred, cbb_pred, cnn_target, caa_target, cbb_target)
+    # plotcoordinates(pred, target_coord)
     return net
 
 

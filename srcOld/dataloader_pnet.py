@@ -48,7 +48,7 @@ class Dataset_pnet(Dataset):
         if self.transform_mask is not None:
             mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
 
-        return features, target, mask, self.r3[index]
+        return features, target, mask, (self.r1[index], self.r2[index], self.r3[index])
 
     def __len__(self):
         return len(self.seq)

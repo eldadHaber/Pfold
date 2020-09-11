@@ -74,7 +74,9 @@ class TransformerModel(nn.Module):
 
         # Now we change the shape back to normal again.
         output = output.permute(1,2,0)
-        D = tr2DistSmall(output)
+        dNN = tr2DistSmall(output[:,0:3,:])
+        dCaCa = tr2DistSmall(output[:,3:6,:])
+        dCbCb = tr2DistSmall(output[:,6:9,:])
 
         # aa=torch.zeros((1,3,4))
         # aa[0,0,1] = 1
@@ -89,7 +91,7 @@ class TransformerModel(nn.Module):
         # aa = aa.to(device=output.get_device())
 
 
-        return (D,), output
+        return (dNN,dCaCa,dCbCb), output
 
 
 

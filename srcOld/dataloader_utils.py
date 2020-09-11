@@ -188,12 +188,12 @@ class ConvertCoordToDists(object):
         M = mask[:,None] @  mask[None,:]
 
         # #N-N
-        # dNN = np.sum(rN ** 2, axis=1)[:,None] + np.sum(rN ** 2, axis=1)[None,:] - 2 * (rN @ rN.transpose())
-        # dNN = np.sqrt(np.maximum(M*dNN,0))
+        dNN = np.sum(rN ** 2, axis=1)[:,None] + np.sum(rN ** 2, axis=1)[None,:] - 2 * (rN @ rN.transpose())
+        dNN = np.sqrt(np.maximum(M*dNN,0))
         #
         # #Ca-Ca
-        # dCaCa = np.sum(rCa ** 2, axis=1)[:,None] + np.sum(rCa ** 2, axis=1)[None,:] - 2 * (rCa @ rCa.transpose())
-        # dCaCa = np.sqrt(np.maximum(M*dCaCa,0))
+        dCaCa = np.sum(rCa ** 2, axis=1)[:,None] + np.sum(rCa ** 2, axis=1)[None,:] - 2 * (rCa @ rCa.transpose())
+        dCaCa = np.sqrt(np.maximum(M*dCaCa,0))
 
         #Cb-Cb
         dCbCb = np.sum(rCb ** 2, axis=1)[:,None] + np.sum(rCb ** 2, axis=1)[None,:] - 2 * (rCb @ rCb.transpose())
@@ -224,7 +224,7 @@ class ConvertCoordToDists(object):
         # dCaCb = V1[:,:,0]**2+V1[:,:,1]**2+V1[:,:,2]**2
         # dCaCb = np.sqrt(np.maximum(M*dCaCb,0))
 
-        return (dCbCb,)
+        return (dNN, dCaCa, dCbCb,)
 
         # return dNN, dCaCa, dCbCb, dNCa, dNCb, dCaCb
 
