@@ -25,51 +25,34 @@ class PositionalEncoding(nn.Module):
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.1, ntokenOut=-1, stencilsize=7):
+    def __init__(self, chan_in, emsize, nhead, nhid, nlayers, dropout=0.1, chan_out=-1, stencil=7):
         super(TransformerModel, self).__init__()
         from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 
         self.model_type = 'Transformer'
         self.src_mask = None
-        self.pos_encoder = PositionalEncoding(ninp, dropout)
-        encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
+        self.pos_encoder = PositionalEncoding(emsize, dropout)
+        encoder_layers = TransformerEncoderLayer(emsize, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        # self.encoder = nn.Embedding(ntoken, ninp)
-        self.encoder = CNN(ntoken, 2*ntoken, 3*ntoken, ninp, stencilsize)
-        # self.encoder = nn.Conv1d(ntoken, ninp, 7, padding=3) #nn.Linear(ntoken, ninp)
-        # self.encoder = nn.Linear(ntoken, ninp)
-        self.ninp = ninp
-        if ntokenOut < 0:
-            ntokenOut = ntoken
-        # self.decoder = nn.Linear(ninp, ntoken)
-        self.decoder = CNN(ninp, 2*ninp, 3*ninp, ntokenOut, stencilsize)
-        # self.decoder = nn.Conv1d(ninp, ntokenOut, 7, padding=3) #nn.Linear(ninp, ntokenOut)
-
-        self.init_weights()
-
-    def init_weights(self):
-        initrange = 0.1
-        # self.encoder.weight.data.uniform_(-initrange, initrange)
-        # self.decoder.bias.data.zero_()
-        # self.decoder.weight.data.uniform_(-initrange, initrange)
+        self.encoder = CNN(chan_in, 2 * chan_in, 3 * chan_in, emsize, stencil)
+        self.ninp = emsize
+        if chan_out < 0:
+            chan_out = chan_in
+        self.decoder = CNN(emsize, 2 * emsize, 3 * emsize, chan_out, stencil)
 
     def forward(self, src, mask):
         # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
         src = src.permute(2,0,1)
         mask_e = mask.unsqueeze(1)
 
-        #src = self.encoder(src) * math.sqrt(self.ninp)
-        # src = self.encoder(src)
         src = self.encoder(src.permute(1,2,0), mask_e)
         src = src.permute(2,0,1)
         src = self.pos_encoder(src)
 
         #src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
-        #output = self.decoder(output)
-        # output = self.decoder(output) # * mask[:,None,:]
-        output = self.decoder(output.permute(1,2,0), mask_e) # * mask[:,None,:]
+        output = self.decoder(output.permute(1,2,0), mask_e)
         output = output.permute(2,0,1)
 
         # Now we change the shape back to normal again.
@@ -77,19 +60,6 @@ class TransformerModel(nn.Module):
         dNN = tr2DistSmall(output[:,0:3,:])
         dCaCa = tr2DistSmall(output[:,3:6,:])
         dCbCb = tr2DistSmall(output[:,6:9,:])
-
-        # aa=torch.zeros((1,3,4))
-        # aa[0,0,1] = 1
-        # aa[0,1,1] = 1
-        # aa[0,2,1] = 1
-        # aa[0,0,2] = 2
-        # aa[0,1,2] = 2
-        # aa[0,2,2] = 2
-        # aa[0,0,3] = 3
-        # aa[0,1,3] = 3
-        # aa[0,2,3] = 3
-        # aa = aa.to(device=output.get_device())
-
 
         return (dNN,dCaCa,dCbCb), output
 

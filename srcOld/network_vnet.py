@@ -72,15 +72,16 @@ def conv1T(X, Kernel):
 
 class vnet1D(nn.Module):
     """ VNet """
-    def __init__(self, Arch,nout):
+    def __init__(self, arch, chan_out):
         super(vnet1D, self).__init__()
-        K, W = self.init_weights(Arch,nout)
+        K, W = self.init_weights(arch, chan_out)
         self.K = K
         self.W = W
         self.h = 0.1
 
     def init_weights(self,A,nout):
         # print('Initializing network  ')
+        A = np.array(A)
         nL = A.shape[0]
         K = nn.ParameterList([])
         npar = 0

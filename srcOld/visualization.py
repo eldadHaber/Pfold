@@ -102,15 +102,7 @@ def plotfullprotein(p1,p2,p3,t1,t2,t3):
     for i in range(n):
         line3 = axes.plot3D(tx[i,:], ty[i,:], tz[i,:], 'blue', marker='o')
 
-    #
-    #
-    #
-    #
-    # line2 = axes.plot3D(t2[0, :], t2[1, :], t2[2, :], 'red', marker='x')
-    # line3 = axes.plot3D(t3[0, :], t3[1, :], t3[2, :], 'red', marker='x')
-    # line = axes.plot3D(pred[0,:],pred[1,:], pred[2,:], 'green', marker='x')
-    # line2 = axes.plot3D(target[0,:],target[1,:], target[2,:], 'red', marker='x')
-    plt.pause(2.5)
+    plt.pause(0.5)
 
     return
 

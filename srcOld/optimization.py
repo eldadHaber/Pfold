@@ -32,18 +32,10 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     loss_train_d = 0
     loss_train_ot = 0
     loss = 0
-    # lr_finder = LRFinder(net, optimizer, loss_fnc, device=device)
-    # lr_finder.range_test(dataloader_train, end_lr=100, num_iter=100)
-    # lr_finder.plot()  # to inspect the loss-learning rate graph
-    # lr_finder.reset()  # to reset the model and optimizer to their initial state
-
-
-
-
     while True:
         for i,(seq, target,mask, coords) in enumerate(dataloader_train):
             seq = seq.to(device, non_blocking=True)
-            mask = mask.to(device, non_blocking=True)
+            mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             target = move_tuple_to(target, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             optimizer.zero_grad()
@@ -79,7 +71,6 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                         '{:6d}/{:6d}  Loss(training): {:6.4f}%   Loss(test): {:6.4f}%  LR: {:.8}  Time(train): {:.2f}  Time(test): {:.2f}  Time(total): {:.2f}  ETA: {:.2f}h'.format(
                             ite + 1,int(max_iter), loss_train_d/report_iter*100, loss_train_ot/report_iter*100, lr, t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
-                    # plotcoordinates(pred, target_coord)
                     loss_train_d = 0
                     loss_train_ot = 0
             if (ite + 1) % checkpoint == 0:

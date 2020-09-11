@@ -49,12 +49,10 @@ def main(c):
     # Select loss function for training
     loss_inner_fnc = MSELoss()
     loss_fnc = LossMultiTargets(loss_inner_fnc)
-    # loss_fnc = MSELoss()
 
     c.LOG.info('Date:{}'.format(datetime.now()))
 
-    # net = ResNet(c.nlayers,dl_train.dataset.nfeatures)
-    net = select_network(c.network)
+    net = select_network(c.network,c.network_args)
 
     c.LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
     net.to(c.device)
