@@ -76,6 +76,19 @@ class TransformerModel(nn.Module):
         output = output.permute(1,2,0)
         D = tr2DistSmall(output)
 
+        # aa=torch.zeros((1,3,4))
+        # aa[0,0,1] = 1
+        # aa[0,1,1] = 1
+        # aa[0,2,1] = 1
+        # aa[0,0,2] = 2
+        # aa[0,1,2] = 2
+        # aa[0,2,2] = 2
+        # aa[0,0,3] = 3
+        # aa[0,1,3] = 3
+        # aa[0,2,3] = 3
+        # aa = aa.to(device=output.get_device())
+
+
         return (D,), output
 
 

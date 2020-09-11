@@ -29,7 +29,8 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     net.to(device)
     t0 = time.time()
     t1 = time.time()
-    loss_train = 0
+    loss_train_d = 0
+    loss_train_ot = 0
     loss = 0
     # lr_finder = LRFinder(net, optimizer, loss_fnc, device=device)
     # lr_finder.range_test(dataloader_train, end_lr=100, num_iter=100)
@@ -47,15 +48,19 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             coords = coords.to(device, non_blocking=True)
             optimizer.zero_grad()
             outputs, coords_pred = net(seq,mask)
-            loss, pred,target_coord = OT(coords_pred, coords)
-            # loss += loss_fnc(outputs, target)
+            loss_ot, pred,target_coord = OT(coords_pred, coords)
+            loss_d = loss_fnc(outputs, target)
+            if ite > 250:
+                loss = loss_ot + loss_d
+            else:
+                loss = loss_d
 
             loss.backward()
             optimizer.step()
-            loss_train += loss.cpu().detach()
+            loss_train_d += loss_d.cpu().detach()
+            loss_train_ot += loss_ot.cpu().detach()
             if scheduler is not None:
                 scheduler.step()
-            loss = 0
 
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
@@ -68,10 +73,11 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
                         '{:6d}/{:6d}  Loss(training): {:6.4f}%   Loss(test): {:6.4f}%  LR: {:.8}  Time(train): {:.2f}  Time(test): {:.2f}  Time(total): {:.2f}  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, 0, lr, t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                            ite + 1,int(max_iter), loss_train_d/report_iter*100, loss_train_ot/report_iter*100, lr, t2-t1, t3 - t2, t3 - t0,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     # plotcoordinates(pred, target_coord)
-                    loss_train = 0
+                    loss_train_d = 0
+                    loss_train_ot = 0
             if (ite + 1) % checkpoint == 0:
                 pass
                 # filename = "{}{}_checkpoint.tar".format(save, ite + 1)
@@ -83,7 +89,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 break
         if stop_run:
             break
-    print(net.decoder.K6.weight[0,40:70,3])
+    plotcoordinates(pred, target_coord)
     return net
 
 
@@ -149,12 +155,38 @@ def OT(r1,r2):
     tmp = torch.diag_embed(tt).to(device=V.get_device())
     R = V @ tmp @ U.transpose(1,2)
 
+    tt2 = torch.tensor([1, 1, -d])
+    tmp2 = torch.diag_embed(tt2).to(device=V.get_device())
+    R2 = V @ tmp2 @ U.transpose(1,2)
+
     r1c_rotated = R @ r1c
+    r1c_rotated2 = R2 @ r1c
 
     assert torch.norm(r2c) > 0
-    result = torch.norm(r1c_rotated - r2c) ** 2 / torch.norm(r2c) ** 2
+    res1 = torch.norm(r1c_rotated - r2c) ** 2 / torch.norm(r2c) ** 2
+    res2 = torch.norm(r1c_rotated2 - r2c) ** 2 / torch.norm(r2c) ** 2
 
-    pred = r1c_rotated.squeeze().cpu().detach().numpy()
+
+    # dr11 = r1c_rotated[:,:,1:] - r1c_rotated[:,:,:-1]
+    # dr12 = r1c_rotated2[:,:,1:] - r1c_rotated2[:,:,:-1]
+    # dr2 = r2c[:,:,1:] - r2c[:,:,:-1]
+    #
+    # dres1 = torch.norm(dr11 - dr2) ** 2 / torch.norm(dr2) ** 2
+    # dres2 = torch.norm(dr12 - dr2) ** 2 / torch.norm(dr2) ** 2
+
+
+    if res1 < res2:
+        res = res1
+        # dres = dres1
+        pred = r1c_rotated.squeeze().cpu().detach().numpy()
+
+    else:
+        pred = r1c_rotated2.squeeze().cpu().detach().numpy()
+        res = res2
+        # dres = dres2
+    result = res #+ dres
+    # print("result = {:2.2f}, result2 = {:2.2f}".format(result,result2))
+
     target = r2c.squeeze().cpu().detach().numpy()
 
     return result, pred,target

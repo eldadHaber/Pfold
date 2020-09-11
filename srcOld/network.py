@@ -17,13 +17,14 @@ def select_network(network):
         net = vnet1D(Arch, 3)
     elif network.lower() == 'transformer':
         ntokens = 42  # the size of vocabulary
-        emsize = 512  # embedding dimension
-        nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
-        # emsize = 128  # embedding dimension
-        # nhid = 256  # the dimension of the feedforward network model in nn.TransformerEncoder
-        nlayers = 5  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        # emsize = 512  # embedding dimension
+        # nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
+        # nlayers = 5  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        emsize = 256  # embedding dimension
+        nhid = 512  # the dimension of the feedforward network model in nn.TransformerEncoder
+        nlayers = 2
         nhead = 8  # the number of heads in the multiheadattention models
-        dropout = 1e-3  # 0.2 # the dropout value
+        dropout = 1e-6  # 0.2 # the dropout value
         ntokenOut = 3  # negative ntokenOut = ntoken
         stencil = 5
 
