@@ -148,11 +148,11 @@ def OT(r1,r2):
     d = torch.det(V @ U.transpose(1,2))
 
     tt = torch.tensor([1, 1, d])
-    tmp = torch.diag_embed(tt).to(device=V.get_device())
+    tmp = torch.diag_embed(tt).to(device=V.device)
     R = V @ tmp @ U.transpose(1,2)
 
     tt2 = torch.tensor([1, 1, -d])
-    tmp2 = torch.diag_embed(tt2).to(device=V.get_device())
+    tmp2 = torch.diag_embed(tt2).to(device=V.device)
     R2 = V @ tmp2 @ U.transpose(1,2)
 
     r1c_rotated = R @ r1c

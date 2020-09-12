@@ -64,12 +64,12 @@ lr = 1e-4 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 200
+iters = 20
 hist = []
 ids = [0]
 model.train() # Turn on the train mode
 for itr in range(iters):
-    idx = ids[0] #ids[torch.randint(0,8,(1,))]
+    idx = torch.randint(0,40,(1,))
     data = S[idx].squeeze(0).unsqueeze(1) #[0,:,:]
     targets = Yobs[idx]
     Msk     = M[idx]
@@ -89,8 +89,11 @@ for itr in range(iters):
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
     optimizer.step()
-
-    print("% 2d  % 10.3E  % 10.3E"% (itr, torch.sqrt(misfit).item(), tv.item()))
+    if itr>40:
+        amisfit = torch.mean(torch.tensor(hist[-40:])).item()
+    else:
+        amisfit = torch.sqrt(misfit).item()
+    print("% 2d  % 10.3E  % 10.3E  % 10.3E"% (itr, torch.sqrt(misfit).item(), amisfit, tv.item()))
     hist.append(torch.sqrt(loss).item())
 
 idx = 0

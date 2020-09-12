@@ -33,25 +33,20 @@ for i in idx:
     rM.append(rMi.type(torch.FloatTensor))
     print('Image ', i, 'imsize ', Xi.shape)
 
+n0 = 128
+sc = 3
+Arch = torch.tensor([[20,n0,1,sc],[n0,n0,5,sc],[n0,2*n0,1,sc],[2*n0,2*n0,5,sc],[2*n0,4*n0,1,sc],[4*n0,4*n0,5,sc],[4*n0,8*n0,1,sc]])
+model = networks.vnet1D(Arch,3)
 
-Arch = torch.tensor([[20,64,1,5],[64,64,5,5],[64,128,1,5],[128,128,15,5],[128,256,1,5]])
-model = networks.vnet1D(Arch,32)
+total_params = sum(p.numel() for p in model.parameters())
+print('Number of parameters ',total_params)
 
-#id = 0
-#Z = S[id].squeeze(0).t()
-#n = 8*(Z.shape[1]//8 + 1)
-#Zp = torch.zeros(1,Z.shape[0],n)
-#Zp[:,:,:Z.shape[1]] = Z
-#Yp = model(Zp)
-#Dp = networks.tr2DistSmall(Yp.squeeze(0).t().unsqueeze(0))
-#plt.imshow(Dp.detach())
-#plt.colorbar()
 
 lr = 1e-3 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam([{'params': model.K, 'lr': lr},{'params': model.W, 'lr': lr}], lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 200
+iters = 5
 hist = []
 model.train() # Turn on the train mode
 for itr in range(iters):
@@ -72,14 +67,20 @@ for itr in range(iters):
     output = networks.tr2DistSmall(output)
 
     Wt = 1 /(targets + 1e-3)
+    misfit = torch.norm(Wt*(Msk*(output - targets)))**2/torch.norm(Wt*(Msk*targets))**2
 
-    loss = torch.norm(Wt*(Msk*(output - targets)))**2/torch.norm(Wt*(Msk*targets))**2
+    dY  = Ypred[0,:,1:] - Ypred[0,:,:-1]
+    reg = torch.sum(torch.sqrt(torch.sum(dY**2,dim=1)))
+    loss = misfit + 1e-5*reg
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
     optimizer.step()
-
-    print("% 2d, % 10.3E"% (itr, torch.sqrt(loss).item()))
-    hist.append(torch.sqrt(loss).item())
+    if len(hist) > 40:
+        aloss = torch.mean(torch.tensor(hist[-40:])).item()
+    else:
+        aloss = torch.sqrt(misfit).item()
+    print("% 2d  % 10.3E   % 10.3E   % 10.3E"% (itr, torch.sqrt(misfit).item(),aloss, reg))
+    hist.append(torch.sqrt(misfit).item())
 
 
 plt.figure(2)

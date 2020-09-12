@@ -56,7 +56,7 @@ class vnet1D(nn.Module):
     def init_weights(self,A,nout):
         print('Initializing network  ')
         nL = A.shape[0]
-        K = []
+        K = nn.ParameterList([])
         npar = 0
         cnt = 1
         for i in range(nL):
@@ -496,3 +496,43 @@ def Seq2Dist(Y):
 
     D = torch.sum(Y**2,dim=1) + torch.sum(Y**2,dim=1).t() -  Y[0,:,:].t()@Y[0,:,:]
     return D
+
+def rotatePoints(X, Xo):
+    # Find a matrix R such that Xo@R = X
+    # Translate X to fit Xo
+    # (X+c)R = V*S*V' R + c*R = Xo
+    # X = Uo*So*Vo'*R' - C
+
+    # R = V*inv(S)*U'
+    if X.shape != Xo.shape:
+        U, S, V =  torch.svd(X)
+        S[3:] = 0
+        X = U@torch.diag(S)@V.t()
+        X = X[:,:3]
+
+    n, dim = X.shape
+
+    Xc  = X - X.mean(dim=0)
+    Xco = Xo - Xo.mean(dim=0)
+
+    C = (Xc.t()@Xco) / n
+
+    U, S, V = torch.svd(C)
+    d = torch.sign((torch.det(U) * torch.det(V)))
+
+    R  = V@torch.diag(torch.tensor([1.0,1,d],dtype=U.dtype))@U.t()
+
+    Xr = Xc@R.t()
+    print(torch.norm(Xco - Xc @ R.t()))
+
+    return Xr, Xco, R
+
+def getRotDist(Xc, Xo, alpha = 1.0):
+
+    Xr, Xco, R = rotatePoints(Xc, Xo)
+    Do = torch.sum(Xo**2,dim=1,keepdim=True) + torch.sum(Xo**2,dim=1,keepdim=True).t() - 2*Xo@Xo.t()
+    Do = torch.sqrt(torch.relu(Do))
+    Dc = torch.sum(Xc**2,dim=1,keepdim=True) + torch.sum(Xc**2,dim=1,keepdim=True).t() - 2*Xc@Xc.t()
+    Dc = torch.sqrt(torch.relu(Dc))
+
+    return F.mse_loss(Xr, Xco) + alpha*F.mse_loss(Dc, Do)

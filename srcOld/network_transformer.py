@@ -51,6 +51,7 @@ class TransformerModel(nn.Module):
         src = self.pos_encoder(src)
 
         #src = self.pos_encoder(src)
+        #output = src
         output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
         output = self.decoder(output.permute(1,2,0), mask_e)
         output = output.permute(2,0,1)
