@@ -19,19 +19,19 @@ def compare_distogram(outputs, targets):
             target = torch.squeeze(target[-1,:,:]).cpu().detach().numpy()
             mask = target > 0
 
-        plt.subplot(n,3, i*2+1)
+        plt.subplot(n,3, i*n+1)
         plt.imshow(output, vmin=0)
         plt.colorbar()
         tit = name + "(prediction)"
         plt.title(tit)
 
-        plt.subplot(n,3, i*2+2)
+        plt.subplot(n,3, i*n+2)
         plt.imshow(target, vmin=0)
         plt.colorbar()
         tit = name + "(target)"
         plt.title(tit)
 
-        plt.subplot(n, 3, i * 2 + 3)
+        plt.subplot(n, 3, i * n + 3)
         plt.imshow(np.abs(mask * output - target), vmin=0)
         plt.colorbar()
         tit = name + "(diff)"
@@ -43,7 +43,7 @@ def compare_distogram(outputs, targets):
 
 
 def plotfullprotein(p1,p2,p3,t1,t2,t3):
-    plt.figure(num=1, figsize=[15, 10])
+    plt.figure(num=2, figsize=[15, 10])
     plt.clf()
 
     n = t1.shape[1]

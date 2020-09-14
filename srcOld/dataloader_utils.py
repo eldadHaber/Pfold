@@ -183,50 +183,28 @@ class ConvertCoordToDists(object):
         rN = args[0]
         rCa = args[1]
         rCb = args[2]
-        mask = args[3]
 
-        M = mask[:,None] @  mask[None,:]
+        mask_N = rN[0,:] != 0
+        mask_Ca = rCa[0,:] != 0
+        mask_Cb = rCb[0,:] != 0
+
+        MN = mask_N[:,None] @  mask_N[None,:]
+        MCa = mask_Ca[:,None] @  mask_Ca[None,:]
+        MCb = mask_Cb[:,None] @  mask_Cb[None,:]
 
         # #N-N
-        dNN = np.sum(rN ** 2, axis=1)[:,None] + np.sum(rN ** 2, axis=1)[None,:] - 2 * (rN @ rN.transpose())
-        dNN = np.sqrt(np.maximum(M*dNN,0))
+        dNN = np.sum(rN ** 2, axis=0)[:,None] + np.sum(rN ** 2, axis=0)[None,:] - 2 * (rN.T @ rN)
+        dNN = np.sqrt(np.maximum(MN*dNN,0))
         #
         # #Ca-Ca
-        dCaCa = np.sum(rCa ** 2, axis=1)[:,None] + np.sum(rCa ** 2, axis=1)[None,:] - 2 * (rCa @ rCa.transpose())
-        dCaCa = np.sqrt(np.maximum(M*dCaCa,0))
+        dCaCa = np.sum(rCa ** 2, axis=0)[:,None] + np.sum(rCa ** 2, axis=0)[None,:] - 2 * (rCa.T @ rCa)
+        dCaCa = np.sqrt(np.maximum(MCa*dCaCa,0))
 
         #Cb-Cb
-        dCbCb = np.sum(rCb ** 2, axis=1)[:,None] + np.sum(rCb ** 2, axis=1)[None,:] - 2 * (rCb @ rCb.transpose())
-        dCbCb = np.sqrt(np.maximum(M*dCbCb,0))
+        dCbCb = np.sum(rCb ** 2, axis=0)[:,None] + np.sum(rCb ** 2, axis=0)[None,:] - 2 * (rCb.T @ rCb)
+        dCbCb = np.sqrt(np.maximum(MCb*dCbCb,0))
 
-        nat = rCa.shape[0]
-        V1 = np.zeros((nat, nat, 3))
-
-
-        # #N-Ca
-        # V1[:,:,0] = rN[:,0][:,None].repeat(nat,axis=1) - rCa[:,0][None,:].repeat(nat,axis=0)
-        # V1[:,:,1] = rN[:,1][:,None].repeat(nat,axis=1) - rCa[:,1][None,:].repeat(nat,axis=0)
-        # V1[:,:,2] = rN[:,2][:,None].repeat(nat,axis=1) - rCa[:,2][None,:].repeat(nat,axis=0)
-        # dNCa = V1[:,:,0]**2+V1[:,:,1]**2+V1[:,:,2]**2
-        # dNCa = np.sqrt(np.maximum(M*dNCa,0))
-        #
-        # #N-Cb
-        # V1[:,:,0] = rN[:,0][:,None].repeat(nat,axis=1) - rCb[:,0][None,:].repeat(nat,axis=0)
-        # V1[:,:,1] = rN[:,1][:,None].repeat(nat,axis=1) - rCb[:,1][None,:].repeat(nat,axis=0)
-        # V1[:,:,2] = rN[:,2][:,None].repeat(nat,axis=1) - rCb[:,2][None,:].repeat(nat,axis=0)
-        # dNCb = V1[:,:,0]**2+V1[:,:,1]**2+V1[:,:,2]**2
-        # dNCb = np.sqrt(np.maximum(M*dNCb,0))
-        #
-        # #Ca-Cb
-        # V1[:,:,0] = rCa[:,0][:,None].repeat(nat,axis=1) - rCb[:,0][None,:].repeat(nat,axis=0)
-        # V1[:,:,1] = rCa[:,1][:,None].repeat(nat,axis=1) - rCb[:,1][None,:].repeat(nat,axis=0)
-        # V1[:,:,2] = rCa[:,2][:,None].repeat(nat,axis=1) - rCb[:,2][None,:].repeat(nat,axis=0)
-        # dCaCb = V1[:,:,0]**2+V1[:,:,1]**2+V1[:,:,2]**2
-        # dCaCb = np.sqrt(np.maximum(M*dCaCb,0))
-
-        return (dNN, dCaCa, dCbCb,)
-
-        # return dNN, dCaCa, dCbCb, dNCa, dNCb, dCaCb
+        return (dNN, dCaCa, dCbCb), (rN, rCa, rCb)
 
 
 

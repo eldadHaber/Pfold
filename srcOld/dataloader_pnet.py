@@ -21,15 +21,6 @@ class Dataset_pnet(Dataset):
         self.r2 = r2
         self.r3 = r3
 
-        # R = np.array([[0, 0, 1],[1,0,0],[0,1,0]])
-        # r3n = np.transpose(np.array(r3).squeeze())
-        # rr3 = R @ r3n
-        # # rr3 *= 1.1
-        # rr3t = np.transpose(rr3)
-        # lr3 = rr3t[None,:,:].tolist()
-        #
-        # self.r3 = lr3
-
         self.transform = transform
         self.transform_target = transform_target
         self.transform_mask = transform_mask
@@ -38,17 +29,17 @@ class Dataset_pnet(Dataset):
     def __getitem__(self, index):
         features = (self.seq[index], self.pssm[index], self.entropy[index])
         mask = self.mask[index]
-        target = (self.r1[index], self.r2[index], self.r3[index], copy.deepcopy(mask))
+        target = (self.r1[index], self.r2[index], self.r3[index])
 
         self.transform.transforms[0].reroll()
         if self.transform is not None:
             features = self.transform(features)
         if self.transform_target is not None:
-            target = self.transform_target(target)
-        if self.transform_mask is not None:
-            mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
+            distances, coords = self.transform_target(target)
+        # if self.transform_mask is not None:
+        #     mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
 
-        return features, target, mask, (self.r1[index], self.r2[index], self.r3[index])
+        return features, distances, coords
 
     def __len__(self):
         return len(self.seq)
@@ -163,9 +154,10 @@ def parse_pnet(file,max_seq_len=-1):
         coords = coords
         for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
             pssm2.append(flip_multidimensional_list(pssm[i]))
-            r1.append(separate_coords(coords[i], 0))
-            r2.append(separate_coords(coords[i], 1))
-            r3.append(separate_coords(coords[i], 2))
+            r1.append(flip_multidimensional_list(separate_coords(coords[i], 0)))
+            r2.append(flip_multidimensional_list(separate_coords(coords[i], 1)))
+            r3.append(flip_multidimensional_list(separate_coords(coords[i], 2)))
+
             if i+1 % 1000 == 0:
                 print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
 
@@ -180,6 +172,7 @@ def parse_pnet(file,max_seq_len=-1):
                 new_args += (list(compress(list_i,filter)),)
         else:
             new_args = args
+
         print("parse complete! Took: {:2.2f}".format(time.time() - t0))
     return new_args
 

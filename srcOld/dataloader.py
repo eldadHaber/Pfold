@@ -11,7 +11,7 @@ from srcOld.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
-def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1, network=None):
+def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None):
     '''
     This is a wrapper routine for various dataloaders.
     Currently supports:
@@ -42,7 +42,7 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1, netw
             transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo2D()])
         elif type == '1D':
             transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo1D()])
-        transform_target_train = transforms.Compose([Flip])
+        transform_target_train = transforms.Compose([Flip, ConvertCoordToDists()])
         transform_mask_train = transforms.Compose([Flip])
 
         dataset_train = Dataset_lmdb(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train)
@@ -66,7 +66,8 @@ def select_dataset(path_train,path_test,seq_len=300,type='2D',batch_size=1, netw
             transform_test = transforms.Compose([ConvertPnetFeaturesTo2D()])
         elif type == '1D':
             transform_test = transforms.Compose([ConvertPnetFeaturesTo1D()])
-        dataset_test = Dataset_lmdb(path_test, transform=transform_test)
+        transform_target_test = transforms.Compose([ConvertCoordToDists()])
+        dataset_test = Dataset_lmdb(path_test, transform=transform_test, target_transform=transform_target_test)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
@@ -131,16 +132,15 @@ class PadCollate:
         max_len = max(map(lambda x: x[0].shape[self.dim], batch))
         max_len = int(self.pad_mod * np.ceil(max_len / self.pad_mod))
 
-        targets = ()
-        nt = len(batch[0][1]) # Number of targets
+        distances = ()
+        nt = len(batch[0][1]) # Number of distograms
         tt = torch.empty((nt,nb,max_len,max_len),dtype=torch.float32)
 
         coords = ()
-        nc = len(batch[0][3]) # Number of coordinates
-        cc = torch.empty((nc,nb,max_len,3),dtype=torch.float32)
+        nc = len(batch[0][2]) # Number of coordinates
+        cc = torch.empty((nc,nb,3,max_len),dtype=torch.float32)
 
         features = torch.empty((nb,nf,max_len),dtype=torch.float32)
-        # targets = torch.empty((nb,max_len,max_len),dtype=torch.float32)
         masks = torch.ones((nb,max_len),dtype=torch.int64)
         for i,batchi in enumerate(batch):
             feature = batchi[0]
@@ -149,23 +149,23 @@ class PadCollate:
             features[i,:,:] = torch.cat([torch.from_numpy(feature), torch.zeros(*pad_size)],dim=self.dim)
 
             for j in range(nt):
-                target = batchi[1][j]
-                pad_size = list(target.shape)
+                distance = batchi[1][j]
+                pad_size = list(distance.shape)
                 pad_size[0] = max_len - pad_size[0]
-                tt[j,i,:,:] = torch.cat([torch.cat([torch.from_numpy(target), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
+                tt[j,i,:,:] = torch.cat([torch.cat([torch.from_numpy(distance), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
 
             for j in range(nc):
-                coord = torch.tensor(batchi[3][j])
+                coord = torch.from_numpy(batchi[2][j].copy())
                 pad_size = list(coord.shape)
-                pad_size[0] = max_len - pad_size[0]
-                cc[j,i,:,:] = torch.cat([coord, torch.zeros(*pad_size)], dim=0)
+                pad_size[1] = max_len - pad_size[1]
+                cc[j,i,:,:] = torch.cat([coord, torch.zeros(*pad_size)], dim=1)
 
             masks[i,feature.shape[self.dim]:] = 0
         for i in range(nt):
-            targets += (tt[i,:,:,:],)
+            distances += (tt[i,:,:,:],)
         for i in range(nc):
-            coords += (cc[i,:,:,:].transpose(1,2),)
-        return features, targets, masks, coords
+            coords += (cc[i,:,:,:],)
+        return features, distances, masks, coords
 
     def __call__(self, batch):
         return self.pad_collate(batch)

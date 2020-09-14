@@ -43,7 +43,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.seq_len,c.feature_type,batch_size=c.batch_size, network=c.network)
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_type,batch_size=c.batch_size, network=c.network)
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training

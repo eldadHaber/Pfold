@@ -3,6 +3,9 @@ import os
 
 from srcOld.main import main
 
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Distogram Predictor')
 
@@ -13,23 +16,19 @@ if __name__ == '__main__':
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
     parser.add_argument('--dataset-train', default='e:/training30_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-test', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='e:/small_test_lmdb.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='./data/training_100.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='./data/pnet/train.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='./data/pnet/synthetic.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='e:/testing_small_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='e:/testing_small_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-test', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--nsamples', default=10000, type=int, metavar='N', help='Number of datasamples, only used with synthetic now')
-    parser.add_argument('--seq-len', default=512, type=int, metavar='N', help='Length each sequence will be extended/cropped to')
+    # parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--batch-size', default=25, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--network', default='transformer', type=str, metavar='N', help='network to use')
 
     # Learning
 
-    parser.add_argument('--nlayers', default=20, type=int, metavar='N', help='Number of residual layers in network')
     parser.add_argument('--SL-lr', default=1e-4, type=float, metavar='N', help='Learning Rate')
     # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--max-iter', default=400000, type=int, metavar='N', help='select the neural network to train (resnet)')
@@ -40,4 +39,26 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
+    if args.network.lower() == 'transformer':
+        args.network_args = {
+        'chan_in': 42,  # the size of vocabulary
+        'emsize': 512,  # embedding dimension
+        'nhid': 1024, # nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
+        'nlayers': 5,  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        'nhead': 8,  # the number of heads in the multiheadattention models
+        'dropout': 1e-3,  # 0.2 # the dropout value
+        'chan_out': 9,  # the output channels
+        'stencil': 5}
+    elif args.network.lower() == 'vnet':
+        args.network_args = {
+        'arch': [[42, 64, 1, 5], [64, 64, 5, 5], [64, 128, 1, 5], [128, 128, 15, 5], [128, 256, 1, 5]],
+        'chan_out': 3
+        }
+    else:
+        raise UserWarning("network: {:} not recognised for arg.network_args".format(args.network))
+
+
     losses = main(args)
+
+
+

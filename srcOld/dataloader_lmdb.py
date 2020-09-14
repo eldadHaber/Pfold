@@ -4,6 +4,8 @@ import pyarrow as pa
 import torch.utils.data as data
 import copy
 
+from srcOld.dataloader_utils import SeqFlip
+
 
 class Dataset_lmdb(data.Dataset):
     '''
@@ -41,20 +43,23 @@ class Dataset_lmdb(data.Dataset):
         features = copy.deepcopy(unpacked[0])
 
         targets = copy.deepcopy(unpacked[1])
+        # coords = copy.deepcopy(unpacked[2])
 
         # mask = copy.deepcopy(unpacked[2])
 
-        # self.transform.transforms[0].reroll()
+
+        if isinstance(self.transform.transforms[0], SeqFlip):
+            self.transform.transforms[0].reroll()
         if self.transform is not None:
             features = self.transform(features)
 
         if self.target_transform is not None:
-            targets = self.target_transform(targets)
+            distances, coords = self.target_transform(targets)
 
         # if self.mask_transform is not None:
         #     mask = self.mask_transform(mask)
 
-        return features, targets
+        return features, distances, coords
 
     def __len__(self):
         return self.length
