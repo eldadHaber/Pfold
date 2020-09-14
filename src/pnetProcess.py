@@ -323,7 +323,7 @@ def getProteinDataLinear(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     X[:-1,:kp] = S.t()
     X[-1,:kp] = E
     X = X.unsqueeze(0)
-
+    dd=1
     rN, m  = interpolateRes(rN,msk) #torch.tensor(rN)
     rCa, m = interpolateRes(rCa,msk) #torch.tensor(rCa)
     rCb, m = interpolateRes(rCb,msk) #torch.tensor(rCb)
