@@ -303,6 +303,39 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
 
     return X, Yobs, Mpad, Sh, S, rM
 
+
+# Use the codes to process the data and get X and Y
+def getProteinDataLinear(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
+
+    L2np = list2np()
+
+    Sh, S, E, rN, rCa, rCb, msk = L2np(seq[idx], pssm2[idx], entropy[idx],
+                                       RN[idx], RCa[idx], RCb[idx], mask[idx])
+
+    S   = torch.tensor(S)
+    Sh  = torch.tensor(Sh)
+    E   = torch.tensor(E)
+
+    nc = ncourse
+    kp = S.shape[0]
+    k  = (2**nc)*(kp//(2**nc) + 1)
+    X  = torch.zeros(21,k)
+    X[:-1,:kp] = S.t()
+    X[-1,:kp] = E
+    X = X.unsqueeze(0)
+
+    rN, m  = interpolateRes(rN,msk) #torch.tensor(rN)
+    rCa, m = interpolateRes(rCa,msk) #torch.tensor(rCa)
+    rCb, m = interpolateRes(rCb,msk) #torch.tensor(rCb)
+    msk = torch.tensor(m)
+    Yobs = torch.zeros(1,3,3,k)
+    Yobs[0,0,:,:kp] = rN
+    Yobs[0,1,:,:kp] = rCa
+    Yobs[0,2,:,:kp] = rCb
+
+    return X, Yobs, m
+
+
 def plotProteinData(Y,j):
 
     plt.figure(j)

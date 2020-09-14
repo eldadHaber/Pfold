@@ -27,15 +27,13 @@ M = []
 S = []
 rM = []
 for i in idx:
-    Xi, Yobsi, Mi, Shi, Si, rMi = pnetProcess.getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, i, ncourse)
+    Xi, Yobsi, Mi = pnetProcess.getProteinDataLinear(seq, pssm2, entropy, RN, RCa, RCb, mask, i, ncourse)
     X.append(Xi)
-    ns = Si.shape[0]
-    Yobs.append(Yobsi[0,0,:ns,:ns]/5000)
-    M.append(Mi[0,:ns,:ns])
-    S.append(Si.unsqueeze(0).type(torch.FloatTensor))
-    rM.append(rMi.type(torch.FloatTensor))
+    Yobs.append(Yobsi/5000)
+    M.append(Mi)
     print('Image ', i, 'imsize ', Xi.shape)
 
+error
 n0 = 128
 sc = 3
 Arch = torch.tensor([[20,n0,1,sc],[n0,n0,5,sc],[n0,2*n0,1,sc],[2*n0,2*n0,5,sc],[2*n0,4*n0,1,sc],[4*n0,4*n0,5,sc],[4*n0,8*n0,1,sc]])

@@ -5,6 +5,11 @@ import torch.nn.functional as F
 import numpy as np
 import math
 from src import networks
+from src import pnetProcess
+from src import utils
+
+pnetProcess.getProteinDataLinear(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse)
+
 
 def getRotMat(t):
     A1 = torch.tensor([[np.cos(t[0]), -np.sin(t[0]), 0],
@@ -21,9 +26,12 @@ def getRotMat(t):
     return A
 
 
-X = torch.randn(10,5)
+X = torch.randn(10,3)
 Q = getRotMat(torch.randn(3))
 
-Xo = X[:,:3]@Q
+Xo = X@Q
 
-Xr, Xco, R = networks.rotatePoints(X, Xo)
+Xr, Xco, R = utils.rotatePoints(X, Xo)
+
+a = utils.getRotDist(X, Xo)
+print(a)

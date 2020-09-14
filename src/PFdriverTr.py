@@ -4,6 +4,8 @@ import torch.nn as nn
 from src import networks, optimizeNet, pnetProcess
 import matplotlib.pyplot as plt
 import torch.optim as optim
+from src import utils
+from src import regularization as rg
 
 
 def imagesc(X):
@@ -13,7 +15,7 @@ def imagesc(X):
 def plot(X):
     plt.plot(X)
 
-dataFile = './../data/testing.pnet'
+dataFile = '../../../data/casp12Testing/testing.pnet'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)
 
 idx = np.arange(0, 40)
@@ -53,8 +55,7 @@ id = 0
 Z = S[id].squeeze(0).unsqueeze(1) #[0,:,:]
 Yp = model(Z)
 Yp = Yp.squeeze(1).unsqueeze(0)
-#Dp = torch.relu(torch.sum(Yp**2,2) + torch.sum(Yp**2,2).t() - 2*Yp.squeeze(1)@Yp.squeeze(1).t())
-Dp = networks.tr2DistSmall(Yp)
+Dp = utils.tr2Dist(Yp)
 #plt.imshow(Dp.detach())
 #plt.colorbar()
 
@@ -77,14 +78,14 @@ for itr in range(iters):
     output = model(data)
     output = output.squeeze(1).unsqueeze(0)
     #output = networks.tr2Dist(output)
-    output = networks.tr2DistSmall(output)
+    output = utils.tr2Dist(output)
     #output = torch.sqrt(torch.relu(torch.sum(output ** 2, 2) + torch.sum(output ** 2, 2).t() - 2 *
     #                   output.squeeze(1) @ output.squeeze(1).t()))
 
     #Wt  = 1/torch.sqrt(targets + 0.01)
     Wt = 1 /(targets + 1e-3)
     misfit = torch.norm(Wt*(Msk*(output - targets)))**2/torch.norm(Wt*(Msk*targets))**2
-    tv, tt = networks.TVreg(output.unsqueeze(0).unsqueeze(0))
+    tv, tt = rg.TVreg(output.unsqueeze(0).unsqueeze(0))
     loss = misfit + 1e-5*tv
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
@@ -99,7 +100,7 @@ for itr in range(iters):
 idx = 0
 Yp = model(S[idx].squeeze(0).unsqueeze(1))
 Yp = Yp.squeeze(1).unsqueeze(0)
-Dp = networks.tr2DistSmall(Yp)
+Dp = utils.tr2Dist(Yp)
 plt.subplot(2,2,1)
 plt.imshow(M[idx]*Dp.detach())
 plt.colorbar()
