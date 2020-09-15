@@ -58,7 +58,7 @@ class vnet1D(nn.Module):
         print('Number of parameters  ', npar)
         return K, W
 
-    def forward(self, x):
+    def forward(self, x, m=1.0):
         """ Forward propagation through the network """
 
         # Number of layers
@@ -66,9 +66,9 @@ class vnet1D(nn.Module):
 
         # Store the output at different scales to add back later
         xS = []
-
+        mS = [m]
         # Opening layer
-        z = conv1(x, self.K[0])
+        z = mS[-1]*conv1(x, self.K[0])
         z = F.instance_norm(z)
         x = F.relu(z)
 
@@ -81,24 +81,24 @@ class vnet1D(nn.Module):
             sK = self.K[i].shape
 
             if sK[0] == sK[1]:
-                z  = conv1(x, self.K[i])
+                z  = mS[-1]*conv1(x, self.K[i])
                 z  = F.instance_norm(z)
                 z  = F.relu(z)
-                z  = conv1T(z, self.K[i])
+                z  = mS[-1]*conv1T(z, self.K[i])
                 x  = x - self.h*z
 
             # Change number of channels/resolution
             else:
                 # Store the features
                 xS.append(x)
-
-                z  = conv1(x, self.K[i])
+                z  = mS[-1]*conv1(x, self.K[i])
                 z  = F.instance_norm(z)
                 x  = F.relu(z)
 
                 # Downsample by factor of 2
                 x = F.avg_pool1d(x, 3, stride=2, padding=1)
-
+                m = F.avg_pool1d(m.unsqueeze(0).unsqueeze(0), 3, stride=2, padding=1).squeeze(0).squeeze(0)
+                mS.append(m)
         # Number of scales being computed (how many downsampling)
         n_scales = len(xS)
 
@@ -109,10 +109,10 @@ class vnet1D(nn.Module):
             # (same number of input and output kernels)
             sK = self.K[i].shape
             if sK[0] == sK[1]:
-                z  = conv1T(x, self.K[i])
+                z  = mS[-1]*conv1T(x, self.K[i])
                 z  = F.instance_norm(z)
                 z  = F.relu(z)
-                z  = conv1(z, self.K[i])
+                z  = mS[-1]*conv1(z, self.K[i])
                 x  = x - self.h*z
 
             # Change number of channels/resolution
@@ -120,8 +120,8 @@ class vnet1D(nn.Module):
                 n_scales -= 1
                 # Upsample by factor of 2
                 x = F.interpolate(x, scale_factor=2)
-
-                z  = conv1T(x, self.K[i])
+                mS = mS[:-1]
+                z  = mS[-1]*conv1T(x, self.K[i])
                 z  = F.instance_norm(z)
                 x  = F.relu(z) + xS[n_scales]
 

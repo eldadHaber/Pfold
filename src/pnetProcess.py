@@ -323,17 +323,18 @@ def getProteinDataLinear(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     X[:-1,:kp] = S.t()
     X[-1,:kp] = E
     X = X.unsqueeze(0)
-    dd=1
+
     rN, m  = interpolateRes(rN,msk) #torch.tensor(rN)
     rCa, m = interpolateRes(rCa,msk) #torch.tensor(rCa)
     rCb, m = interpolateRes(rCb,msk) #torch.tensor(rCb)
     msk = torch.tensor(m)
     Yobs = torch.zeros(1,3,3,k)
-    Yobs[0,0,:,:kp] = rN
-    Yobs[0,1,:,:kp] = rCa
-    Yobs[0,2,:,:kp] = rCb
-
-    return X, Yobs, m
+    Yobs[0,0,:,:kp] = rN.t()
+    Yobs[0,1,:,:kp] = rCa.t()
+    Yobs[0,2,:,:kp] = rCb.t()
+    msk = torch.zeros(k)
+    msk[:kp] = m
+    return X, Yobs, msk
 
 
 def plotProteinData(Y,j):

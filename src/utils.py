@@ -31,9 +31,11 @@ def rotatePoints(X, Xo):
     # X = Uo*So*Vo'*R' - C
 
     # R = V*inv(S)*U'
+    X = X.squeeze(0).t()
+    Xo = Xo.t()
     if X.shape != Xo.shape:
         U, S, V =  torch.svd(X)
-        S[3:] = 0
+        S[:,3:] = 0
         X = U@torch.diag(S)@V.t()
         X = X[:,:3]
 
@@ -52,7 +54,7 @@ def rotatePoints(X, Xo):
     Xr = Xc@R.t()
     #print(torch.norm(Xco - Xc @ R.t()))
 
-    return Xr, Xco, R
+    return Xr.t(), Xco.t(), R
 
 def getRotDist(Xc, Xo, alpha = 1.0):
 
