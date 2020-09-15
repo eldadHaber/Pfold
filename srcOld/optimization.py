@@ -47,7 +47,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             outputs, coords_pred = net(seq,mask)
             tt12 = time.time()
 
-            loss_c = loss_tr_all(coords_pred, coords)
+            # loss_c = loss_tr_all(coords_pred, coords)
             loss_cnn = loss_tr(coords_pred[:,0:3,:], coords[1])
             loss_caa = loss_tr(coords_pred[:,3:6,:], coords[1])
             loss_cbb = loss_tr(coords_pred[:,6:9,:], coords[2])
@@ -57,7 +57,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             tc = time.time()
             loss_d = loss_fnc(outputs, target)
             td = time.time()
-            # loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
+            loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
             # if loss_d < 0.001:
             #     enable_coordinate_loss = True
             # if enable_coordinate_loss:
@@ -73,8 +73,6 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             loss_train_ot += loss_c.cpu().detach()
             if scheduler is not None:
                 scheduler.step()
-            if ite == 8:
-                print("here")
 
             tt2 = time.time()
             print("Loading:{:2.4f}, other:{:2.4f}, transfer:{:2.4f}, network:{:2.4f}, loss:{:2.4f}, backward:{:2.4f}, loss_c:{:2.4f}, loss_d:{:2.4f}".format(tt1-tt0,tt2-tt1,tt11-tt1,tt12-tt11,tt13-tt12,tt14-tt13,tc-tt12,td-tc))
