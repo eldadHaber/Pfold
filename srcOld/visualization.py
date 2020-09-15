@@ -108,6 +108,73 @@ def plotfullprotein(p1,p2,p3,t1,t2,t3):
 
 
 
+def plotfullprotein_vec(p,t):
+    plt.figure(num=2, figsize=[15, 10])
+    plt.clf()
+
+    n = t.shape[1]
+    axes = plt.axes(projection='3d')
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    axes.set_zlabel("z")
+    line1 = axes.plot3D(t1[0, :], t1[1, :], t1[2, :], 'red', marker='x')
+    a = t1[0,:].T
+    b = t2[0,:].T
+    tx = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = t1[1,:].T
+    b = t2[1,:].T
+    ty = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = t1[2,:].T
+    b = t2[2,:].T
+    tz = np.concatenate((a[:,None],b[:,None]),axis=1)
+    for i in range(n):
+        line2 = axes.plot3D(tx[i,:], ty[i,:], tz[i,:], 'red', marker='d')
+
+    a = t1[0,:].T
+    b = t3[0,:].T
+    tx = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = t1[1,:].T
+    b = t3[1,:].T
+    ty = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = t1[2,:].T
+    b = t3[2,:].T
+    tz = np.concatenate((a[:,None],b[:,None]),axis=1)
+    for i in range(n):
+        line3 = axes.plot3D(tx[i,:], ty[i,:], tz[i,:], 'red', marker='o')
+
+
+    line1 = axes.plot3D(p1[0, :], p1[1, :], p1[2, :], 'blue', marker='x')
+    a = p1[0,:].T
+    b = p2[0,:].T
+    tx = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = p1[1,:].T
+    b = p2[1,:].T
+    ty = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = p1[2,:].T
+    b = p2[2,:].T
+    tz = np.concatenate((a[:,None],b[:,None]),axis=1)
+    for i in range(n):
+        line2 = axes.plot3D(tx[i,:], ty[i,:], tz[i,:], 'blue', marker='d')
+
+    a = p1[0,:].T
+    b = p3[0,:].T
+    tx = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = p1[1,:].T
+    b = p3[1,:].T
+    ty = np.concatenate((a[:,None],b[:,None]),axis=1)
+    a = p1[2,:].T
+    b = p3[2,:].T
+    tz = np.concatenate((a[:,None],b[:,None]),axis=1)
+    for i in range(n):
+        line3 = axes.plot3D(tx[i,:], ty[i,:], tz[i,:], 'blue', marker='o')
+
+    plt.pause(0.5)
+
+    return
+
+
+
+
 def plotcoordinates(pred,target):
     plt.figure(num=1, figsize=[15, 10])
     plt.clf()

@@ -3,7 +3,7 @@ import time
 import matplotlib
 import numpy as np
 
-from srcOld.loss import loss_tr_wrapper, loss_tr
+from srcOld.loss import loss_tr, loss_tr_all
 from srcOld.utils import move_tuple_to
 from srcOld.visualization import compare_distogram, plotcoordinates, plotfullprotein
 
@@ -47,7 +47,8 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             outputs, coords_pred = net(seq,mask)
             tt12 = time.time()
 
-            loss_cnn = loss_tr(coords_pred[:,0:3,:], coords[0])
+            loss_c = loss_tr_all(coords_pred, coords)
+            loss_cnn = loss_tr(coords_pred[:,0:3,:], coords[1])
             loss_caa = loss_tr(coords_pred[:,3:6,:], coords[1])
             loss_cbb = loss_tr(coords_pred[:,6:9,:], coords[2])
             # loss_cnn, cnn_pred,cnn_target = loss_tr_wrapper(coords_pred[:,0:3,:], coords[0])
@@ -56,7 +57,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             tc = time.time()
             loss_d = loss_fnc(outputs, target)
             td = time.time()
-            loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
+            # loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
             # if loss_d < 0.001:
             #     enable_coordinate_loss = True
             # if enable_coordinate_loss:
@@ -72,9 +73,11 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             loss_train_ot += loss_c.cpu().detach()
             if scheduler is not None:
                 scheduler.step()
+            if ite == 8:
+                print("here")
 
             tt2 = time.time()
-            # print("Loading:{:2.4f}, other:{:2.4f}, transfer:{:2.4f}, network:{:2.4f}, loss:{:2.4f}, backward:{:2.4f}, loss_c:{:2.4f}, loss_d:{:2.4f}".format(tt1-tt0,tt2-tt1,tt11-tt1,tt12-tt11,tt13-tt12,tt14-tt13,tc-tt12,td-tc))
+            print("Loading:{:2.4f}, other:{:2.4f}, transfer:{:2.4f}, network:{:2.4f}, loss:{:2.4f}, backward:{:2.4f}, loss_c:{:2.4f}, loss_d:{:2.4f}".format(tt1-tt0,tt2-tt1,tt11-tt1,tt12-tt11,tt13-tt12,tt14-tt13,tc-tt12,td-tc))
             tt0 = time.time()
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
@@ -135,8 +138,8 @@ def eval_net(net, dl, loss_fnc, device='cpu'):
             loss_d = loss_fnc(outputs, target)
             loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
             loss_v += (loss_d+loss_c).cpu().detach()/2
-    compare_distogram(outputs, target)
-    plotfullprotein(cnn_pred, caa_pred, cbb_pred, cnn_target, caa_target, cbb_target)
+    # compare_distogram(outputs, target)
+    # plotfullprotein(cnn_pred, caa_pred, cbb_pred, cnn_target, caa_target, cbb_target)
     net.train()
     return loss_v/len(dl)
 
