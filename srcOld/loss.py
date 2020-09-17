@@ -102,6 +102,59 @@ def loss_tr(r1,r2, return_coords=False):
         return loss_tr
 
 
+def loss_tr_tuples(r1s,r2s, return_coords=False):
+    '''
+    Given two sets of 3D points of equal size. It computes the distance between these two sets of points, when allowing translation and rotation of the point clouds.
+    r1 -> Tensors of shape (b,3d,n)
+    r2 -> Tuples of length d, containing Tensors of shape (b,3,n)
+    '''
+    loss_tr = 0
+    coords_pred = ()
+    coords_target = ()
+    for i,r2 in enumerate(r2s):
+        r1 = r1s[:,3*i:3*i+3,:]
+
+        mask = (r2 != 0).reshape(r2.shape)
+        mask = (torch.sum(mask,dim=1) > 0).unsqueeze(1)
+        mask = mask.repeat(1,3,1)
+        batch_mask = torch.sum(mask,dim=(1,2)) > 0
+
+        r1 = r1[batch_mask,:,:]
+        r2 = r2[batch_mask,:,:]
+        mask = mask[batch_mask,:,:]
+
+        #First we translate the two sets, by setting both their centroids to origin
+        r1c = r1 - torch.sum(r1 * mask, dim=2, keepdim=True) / torch.sum(mask, dim=2, keepdim=True)
+        r2c = r2 - torch.sum(r2 * mask, dim=2, keepdim=True) / torch.sum(mask, dim=2, keepdim=True)
+        r1c = r1c * mask
+        r2c = r2c * mask
+
+        H = torch.bmm(r1c,r2c.transpose(1,2))
+        U, S, V = torch.svd(H)
+
+        d = torch.sign(torch.det(torch.bmm(V, U.transpose(1,2))))
+
+        ones = torch.ones_like(d)
+        a = torch.stack((ones, ones, d), dim=-1)
+        tmp = torch.diag_embed(a)
+
+        R = torch.bmm(V, torch.bmm(tmp, U.transpose(1,2)))
+
+        r1cr = torch.bmm(R, r1c)
+
+        loss_tr += torch.mean(torch.norm(r1cr - r2c, dim=(1, 2)) ** 2 / torch.norm(r2c, dim=(1, 2)) ** 2)
+        if return_coords:
+            coords_pred += (r1cr[-1,:,:].squeeze().cpu().detach().numpy(),)
+            coords_target += (r2c[-1,:,:].squeeze().cpu().detach().numpy(),)
+    loss_tr / len(r2s)
+    if return_coords:
+        return loss_tr, coords_pred, coords_target
+    else:
+        return loss_tr
+
+
+
+
 def loss_tr_all(r1,r2, return_coords=False):
     '''
     Given two sets of 3D points of equal size. It computes the distance between these two sets of points, when allowing translation and rotation of the point clouds.

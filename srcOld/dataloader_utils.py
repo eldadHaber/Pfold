@@ -113,13 +113,11 @@ class SeqFlip(object):
     '''
     This function is specially designed for flipping the features made in pnet. For other types of features, this might not work.
     '''
-    def __init__(self, prob = 1.5):
+    def __init__(self, prob = 0.5):
         self.prob = prob
         self.p = random.random()
 
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
+    def __call__(self, args):
         if self.p > self.prob:
             new_args = ()
             if isinstance(args[0],list) or isinstance(args[0],np.ndarray):
@@ -154,9 +152,7 @@ class SeqFlip(object):
 class ListToNumpy(object):
     def __init__(self):
         pass
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
+    def __call__(self, args):
         args_array = ()
         if isinstance(args[0], list):
             for arg in args:
@@ -176,173 +172,18 @@ class ConvertCoordToDists(object):
     def __init__(self):
         pass
 
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
+    def __call__(self, args):
+        distances = ()
+        coords = ()
+        for r in args:
+            mask = r[0,:] != 0
+            M = mask[:,None] @  mask[None,:]
+            d = np.sum(r ** 2, axis=0)[:,None] + np.sum(r ** 2, axis=0)[None,:] - 2 * (r.T @ r)
+            d = np.sqrt(np.maximum(M*d,0))
+            distances += (d,)
+            coords += (r,)
 
-        rN = args[0]
-        rCa = args[1]
-        rCb = args[2]
-
-        mask_N = rN[0,:] != 0
-        mask_Ca = rCa[0,:] != 0
-        mask_Cb = rCb[0,:] != 0
-
-        MN = mask_N[:,None] @  mask_N[None,:]
-        MCa = mask_Ca[:,None] @  mask_Ca[None,:]
-        MCb = mask_Cb[:,None] @  mask_Cb[None,:]
-
-        # #N-N
-        dNN = np.sum(rN ** 2, axis=0)[:,None] + np.sum(rN ** 2, axis=0)[None,:] - 2 * (rN.T @ rN)
-        dNN = np.sqrt(np.maximum(MN*dNN,0))
-        #
-        # #Ca-Ca
-        dCaCa = np.sum(rCa ** 2, axis=0)[:,None] + np.sum(rCa ** 2, axis=0)[None,:] - 2 * (rCa.T @ rCa)
-        dCaCa = np.sqrt(np.maximum(MCa*dCaCa,0))
-
-        #Cb-Cb
-        dCbCb = np.sum(rCb ** 2, axis=0)[:,None] + np.sum(rCb ** 2, axis=0)[None,:] - 2 * (rCb.T @ rCb)
-        dCbCb = np.sqrt(np.maximum(MCb*dCbCb,0))
-
-        return (dNN, dCaCa, dCbCb), (rN, rCa, rCb)
-
-
-
-class ConvertCoordToDistAnglesVec(object):
-    def __init__(self):
-        pass
-
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
-
-        rN = args[0]
-        rCa = args[1]
-        rCb = args[2]
-        mask = args[3]
-
-        # Get D
-        D = np.sum(rCb ** 2, axis=1)[:,None] + np.sum(rCb ** 2, axis=1)[None,:] - 2 * (rCb @ rCb.transpose())
-        M = mask[:,None] @  mask[None,:]
-        D = np.sqrt(np.maximum(M*D,0))
-
-        # Get Upper Phi
-        # TODO clean Phi to be the same as OMEGA
-        V1x = (rCa[:, 0])[:,None] - (rCb[:, 0])[:,None]
-        V1y = (rCa[:, 1])[:,None] - (rCb[:, 1])[:,None]
-        V1z = (rCa[:, 2])[:,None] - (rCb[:, 2])[:,None]
-        V2x = (rCb[:, 0])[:,None] - (rCb[:, 0])[:,None].transpose()
-        V2y = (rCb[:, 1])[:,None] - (rCb[:, 1])[:,None].transpose()
-        V2z = (rCb[:, 2])[:,None] - (rCb[:, 2])[:,None].transpose()
-        # Normalize them
-        V1n = np.sqrt(V1x**2 + V1y**2 + V1z**2)
-        V1x = V1x/V1n
-        V1y = V1y/V1n
-        V1z = V1z/V1n
-        V2n = np.sqrt(V2x**2 + V2y**2 + V2z**2)
-        V2x = V2x/V2n
-        V2y = V2y/V2n
-        V2z = V2z/V2n
-        # go for it
-        # PHI is the angle between v1 and -v2 the way the two vectors are defined.
-        PHI = M*(V1x * -V2x + V1y * -V2y + V1z * -V2z)
-        PHI = np.degrees(np.arccos(PHI))
-        indnan = np.isnan(PHI)
-        PHI[indnan] = 0.0
-
-        # Omega
-        nat = rCa.shape[0]
-        V1 = np.zeros((nat, nat, 3))
-        V2 = np.zeros((nat, nat, 3))
-        V3 = np.zeros((nat, nat, 3))
-        # Ca1 - Cb1
-        V1[:,:,0] = ((rCa[:,0])[:,None] - (rCb[:,0])[:,None]).repeat(nat,axis=1)
-        V1[:,:,1] = ((rCa[:,1])[:,None] - (rCb[:,1])[:,None]).repeat(nat,axis=1)
-        V1[:,:,2] = ((rCa[:,2])[:,None] - (rCb[:,2])[:,None]).repeat(nat,axis=1)
-        # Cb1 - Cb2
-        V2[:,:,0] = (rCb[:,0])[:,None] - (rCb[:,0])[:,None].transpose()
-        V2[:,:,1] = (rCb[:,1])[:,None] - (rCb[:,1])[:,None].transpose()
-        V2[:,:,2] = (rCb[:,2])[:,None] - (rCb[:,2])[:,None].transpose()
-        # Cb2 - Ca2
-        V3[:,:,0] = ((rCb[:,0])[None,:] - (rCa[:,0])[None,:]).repeat(nat,axis=0)
-        V3[:,:,1] = ((rCb[:,1])[None,:] - (rCa[:,1])[None,:]).repeat(nat,axis=0)
-        V3[:,:,2] = ((rCb[:,2])[None,:] - (rCa[:,2])[None,:]).repeat(nat,axis=0)
-
-        OMEGA,OMEGA_DOT,OMEGA_DET = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
-        indnan = np.isnan(OMEGA)
-        OMEGA[indnan] = 0.0
-
-        # Theta
-        V1 = np.zeros((nat, nat, 3))
-        V2 = np.zeros((nat, nat, 3))
-        V3 = np.zeros((nat, nat, 3))
-        # N - Ca
-        V1[:,:,0] = (rN[:,0][:,None] - rCa[:,0][:,None]).repeat(nat,axis=1)
-        V1[:,:,1] = (rN[:,1][:,None] - rCa[:,1][:,None]).repeat(nat,axis=1)
-        V1[:,:,2] = (rN[:,2][:,None] - rCa[:,2][:,None]).repeat(nat,axis=1)
-        # Ca - Cb # TODO - repeated computation
-        V2[:,:,0] = (rCa[:,0][:,None] - rCb[:,0][:,None]).repeat(nat,axis=1)
-        V2[:,:,1] = (rCa[:,1][:,None] - rCb[:,1][:,None]).repeat(nat,axis=1)
-        V2[:,:,2] = (rCa[:,2][:,None] - rCb[:,2][:,None]).repeat(nat,axis=1)
-        # Cb1 - Cb2 # TODO - repeated computation
-        V3[:,:,0] = rCb[:,0][:,None] - rCb[:,0][:,None].transpose()
-        V3[:,:,1] = rCb[:,1][:,None] - rCb[:,1][:,None].transpose()
-        V3[:,:,2] = rCb[:,2][:,None] - rCb[:,2][:,None].transpose()
-
-        THETA, THETA_DOT, THETA_DET = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
-        indnan = np.isnan(THETA)
-        THETA[indnan] = 0.0
-        # import matplotlib.pyplot as plt
-        # plt.clf()
-        # plt.subplot(1,3,1)
-        # plt.imshow(OMEGA)
-        # plt.colorbar()
-        # plt.subplot(1,3,2)
-        # plt.imshow(OMEGA_DOT)
-        # plt.colorbar()
-        # plt.subplot(1,3,3)
-        # plt.imshow(OMEGA_DET)
-        # plt.colorbar()
-        #
-        #
-        # plt.clf()
-        # plt.imshow(PHI)
-        # plt.colorbar()
-        #
-        # plt.clf()
-        # plt.subplot(1,3,1)
-        # plt.imshow(THETA)
-        # plt.colorbar()
-        # plt.subplot(1,3,2)
-        # plt.imshow(THETA_DOT)
-        # plt.colorbar()
-        # plt.subplot(1,3,3)
-        # plt.imshow(THETA_DET)
-        # plt.colorbar()
-
-        return D, OMEGA, PHI, THETA
-
-def crossProdMat(V1, V2):
-    Vcp = np.zeros(V1.shape)
-    Vcp[:, :, 0] = V1[:, :, 1] * V2[:, :, 2] - V1[:, :, 2] * V2[:, :, 1]
-    Vcp[:, :, 1] = -V1[:, :, 0] * V2[:, :, 2] + V1[:, :, 2] * V2[:, :, 0];
-    Vcp[:, :, 2] = V1[:, :, 0] * V2[:, :, 1] - V1[:, :, 1] * V2[:, :, 0];
-    return Vcp
-
-
-def ang_between_planes_matrix_360(v1, v2, v3, v4):
-    nA = crossProdMat(v1, v2)
-    nB = crossProdMat(v3, v4)
-    nA = nA / (np.sqrt(np.sum(nA ** 2, axis=2))[:, :, None])
-    nB = nB / (np.sqrt(np.sum(nB ** 2, axis=2))[:, :, None])
-
-    v2n = v2 / (np.sqrt(np.sum(v2 ** 2, axis=2))[:, :, None])
-    det = np.sum(v2n * crossProdMat(nA, nB), axis=2)
-    dot = np.sum(nA * nB, axis=2)
-    angle = (np.degrees(np.arctan2(det, dot))+360) % 360
-
-    # Psi    = torch.acos(cosPsi)
-    return angle,dot,det
+        return distances, coords
 
 
 

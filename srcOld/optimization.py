@@ -3,7 +3,7 @@ import time
 import matplotlib
 import numpy as np
 
-from srcOld.loss import loss_tr, loss_tr_all
+from srcOld.loss import loss_tr, loss_tr_all, loss_tr_tuples
 from srcOld.utils import move_tuple_to
 from srcOld.visualization import compare_distogram, plotcoordinates, plotfullprotein
 
@@ -36,33 +36,21 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     enable_coordinate_loss = False
     tt0 = time.time()
     while True:
-        for i,(seq, target,mask, coords) in enumerate(dataloader_train):
+        for i,(seq, dists,mask, coords) in enumerate(dataloader_train):
             tt1 = time.time()
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
-            target = move_tuple_to(target, device, non_blocking=True)
+            dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             optimizer.zero_grad()
             tt11 = time.time()
-            outputs, coords_pred = net(seq,mask)
+            dists_pred, coords_pred = net(seq,mask)
             tt12 = time.time()
 
-            # loss_c = loss_tr_all(coords_pred, coords)
-            loss_cnn = loss_tr(coords_pred[:,0:3,:], coords[1])
-            loss_caa = loss_tr(coords_pred[:,3:6,:], coords[1])
-            loss_cbb = loss_tr(coords_pred[:,6:9,:], coords[2])
-            # loss_cnn, cnn_pred,cnn_target = loss_tr_wrapper(coords_pred[:,0:3,:], coords[0])
-            # loss_caa, caa_pred,caa_target = loss_tr_wrapper(coords_pred[:,3:6,:], coords[1])
-            # loss_cbb, cbb_pred,cbb_target = loss_tr_wrapper(coords_pred[:,6:9,:], coords[2])
+            loss_c = loss_tr_tuples(coords_pred, coords)
             tc = time.time()
-            loss_d = loss_fnc(outputs, target)
+            loss_d = loss_fnc(dists_pred, dists)
             td = time.time()
-            loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
-            # if loss_d < 0.001:
-            #     enable_coordinate_loss = True
-            # if enable_coordinate_loss:
-            # else:
-            #     loss = loss_d
 
             loss = 0.5 * loss_d + 0.5 * loss_c
             tt13 = time.time()
@@ -75,7 +63,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 scheduler.step()
 
             tt2 = time.time()
-            print("Loading:{:2.4f}, other:{:2.4f}, transfer:{:2.4f}, network:{:2.4f}, loss:{:2.4f}, backward:{:2.4f}, loss_c:{:2.4f}, loss_d:{:2.4f}".format(tt1-tt0,tt2-tt1,tt11-tt1,tt12-tt11,tt13-tt12,tt14-tt13,tc-tt12,td-tc))
+            # print("Loading:{:2.4f}, other:{:2.4f}, transfer:{:2.4f}, network:{:2.4f}, loss:{:2.4f}, backward:{:2.4f}, loss_c:{:2.4f}, loss_d:{:2.4f}".format(tt1-tt0,tt2-tt1,tt11-tt1,tt12-tt11,tt13-tt12,tt14-tt13,tc-tt12,td-tc))
             tt0 = time.time()
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
@@ -108,7 +96,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     return net
 
 
-def eval_net(net, dl, loss_fnc, device='cpu'):
+def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False):
     '''
     Standard training routine.
     :param net: Network to train
@@ -124,20 +112,18 @@ def eval_net(net, dl, loss_fnc, device='cpu'):
     net.eval()
     with torch.no_grad():
         loss_v = 0
-        for i,(seq, target,mask, coords) in enumerate(dl):
+        for i,(seq, dists,mask, coords) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
-            target = move_tuple_to(target, device, non_blocking=True)
+            dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
-            outputs, coords_pred = net(seq,mask)
-            loss_cnn, cnn_pred,cnn_target = loss_tr(coords_pred[:,0:3,:], coords[0], return_coords=True)
-            loss_caa, caa_pred,caa_target = loss_tr(coords_pred[:,3:6,:], coords[1], return_coords=True)
-            loss_cbb, cbb_pred,cbb_target = loss_tr(coords_pred[:,6:9,:], coords[2], return_coords=True)
-            loss_d = loss_fnc(outputs, target)
-            loss_c = (loss_cnn + loss_caa + loss_cbb) / 3
+            dists_pred, coords_pred = net(seq,mask)
+            loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
+            loss_d = loss_fnc(dists_pred, dists)
             loss_v += (loss_d+loss_c).cpu().detach()/2
-    # compare_distogram(outputs, target)
-    # plotfullprotein(cnn_pred, caa_pred, cbb_pred, cnn_target, caa_target, cbb_target)
+    if plot_results:
+        compare_distogram(dists_pred, dists)
+        plotfullprotein(coords_pred_tr, coords_tr)
     net.train()
     return loss_v/len(dl)
 

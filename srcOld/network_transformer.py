@@ -37,8 +37,7 @@ class TransformerModel(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder = CNN(chan_in, 2 * chan_in, 3 * chan_in, emsize, stencil)
         self.ninp = emsize
-        if chan_out < 0:
-            chan_out = chan_in
+        assert np.mod(chan_out,3) == 0, "The number of channels out, should be divisible by 3, since we need 3 channels for each target currently. It was chosen as {}".format(chan_out)
         self.decoder = CNN(emsize, 2 * emsize, 3 * emsize, chan_out, stencil)
 
     def forward(self, src, mask):
@@ -48,21 +47,16 @@ class TransformerModel(nn.Module):
 
         src = self.encoder(src.permute(1,2,0), mask_e)
         src = src.permute(2,0,1)
-        src = self.pos_encoder(src)
+        # src = self.pos_encoder(src)
 
-        #src = self.pos_encoder(src)
-        #output = src
         output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
         output = self.decoder(output.permute(1,2,0), mask_e)
-        output = output.permute(2,0,1)
 
-        # Now we change the shape back to normal again.
-        output = output.permute(1,2,0)
-        dNN = tr2DistSmall(output[:,0:3,:])
-        dCaCa = tr2DistSmall(output[:,3:6,:])
-        dCbCb = tr2DistSmall(output[:,6:9,:])
+        dists = ()
+        for i in range(output.shape[1]//3):
+            dists += (tr2DistSmall(output[:,i:i+3,:]),)
 
-        return (dNN,dCaCa,dCbCb), output
+        return dists, output
 
 
 
