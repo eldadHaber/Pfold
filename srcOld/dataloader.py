@@ -79,7 +79,7 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
 
     dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=min(batch_size,len(dataset_train)), shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=True)
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=False)
 
     return dl_train, dl_test
