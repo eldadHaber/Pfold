@@ -8,7 +8,7 @@ from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DIC
 
 
 class Dataset_pnet(Dataset):
-    def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300):
+    def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300, chan_out=3):
         id,seq,pssm,entropy,dssp,r1,r2,r3,mask = parse_pnet(file,max_seq_len=max_seq_len)
         self.file = file
         self.id = id
@@ -17,29 +17,41 @@ class Dataset_pnet(Dataset):
         self.entropy = entropy
         self.dssp = dssp
         self.mask = mask
-        self.r1 = r1
-        self.r2 = r2
-        self.r3 = r3
+        self.r1 = r1  # Ca
+        self.r2 = r2  # Cb
+        self.r3 = r3  # N
 
         self.transform = transform
         self.transform_target = transform_target
         self.transform_mask = transform_mask
+        self.chan_out = chan_out
         # self.nfeatures = 84
 
     def __getitem__(self, index):
         features = (self.seq[index], self.pssm[index], self.entropy[index])
-        mask = self.mask[index]
         target = (self.r1[index], self.r2[index], self.r3[index])
+
+        target = self.match_target_channels(target)
 
         self.transform.transforms[0].reroll()
         if self.transform is not None:
             features = self.transform(features)
         if self.transform_target is not None:
             distances, coords = self.transform_target(target)
-        # if self.transform_mask is not None:
-        #     mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
 
         return features, distances, coords
+
+    def match_target_channels(self,target):
+        if self.chan_out == 3:
+            target = (target[0],)
+        elif self.chan_out == 6:
+            target = target[0:2]
+        elif self.chan_out == 9:
+            pass
+        else:
+            raise NotImplementedError("Chan_out is {}, which is not implemented".format(self.chan_out))
+        return target
+
 
     def __len__(self):
         return len(self.seq)
@@ -154,9 +166,10 @@ def parse_pnet(file,max_seq_len=-1):
         coords = coords
         for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
             pssm2.append(flip_multidimensional_list(pssm[i]))
-            r1.append(flip_multidimensional_list(separate_coords(coords[i], 0)))
-            r2.append(flip_multidimensional_list(separate_coords(coords[i], 1)))
-            r3.append(flip_multidimensional_list(separate_coords(coords[i], 2)))
+            # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
+            r1.append(flip_multidimensional_list(separate_coords(coords[i], 1)))
+            r2.append(flip_multidimensional_list(separate_coords(coords[i], 2)))
+            r3.append(flip_multidimensional_list(separate_coords(coords[i], 0)))
 
             if i+1 % 1000 == 0:
                 print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))

@@ -24,15 +24,15 @@ if __name__ == '__main__':
     parser.add_argument('--dataset-test', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--batch-size', default=5, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=22, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--network', default='transformer', type=str, metavar='N', help='network to use')
 
     # Learning
 
     parser.add_argument('--SL-lr', default=1e-4, type=float, metavar='N', help='Learning Rate')
     # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--max-iter', default=400000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=1, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--max-iter', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=100, type=int, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--epochs', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='./results/checkpoints/790000_checkpoint.tar', type=str, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='', type=str, metavar='N', help='select the neural network to train (resnet)')
@@ -47,7 +47,7 @@ if __name__ == '__main__':
         'nlayers': 2,  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
         'nhead': 8,  # the number of heads in the multiheadattention models
         'dropout': 1e-3,  # 0.2 # the dropout value
-        'chan_out': 9,  # the output channels
+        'chan_out': 3,  # the output channels, need 3 for each atom type
         'stencil': 5}
     elif args.network.lower() == 'vnet':
         args.network_args = {

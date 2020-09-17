@@ -13,7 +13,7 @@ from srcOld.loss import MSELoss, LossMultiTargets
 from srcOld.network import select_network
 from srcOld.network_vnet import vnet1D
 from srcOld.network_transformer import TransformerModel
-from srcOld.optimization import train
+from srcOld.optimization import train, eval_net
 from srcOld.utils import fix_seed
 
 matplotlib.use('TkAgg') #TkAgg
@@ -43,7 +43,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_type,batch_size=c.batch_size, network=c.network)
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_type,batch_size=c.batch_size, network=c.network, chan_out=c.network_args['chan_out'])
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training
@@ -61,5 +61,5 @@ def main(c):
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
-
+    eval_net(net, dl_test, loss_fnc, device=c.device, plot_results=True)
     print("Done")

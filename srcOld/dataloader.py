@@ -11,7 +11,7 @@ from srcOld.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
-def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None):
+def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, chan_out=3):
     '''
     This is a wrapper routine for various dataloaders.
     Currently supports:
@@ -36,7 +36,7 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None):
             transform_mask_train = transforms.Compose([Flip, ListToNumpy()])
 
 
-        dataset_train = Dataset_pnet(path_train, transform=transform_train,transform_target=transform_target_train,transform_mask=transform_mask_train)
+        dataset_train = Dataset_pnet(path_train, transform=transform_train,transform_target=transform_target_train,transform_mask=transform_mask_train, chan_out=chan_out)
     elif os.path.isfile(path_train) and os.path.splitext(path_train)[1].lower() == '.lmdb':
         if type == '2D':
             transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo2D()])
@@ -45,7 +45,7 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None):
         transform_target_train = transforms.Compose([Flip, ConvertCoordToDists()])
         transform_mask_train = transforms.Compose([Flip])
 
-        dataset_train = Dataset_lmdb(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train)
+        dataset_train = Dataset_lmdb(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train, chan_out=chan_out)
     else:
         raise NotImplementedError("dataset not implemented yet.")
     if os.path.isdir(path_test):
@@ -60,14 +60,14 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None):
             transform_target_test = transforms.Compose([Flip, ListToNumpy(), ConvertCoordToDists()])
             transform_mask_test = transforms.Compose([Flip, ListToNumpy()])
 
-        dataset_test = Dataset_pnet(path_test, transform=transform_test,transform_target=transform_target_test, transform_mask=transform_mask_test)
+        dataset_test = Dataset_pnet(path_test, transform=transform_test,transform_target=transform_target_test, transform_mask=transform_mask_test, chan_out=chan_out)
     elif os.path.isfile(path_test) and os.path.splitext(path_test)[1].lower() == '.lmdb':
         if type == '2D':
             transform_test = transforms.Compose([ConvertPnetFeaturesTo2D()])
         elif type == '1D':
             transform_test = transforms.Compose([ConvertPnetFeaturesTo1D()])
         transform_target_test = transforms.Compose([ConvertCoordToDists()])
-        dataset_test = Dataset_lmdb(path_test, transform=transform_test, target_transform=transform_target_test)
+        dataset_test = Dataset_lmdb(path_test, transform=transform_test, target_transform=transform_target_test, chan_out=chan_out)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
