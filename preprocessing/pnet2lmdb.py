@@ -147,6 +147,7 @@ def read_pnet_into_lmdb(pnet_file, lmdb_file,max_seq_len=300,min_seq_len=80,num_
 
                     print("Flushing database ...")
                     db.sync()
+                    db.set_mapsize(1) # This basically just sets the mapsize as small as possible after we have populated the database.
                     db.close()
                     print("Done: {:}, excluded: {:}, problems: {:} Time: {:2.2f}".format(cnt, n_excluded,
                                                                                                    problems,
@@ -178,18 +179,13 @@ def process_data(seq,pssm,entropy,coord,mask):
 
 if __name__ == "__main__":
     import argparse
-
+    from pathlib import Path
     parser = argparse.ArgumentParser()
     # parser.add_argument("-f", "--folder", type=str, default='./../data/training_100.pnet')
-    parser.add_argument("-f", "--folder", type=str, default='./../data/training_30.pnet')
-    # parser.add_argument('-s', '--split', type=str, default="val")
-    # parser.add_argument('--out', type=str, default="e:/test_lmdb")
-    # parser.add_argument("-f", "--folder", type=str, default='./../data/testing.pnet')
-    # parser.add_argument("-f", "--folder", type=str, default='./../data/testing_small.pnet')
-    parser.add_argument('--out', type=str, default="e:/training30")
-    parser.add_argument('-p', '--procs', type=int, default=0)
+    # parser.add_argument("-f", "--folder", type=str, default='./../data/training_30.pnet')
+    parser.add_argument("-f", "--folder", type=str, default='./../data/testing.pnet')
+    args = parser.parse_args()
     max_seq_len = 320
     min_seq_len = 80
-    args = parser.parse_args()
-    lmdb_name = "{:}_{:}_{:}.lmdb".format(args.out,min_seq_len,max_seq_len)
-    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=5e9, report_freq=1000, write_freq=5000)
+    lmdb_name = "e:/{:}_{:}_{:}_test.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
+    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=300e9, report_freq=1000, write_freq=5000)
