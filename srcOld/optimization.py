@@ -68,7 +68,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v = eval_net(net, dl_test, loss_fnc, device=device)
+                    loss_v = eval_net(net, dl_test, loss_fnc, device=device, plot_results=True)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
@@ -114,10 +114,9 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False):
         loss_v = 0
         for i,(seq, dists,mask, coords) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
-            mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
-            dists_pred, coords_pred = net(seq,mask)
+            dists_pred, coords_pred = net(seq)
             loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
             loss_d = loss_fnc(dists_pred, dists)
             loss_v += (loss_d+loss_c).cpu().detach()/2

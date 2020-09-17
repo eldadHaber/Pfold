@@ -63,3 +63,4 @@ def main(c):
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
     eval_net(net, dl_test, loss_fnc, device=c.device, plot_results=True)
     print("Done")
+    input()

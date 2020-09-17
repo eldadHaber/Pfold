@@ -32,7 +32,7 @@ class TransformerModel(nn.Module):
 
         self.model_type = 'Transformer'
         self.src_mask = None
-        self.pos_encoder = PositionalEncoding(emsize, dropout)
+        # self.pos_encoder = PositionalEncoding(emsize, dropout)
         encoder_layers = TransformerEncoderLayer(emsize, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder = CNN(chan_in, 2 * chan_in, 3 * chan_in, emsize, stencil)
@@ -40,7 +40,10 @@ class TransformerModel(nn.Module):
         assert np.mod(chan_out,3) == 0, "The number of channels out, should be divisible by 3, since we need 3 channels for each target currently. It was chosen as {}".format(chan_out)
         self.decoder = CNN(emsize, 2 * emsize, 3 * emsize, chan_out, stencil)
 
-    def forward(self, src, mask):
+    def forward(self, src, mask=None):
+        if mask is None:
+            mask = torch.ones_like(src[:,0,:])
+
         # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
         src = src.permute(2,0,1)
         mask_e = mask.unsqueeze(1)
