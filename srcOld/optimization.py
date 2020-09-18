@@ -37,6 +37,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     tt0 = time.time()
     while True:
         for i,(seq, dists,mask, coords) in enumerate(dataloader_train):
+
             tt1 = time.time()
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.

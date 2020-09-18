@@ -16,7 +16,7 @@ class Dataset_lmdb(data.Dataset):
         target = (dist, omega, phi, theta)
 
     '''
-    def __init__(self, db_path, transform=None, target_transform=None, mask_transform=None):
+    def __init__(self, db_path, transform=None, target_transform=None, mask_transform=None, chan_out=3):
         self.db_path = db_path
         self.env = lmdb.open(db_path, subdir=osp.isdir(db_path), max_readers=1,
                              readonly=True, lock=False,
@@ -31,6 +31,7 @@ class Dataset_lmdb(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.mask_transform = mask_transform
+        self.chan_out = chan_out
         # self.nfeatures = 84
 
     def __getitem__(self, index):
@@ -39,14 +40,9 @@ class Dataset_lmdb(data.Dataset):
             byteflow = txn.get(self.keys[index])
         unpacked = pa.deserialize(byteflow)
 
-        # load image
         features = copy.deepcopy(unpacked[0])
-
         targets = copy.deepcopy(unpacked[1])
-        # coords = copy.deepcopy(unpacked[2])
-
-        # mask = copy.deepcopy(unpacked[2])
-
+        targets = self.match_target_channels(targets)
 
         if isinstance(self.transform.transforms[0], SeqFlip):
             self.transform.transforms[0].reroll()
@@ -63,6 +59,18 @@ class Dataset_lmdb(data.Dataset):
 
     def __len__(self):
         return self.length
+
+    def match_target_channels(self,target):
+        if self.chan_out == 3:
+            target = (target[0],)
+        elif self.chan_out == 6:
+            target = target[0:2]
+        elif self.chan_out == 9:
+            pass
+        else:
+            raise NotImplementedError("chan_out is {}, which is not implemented".format(self.chan_out))
+        return target
+
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' + self.db_path + ')'

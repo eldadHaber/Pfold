@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import time
 from itertools import compress
 import copy
-from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT
+from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip
 
 
 class Dataset_pnet(Dataset):
@@ -33,7 +33,8 @@ class Dataset_pnet(Dataset):
 
         target = self.match_target_channels(target)
 
-        self.transform.transforms[0].reroll()
+        if isinstance(self.transform.transforms[0], SeqFlip):
+            self.transform.transforms[0].reroll()
         if self.transform is not None:
             features = self.transform(features)
         if self.transform_target is not None:

@@ -187,5 +187,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     max_seq_len = 320
     min_seq_len = 80
-    lmdb_name = "e:/{:}_{:}_{:}_test.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
+    lmdb_name = "e:/{:}_{:}_{:}.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
     read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=300e9, report_freq=1000, write_freq=5000)

@@ -48,6 +48,8 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
         dataset_train = Dataset_lmdb(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train, chan_out=chan_out)
     else:
         raise NotImplementedError("dataset not implemented yet.")
+
+    # Test Dataset
     if os.path.isdir(path_test):
         dataset_test = Dataset_a3m(path_test)
     elif os.path.isfile(path_test) and os.path.splitext(path_test)[1].lower() == '.pnet':
@@ -56,9 +58,9 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
             transform_target_test = transforms.Compose([ListToNumpy(), ConvertCoordToDists()])
             transform_mask_test = transforms.Compose([ListToNumpy()])
         elif type == '1D':
-            transform_test = transforms.Compose([Flip, ListToNumpy(), ConvertPnetFeaturesTo1D()])
-            transform_target_test = transforms.Compose([Flip, ListToNumpy(), ConvertCoordToDists()])
-            transform_mask_test = transforms.Compose([Flip, ListToNumpy()])
+            transform_test = transforms.Compose([ListToNumpy(), ConvertPnetFeaturesTo1D()])
+            transform_target_test = transforms.Compose([ListToNumpy(), ConvertCoordToDists()])
+            transform_mask_test = transforms.Compose([ListToNumpy()])
 
         dataset_test = Dataset_pnet(path_test, transform=transform_test,transform_target=transform_target_test, transform_mask=transform_mask_test, chan_out=chan_out)
     elif os.path.isfile(path_test) and os.path.splitext(path_test)[1].lower() == '.lmdb':
