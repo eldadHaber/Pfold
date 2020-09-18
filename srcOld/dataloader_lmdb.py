@@ -35,7 +35,7 @@ class Dataset_lmdb(data.Dataset):
         self.chan_out = chan_out
         self.chan_in = chan_in
         self.draw_seq_from_msa = draw_seq_from_msa
-        self.draw = DrawFromProbabilityMatrix(sanity_check=True, fraction_of_seq_drawn=0.2)
+        self.draw = DrawFromProbabilityMatrix(fraction_of_seq_drawn=0.2)
         self.draw_prob = 0.5
 
     def __getitem__(self, index):
@@ -72,7 +72,7 @@ class Dataset_lmdb(data.Dataset):
                 features = (seq,)
         elif self.chan_in == 22:
             if self.draw_seq_from_msa and p > self.draw_prob:
-                features = (self.draw(pssm, seq=seq, debug=True), entropy)
+                features = (self.draw(pssm, seq=seq), entropy)
             else:
                 features = (seq, entropy)
         elif self.chan_in == 41:
