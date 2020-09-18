@@ -16,14 +16,14 @@ if __name__ == '__main__':
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
     # parser.add_argument('--dataset-train', default='e:/training30_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='e:/training_100_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='e:/training_100_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='e:/testing_small_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='e:/testing_small_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--batch-size', default=50, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--network', default='transformer', type=str, metavar='N', help='network to use')
 
@@ -31,8 +31,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--SL-lr', default=1e-4, type=float, metavar='N', help='Learning Rate')
     # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--max-iter', default=500000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--max-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=1, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--draw-seq-from-msa', default=True, type=bool, help='Draws the sequence from the pssm matrix, using it for data augmentation')
     # parser.add_argument('--epochs', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='./results/checkpoints/790000_checkpoint.tar', type=str, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='', type=str, metavar='N', help='select the neural network to train (resnet)')
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
         args.network_args = {
-        'chan_in': 42,  # the size of vocabulary
+        'chan_in': 22,  # the number of channels in (21 for one-hot, 22 for one-hot + entropy, 41 for one-hot + pssm, 42 for one-hot + pssm + entropy)
         'emsize': 512,  # embedding dimension
         'nhid': 1024, # nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
         'nlayers': 5,  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder

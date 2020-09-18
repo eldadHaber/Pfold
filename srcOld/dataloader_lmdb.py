@@ -1,10 +1,11 @@
 import os.path as osp
+import random
 import lmdb
 import pyarrow as pa
 import torch.utils.data as data
 import copy
 
-from srcOld.dataloader_utils import SeqFlip
+from srcOld.dataloader_utils import SeqFlip, DrawFromProbabilityMatrix
 
 
 class Dataset_lmdb(data.Dataset):
@@ -16,7 +17,7 @@ class Dataset_lmdb(data.Dataset):
         target = (dist, omega, phi, theta)
 
     '''
-    def __init__(self, db_path, transform=None, target_transform=None, mask_transform=None, chan_out=3):
+    def __init__(self, db_path, chan_in, transform=None, target_transform=None, mask_transform=None, chan_out=3, draw_seq_from_msa=False):
         self.db_path = db_path
         self.env = lmdb.open(db_path, subdir=osp.isdir(db_path), max_readers=1,
                              readonly=True, lock=False,
@@ -32,15 +33,19 @@ class Dataset_lmdb(data.Dataset):
         self.target_transform = target_transform
         self.mask_transform = mask_transform
         self.chan_out = chan_out
-        # self.nfeatures = 84
+        self.chan_in = chan_in
+        self.draw_seq_from_msa = draw_seq_from_msa
+        self.draw = DrawFromProbabilityMatrix(sanity_check=True, fraction_of_seq_drawn=0.2)
+        self.draw_prob = 0.5
 
     def __getitem__(self, index):
         env = self.env
         with env.begin(write=False) as txn:
             byteflow = txn.get(self.keys[index])
         unpacked = pa.deserialize(byteflow)
-
         features = copy.deepcopy(unpacked[0])
+        features = self.select_features(features)
+
         targets = copy.deepcopy(unpacked[1])
         targets = self.match_target_channels(targets)
 
@@ -52,13 +57,34 @@ class Dataset_lmdb(data.Dataset):
         if self.target_transform is not None:
             distances, coords = self.target_transform(targets)
 
-        # if self.mask_transform is not None:
-        #     mask = self.mask_transform(mask)
-
         return features, distances, coords
 
     def __len__(self):
         return self.length
+
+    def select_features(self,features):
+        seq,pssm,entropy = features
+        p = random.random()
+        if self.chan_in == 21:
+            if self.draw_seq_from_msa and p > self.draw_prob:
+                features = (self.draw(pssm, seq=seq),)
+            else:
+                features = (seq,)
+        elif self.chan_in == 22:
+            if self.draw_seq_from_msa and p > self.draw_prob:
+                features = (self.draw(pssm, seq=seq, debug=True), entropy)
+            else:
+                features = (seq, entropy)
+        elif self.chan_in == 41:
+            features = (seq, pssm)
+        elif self.chan_in == 42:
+            features = (seq, pssm, entropy)
+        else:
+            raise NotImplementedError("The selected number of channels in is not currently supported")
+
+
+        return features
+
 
     def match_target_channels(self,target):
         if self.chan_out == 3:

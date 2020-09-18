@@ -43,7 +43,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_type,batch_size=c.batch_size, network=c.network, chan_out=c.network_args['chan_out'])
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_type,batch_size=c.batch_size, network=c.network, chan_in=c.network_args['chan_in'], chan_out=c.network_args['chan_out'], draw_seq_from_msa=c.draw_seq_from_msa)
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training
@@ -63,4 +63,5 @@ def main(c):
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
     eval_net(net, dl_test, loss_fnc, device=c.device, plot_results=True)
     print("Done")
+    input()
     input()

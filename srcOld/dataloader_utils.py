@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import norm
 import random
+import matplotlib.pyplot as plt
 
 # Constants
 NUM_DIMENSIONS = 3
@@ -99,12 +100,22 @@ class ConvertPnetFeaturesTo2D(object):
         return f2d
 
 class ConvertPnetFeaturesTo1D(object):
+    """
+    This assumes that the first feature needs to be converted to a one_hot sequence, and that the rest just needs to be stacked.
+    """
     def __init__(self):
         pass
     def __call__(self, features):
         seq_onehot = np.eye(len(AA_DICT), dtype=np.float32)[features[0]]
+        if len(features) == 1:
+            f1d = seq_onehot.transpose(1, 0)
+        elif len(features) == 2:
+            f1d = np.concatenate((seq_onehot, features[1][:, None]), axis=1).transpose(1, 0)
+        elif len(features) == 3:
+            f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
+        else:
+            raise NotImplementedError("ConvertPnetFeaturesTo1D has not been generalized to handle the amount of features you used.")
 
-        f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
         return f1d
 
 
@@ -154,17 +165,8 @@ class ListToNumpy(object):
         pass
     def __call__(self, args):
         args_array = ()
-        if isinstance(args[0], list):
-            for arg in args:
-                if type(arg[0]) == int:  # Note that this will only work for this particular list system, for deeper lists this will need to be looped.
-                    dtype = np.int
-                elif type(arg[0]) == bool:
-                    dtype = np.bool
-                else:
-                    dtype = np.float32
-                args_array += (np.asarray(arg, dtype=dtype),)
-        else:
-            args_array += (np.asarray(args),)
+        for arg in args:
+            args_array += (np.asarray(arg),)
         return args_array
 
 
@@ -185,6 +187,55 @@ class ConvertCoordToDists(object):
 
         return distances, coords
 
+
+class DrawFromProbabilityMatrix(object):
+    '''
+    Given a probability matrix P, we generate a vector where each element in the vector is drawn randomly according to the probabilities in the probability matrix.
+    P: ndarray of shape (l,n), where l length of the protein (in amino acids), and n is the number of possible amino acids in the one hot encoding.
+    NOTE it is assumed that each row in the probability matrix P sums to 1.
+    '''
+    def __init__(self,sanity_check=False,fraction_of_seq_drawn=1):
+        self.sanity_check = sanity_check
+        self.fraction_drawn = fraction_of_seq_drawn
+
+    def __call__(self, P, seq=None, debug=False):
+        if self.sanity_check:
+            self.run_sanity_check(P)
+        if debug:
+            self.run_debug(P, seq)
+        u = np.random.rand(P.shape[0])
+        idxs = (P.cumsum(1) < u[:, None]).sum(1)
+        if self.fraction_drawn < 1:
+            u2 = np.random.rand(P.shape[0])
+            replace = u2 > self.fraction_drawn
+            idxs[replace] = seq[replace]
+        return idxs
+
+    def run_debug(self,P, seq):
+        if seq is not None:
+            p = seq
+        else:
+            p = np.argmax(P,axis=1)
+        n = P.shape[0]
+        iter = 10000
+        counter = np.zeros_like(P)
+        ndif = np.zeros(n+1)
+        for i in range(iter):
+            t = self.__call__(P, seq=seq)
+            counter[np.arange(n),t] += 1
+            tmp = np.sum(t != p)
+            ndif[tmp] += 1
+
+        P_pred = counter/ iter
+        dif = np.linalg.norm(P - P_pred)
+        print("Difference between cumulated drawn examples, and the probability distribution {:2.4e}".format(dif))
+        plt.plot(np.arange(n+1)/n,ndif)
+        plt.pause(0.5)
+        return
+
+    def run_sanity_check(self,P):
+        assert (np.abs(np.sum(P,axis=1) - 1) < 1e-6 ).all()
+        return
 
 
 def one_hot(targets, nb_classes):

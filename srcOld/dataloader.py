@@ -11,7 +11,7 @@ from srcOld.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
-def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, chan_out=3):
+def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, chan_in=21, chan_out=3, draw_seq_from_msa=True):
     '''
     This is a wrapper routine for various dataloaders.
     Currently supports:
@@ -27,16 +27,16 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
         dataset_train = Dataset_a3m(path_train)
     elif os.path.isfile(path_train) and os.path.splitext(path_train)[1].lower() == '.pnet':
         if type == '2D':
-            transform_train = transforms.Compose([Flip, ListToNumpy(), ConvertPnetFeaturesTo2D()])
-            transform_target_train = transforms.Compose([Flip, ListToNumpy(), ConvertCoordToDists()])
-            transform_mask_train = transforms.Compose([Flip, ListToNumpy()])
+            transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo2D()])
+            transform_target_train = transforms.Compose([Flip, ConvertCoordToDists()])
+            transform_mask_train = transforms.Compose([Flip])
         elif type == '1D':
-            transform_train = transforms.Compose([Flip, ListToNumpy(), ConvertPnetFeaturesTo1D()])
-            transform_target_train = transforms.Compose([Flip, ListToNumpy(), ConvertCoordToDists()])
-            transform_mask_train = transforms.Compose([Flip, ListToNumpy()])
+            transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo1D()])
+            transform_target_train = transforms.Compose([Flip, ConvertCoordToDists()])
+            transform_mask_train = transforms.Compose([Flip])
 
 
-        dataset_train = Dataset_pnet(path_train, transform=transform_train,transform_target=transform_target_train,transform_mask=transform_mask_train, chan_out=chan_out)
+        dataset_train = Dataset_pnet(path_train, transform=transform_train,transform_target=transform_target_train,transform_mask=transform_mask_train, chan_in=chan_in, chan_out=chan_out, draw_seq_from_msa=draw_seq_from_msa)
     elif os.path.isfile(path_train) and os.path.splitext(path_train)[1].lower() == '.lmdb':
         if type == '2D':
             transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo2D()])
@@ -45,7 +45,7 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
         transform_target_train = transforms.Compose([Flip, ConvertCoordToDists()])
         transform_mask_train = transforms.Compose([Flip])
 
-        dataset_train = Dataset_lmdb(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train, chan_out=chan_out)
+        dataset_train = Dataset_lmdb(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train, chan_in=chan_in, chan_out=chan_out, draw_seq_from_msa=draw_seq_from_msa)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
@@ -54,22 +54,20 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
         dataset_test = Dataset_a3m(path_test)
     elif os.path.isfile(path_test) and os.path.splitext(path_test)[1].lower() == '.pnet':
         if type == '2D':
-            transform_test = transforms.Compose([ListToNumpy(), ConvertPnetFeaturesTo2D()])
-            transform_target_test = transforms.Compose([ListToNumpy(), ConvertCoordToDists()])
-            transform_mask_test = transforms.Compose([ListToNumpy()])
+            transform_test = transforms.Compose([ConvertPnetFeaturesTo2D()])
+            transform_target_test = transforms.Compose([ConvertCoordToDists()])
         elif type == '1D':
-            transform_test = transforms.Compose([ListToNumpy(), ConvertPnetFeaturesTo1D()])
-            transform_target_test = transforms.Compose([ListToNumpy(), ConvertCoordToDists()])
-            transform_mask_test = transforms.Compose([ListToNumpy()])
+            transform_test = transforms.Compose([ConvertPnetFeaturesTo1D()])
+            transform_target_test = transforms.Compose([ConvertCoordToDists()])
 
-        dataset_test = Dataset_pnet(path_test, transform=transform_test,transform_target=transform_target_test, transform_mask=transform_mask_test, chan_out=chan_out)
+        dataset_test = Dataset_pnet(path_test, transform=transform_test,transform_target=transform_target_test, chan_in=chan_in, chan_out=chan_out)
     elif os.path.isfile(path_test) and os.path.splitext(path_test)[1].lower() == '.lmdb':
         if type == '2D':
             transform_test = transforms.Compose([ConvertPnetFeaturesTo2D()])
         elif type == '1D':
             transform_test = transforms.Compose([ConvertPnetFeaturesTo1D()])
         transform_target_test = transforms.Compose([ConvertCoordToDists()])
-        dataset_test = Dataset_lmdb(path_test, transform=transform_test, target_transform=transform_target_test, chan_out=chan_out)
+        dataset_test = Dataset_lmdb(path_test, transform=transform_test, target_transform=transform_target_test, chan_in=chan_in, chan_out=chan_out)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
@@ -86,21 +84,6 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
 
     return dl_train, dl_test
 
-
-
-def pad_numpy_array_to_tensor(vec, pad, dim):
-    """
-    args:
-        vec - tensor to pad
-        pad - the size to pad to
-        dim - dimension to pad
-
-    return:
-        a new tensor padded to 'pad' in dimension 'dim'
-    """
-    pad_size = list(vec.shape)
-    pad_size[dim] = pad - vec.shape[dim]
-    return torch.cat([torch.from_numpy(vec), torch.zeros(*pad_size)], dim=dim)
 
 
 class PadCollate:
