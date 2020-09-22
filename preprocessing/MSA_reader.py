@@ -4,7 +4,10 @@ import numpy as np
 import string
 import glob
 
-def read_a2m_gz_folder(folder):
+AA_LIST = 'ACDEFGHIKLMNPQRSTVWY-'
+
+
+def read_a2m_gz_folder(folder,AA_LIST=AA_LIST):
     """
     This will read and return the MSAs from all a2m.gz files in the folder given.
     The MSAs will be returned as a list of numpy arrays, where each list element/numpy array corresponds to a a2m.gz file.
@@ -57,7 +60,8 @@ def read_a2m_gz_folder(folder):
         seqs.append(seq) #We include the parent protein in the MSA sequence
         # convert letters into numbers
 
-        alphabet = np.array(list("ARNDCQEGHILKMFPSTWYV-"), dtype='|S1').view(np.uint8)
+        alphabet = np.array(list(AA_LIST), dtype='|S1').view(np.uint8)
+
         msa = np.array([list(s) for s in seqs], dtype='|S1').view(np.uint8)
         for i in range(alphabet.shape[0]):
             msa[msa == alphabet[i]] = i
@@ -65,7 +69,7 @@ def read_a2m_gz_folder(folder):
         # treat all unknown characters as gaps
         msa[msa > 20] = 20
         msas.append(msa)
-    return msas
+    return msas, proteins
 
 def weight_msa(msa_1hot, cutoff):
     """
@@ -88,8 +92,8 @@ def msa2pssm(msa_1hot, w):
     Follows the procedures used by trRossetta
     """
     neff = np.sum(w)
-    f_i = np.sum(w[:, None, None] * msa_1hot, axis=0) / neff + 1e-9
-    h_i = np.sum(- f_i * np.log(f_i), axis=1)
+    f_i = np.sum(w[:, None, None] * msa_1hot, axis=0) / neff
+    h_i = np.sum(- (f_i + 1e-9) * np.log(f_i + 1e-9), axis=1)
     return np.concatenate([f_i, h_i[:, None]], axis=1)
 
 def dca(msa_1hot, w, penalty=4.5):
@@ -118,16 +122,23 @@ def dca(msa_1hot, w, penalty=4.5):
 
 if __name__ == "__main__":
     path = "F:/Globus/raw_subset/" # Path to a folder with a2m.gz files in it.
-    msas = read_a2m_gz_folder(path)
+    msas, proteins = read_a2m_gz_folder(path)
 
     msa = msas[0]
 
     t0 = time.time()
     msa_1hot = np.eye(21, dtype=np.float32)[msa]
-    cutoff = 0.8
+    msa_1hot_r = msa_1hot[:,:,:-1]
+    cutoff = 0.9999
     w = weight_msa(msa_1hot,cutoff)
     t1 = time.time()
     pssm = msa2pssm(msa_1hot, w)
+    # pssm2 = pssm[:,:-1]
+    # pssm3 = pssm2[:,:-1]
+    # tmp = np.sum(pssm3,axis=1)
+    # pssm3_norm = pssm3/tmp[:,None]
+    # p = pssm3_norm.T
+    # p[:,0:4]
     t2 = time.time()
     f2d_dca = dca(msa_1hot, w)
     t3 = time.time()
