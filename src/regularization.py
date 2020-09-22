@@ -5,6 +5,15 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
+def smoothReg(y, msk):
+    msk = 1 - msk
+    mskm = msk[2:]
+    msk0 = msk[1:-1]
+    mskp = msk[:-2]
+    dMsk = 1.0 * torch.logical_or(torch.logical_or(mskp, mskm),msk0)
+    d2y = dMsk*(y[:,2:] - 2*y[:,1:-1] + y[:,:-2])
+    return torch.sum(d2y**2)
+
 def TVreg(I, Active=torch.tensor([1]), h=(1.0,1.0), eps=1e-3):
     n = I.shape
     IntNormGrad = 0

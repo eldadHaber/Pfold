@@ -8,7 +8,89 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+class list2np(object):
+    def __init__(self):
+        pass
+    def __call__(self, *args):
+        args_array = ()
+        for arg in args:
+            args_array += (np.asarray(arg),)
+        return args_array
 
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
+
+def getPointDistance(output, targets, alpha=0.5):
+
+    #outRot, tarRot, R = rotatePoints(output.squeeze(0), targets.squeeze(0))
+    #doutRot = outRot[:, 1:] - outRot[:, :-1]
+    #dtarRot = tarRot[:, 1:] - tarRot[:, :-1]
+    misfitDis = 0.0
+    for i in range(output.shape[0]):
+        outi  = output[i,:,:]
+        tari = targets[i,:,:]
+        Dc = torch.sum(outi**2, dim=0, keepdim=True) + torch.sum(outi**2, dim=0,
+                                                                 keepdim=True).t() - 2*outi.t()@outi
+        Dc = torch.sqrt(torch.relu(Dc))
+        Do = torch.sum(tari**2, dim=0, keepdim=True) + torch.sum(tari**2, dim=0,
+                                                                  keepdim=True).t() - 2*tari.t()@tari
+        Do = torch.sqrt(torch.relu(Do))
+        misfitDis += F.mse_loss(Dc, Do) / F.mse_loss(Do, 0*Do)
+    misfitDis = misfitDis/output.shape[0]
+
+    #misfitCoo = F.mse_loss(doutRot, dtarRot) / F.mse_loss(dtarRot, dtarRot * 0)
+    misfitCoo = F.mse_loss(output, targets) / F.mse_loss(targets, targets * 0)
+
+    misfit = alpha*misfitDis + (1-alpha)*misfitCoo
+    return misfit, misfitDis, misfitCoo
+
+def getRandomMask(n,m):
+    mask = torch.ones(m)
+    i = torch.randint(0,m-n,(1,))
+    mask[i:i+n] = 0
+    return mask
+
+
+def getRandomCrop(X,M, winsize=64, batchSize=[]):
+
+    # Find potential windows
+    k = X.shape[-1]
+    ind = []
+    T = []
+    for i in range(k-winsize):
+        t = torch.sum(M[i:i+winsize])
+        if t == winsize:
+            ind.append(i)
+            T.append(X[:,:,i:i+winsize])
+
+    # Choose on in random
+    n = len(ind)
+    Xout = []
+    Tout = []
+    if n > 0:
+        ii = torch.randint(0,n,(1, ))
+        Xout = X[:,:,ind[ii]:ind[ii]+winsize]
+        Tout = torch.Tensor(len(T),X.shape[1],winsize)
+        for i in range(n):
+            Tout[i,:,:] = T[i]
+    if len(batchSize)>0:
+        if n>batchSize[0]:
+            jj = torch.randint(0,n-batchSize[0],(1,))
+            Tout = Tout[jj:jj+batchSize[0],:,:]
+    return Xout, Tout
+
+
+def getRotMat(t):
+    A1 = torch.tensor([[torch.cos(t[0]), -torch.sin(t[0]), 0],
+                       [torch.sin(t[0]), torch.cos(t[0]), 0],
+                         [0, 0, 1.0]])
+    A2 = torch.tensor([[torch.cos(t[1]),  0, -torch.sin(t[1])],
+                       [0, 1.0, 0],
+                       [torch.sin(t[1]), 0 , torch.cos(t[1])]])
+    A3 = torch.tensor([[1,0,0],
+                       [0, torch.cos(t[2]), -torch.sin(t[2])],
+                       [0, torch.sin(t[2]), torch.cos(t[2])]])
+    return A1@A2@A3
 
 def tr2Dist(Y):
 
@@ -35,9 +117,10 @@ def rotatePoints(X, Xo):
     Xo = Xo.t()
     if X.shape != Xo.shape:
         U, S, V =  torch.svd(X)
-        S[:,3:] = 0
-        X = U@torch.diag(S)@V.t()
-        X = X[:,:3]
+        X = U[:,:3]@torch.diag(S[:3])@V[:3,:3].t()
+        #S[3:] = 0
+        #X = U@torch.diag(S)@V.t()
+        #X = X[:,:3]
 
     n, dim = X.shape
 

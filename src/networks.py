@@ -135,7 +135,7 @@ class vnet1D(nn.Module):
 
 class vnet2D(nn.Module):
     """ VNet """
-    def __init__(self, A):
+    def __init__(self, A,h):
         super(vnet2D, self).__init__()
         K, W = self.initVnetParams2D(A)
         self.K = K
