@@ -16,6 +16,7 @@ import torch.utils.data
 dataFile = '../../../data/casp12Testing/testing.pnet'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)
 
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 idx = np.arange(0, 40)
 ncourse = 4
 X = []
@@ -43,7 +44,7 @@ Ag = torch.tensor([[24,n0,1,sc],
 #Ad = Ag
 # Call generative and discreminative networks
 #netG = proTerp.proGen(Ag,3)
-netG = proTerp.vnet1D(Ag,3)
+netG = proTerp.vnet1D(Ag,3).to(device)
 #lrD   = 1e-4
 lrG   = 1e-3
 beta1 = 0.5
@@ -79,13 +80,15 @@ for epoch in range(epochs):
         maskSize = torch.randint(16,32,(1,)).item()
         randomMask = utils.getRandomMask(maskSize, winsize)
         mm = torch.ones(24, 128); mm[21:, :] = randomMask
+
         netG.zero_grad()
         #patchOutFake = netG(randomMask*patchIn, randomMask)
-        patchesIn = mm * patches
+        patchesIn = (mm * patches).to(device)
+        randomMask = randomMask.to(device)
         patchOutFake = netG(patchesIn, randomMask)
         #patchOutFake = randomMask*patchOut + (1-randomMask)*patchOutFake
         #errG = F.mse_loss(patchOutFake, patchOut)
-        alpha = 0.98 ** (epoch / epochs * 300)
+        alpha = (0.98 ** (epoch / epochs * 300))
         errG, errGD, errGC = utils.getPointDistance(patchOutFake, patchOut,alpha)
         #misfit = alpha*errGD + (1-alpha)*errGC
         #if errGD >5:
