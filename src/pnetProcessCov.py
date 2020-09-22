@@ -117,7 +117,7 @@ def dca(msa_1hot, w, penalty=4.5):
     return np.concatenate([features, contacts[:, :, None]], axis=2)
 
 if __name__ == "__main__":
-    path = "F:/Globus/raw_subset/" # Path to a folder with a2m.gz files in it.
+    path = "/Users/eldadhaber/Dropbox/ComputationalGenetics/data/raw_MSA/" # Path to a folder with a2m.gz files in it.
     msas = read_a2m_gz_folder(path)
 
     msa = msas[0]
