@@ -116,7 +116,7 @@ def loss_tr_tuples(r1s,r2s, return_coords=False):
 
         mask = (r2 != 0).reshape(r2.shape)
         mask = (torch.sum(mask,dim=1) > 0).unsqueeze(1)
-        batch_mask = torch.sum(mask,dim=(1,2)) > 1 # There needs to be at least 2 points in a protein for it to make sense, 1 point is nothing
+        batch_mask = torch.sum(mask,dim=(1,2)) > 10 # There needs to be at least 2 points in a protein for it to make sense, 1 point is nothing. 2 Might also be causing trouble so now we try 20
         mask = mask.repeat(1,3,1)
 
         r1 = r1[batch_mask,:,:]
