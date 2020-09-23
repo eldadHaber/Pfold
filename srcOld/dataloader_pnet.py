@@ -149,6 +149,7 @@ def read_record(file_, num_evo_entries):
     dssp = []
     coord = []
     mask = []
+    seq_len = []
     scaling = 0.001 # converts from pico meters to nanometers
 
     t0 = time.time()
@@ -161,6 +162,7 @@ def read_record(file_, num_evo_entries):
                     print("loading sample: {:}, Time: {:2.2f}".format(len(id),time.time() - t0))
             elif case('[PRIMARY]' + '\n'):
                 seq.append(letter_to_num(file_.readline()[:-1], AA_DICT))
+                seq_len.append(len(seq[-1]))
             elif case('[EVOLUTIONARY]' + '\n'):
                 evolutionary = []
                 for residue in range(num_evo_entries):
@@ -178,12 +180,12 @@ def read_record(file_, num_evo_entries):
             elif case(''):
 
 
-                return id,seq,pssm,entropy,dssp,coord,mask
+                return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
 def parse_pnet(file,max_seq_len=-1):
     with open(file, 'r') as f:
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask = read_record(f, 20)
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20)
         #NOTE THAT THE RESULT IS RETURNED IN ANGSTROM
         print("loading data complete! Took: {:2.2f}".format(time.time()-t0))
         r1 = []
@@ -201,19 +203,25 @@ def parse_pnet(file,max_seq_len=-1):
             if i+1 % 1000 == 0:
                 print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
 
-        args = (seq, pssm2, entropy, dssp, r1,r2,r3, mask)
+        args = (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len)
         if max_seq_len > 0:
             filter = np.full(len(seq), True, dtype=bool)
             for i,seq_i in enumerate(seq):
                 if len(seq_i) > max_seq_len:
                     filter[i] = False
             new_args = ()
-            for list_i in (seq, pssm2, entropy, dssp, r1,r2,r3, mask):
+            for list_i in (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len):
                 new_args += (list(compress(list_i,filter)),)
         else:
             new_args = args
         convert = ListToNumpy()
-        new_args = convert(new_args)
+        seq = convert(new_args[0])
+        r1 = convert(new_args[4])
+        r2 = convert(new_args[5])
+        r3 = convert(new_args[6])
+        seq_len = np.array(new_args[-1])
+        new_args = (seq, r1, r2, r3,seq_len)
+
         print("parse complete! Took: {:2.2f}".format(time.time() - t0))
     return new_args
 
