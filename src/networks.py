@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import math
+from src import utils
 
 
 def conv2(X, Kernel):
@@ -17,6 +18,10 @@ def conv1T(X, Kernel):
 def conv2T(X, Kernel):
     return F.conv_transpose2d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
 
+def tv_norm(X, eps=1e-3):
+    X = X - torch.mean(X,dim=1, keepdim=True)
+    X = X/torch.sqrt(torch.mean(X,dim=1,keepdim=True) + eps)
+    return X
 
 ##### 1D VNET ###########################
 #
@@ -69,6 +74,9 @@ class vnet1D(nn.Module):
         mS = [m]
         # Opening layer
         z = mS[-1]*conv1(x, self.K[0])
+        # L = utils.getGraphLap(x)
+        #z = mS[-1] * conv1(x, self.K[0])@L
+
         z = F.instance_norm(z)
         x = F.relu(z)
 
@@ -133,6 +141,9 @@ class vnet1D(nn.Module):
 #
 ##### END 1D VNET ###########################
 
+
+##### VNET 2D ###########################
+
 class vnet2D(nn.Module):
     """ VNet """
     def __init__(self, A,h):
@@ -142,11 +153,11 @@ class vnet2D(nn.Module):
         self.W = W
         self.h = h
 
-    def initVnetParams2D(A, device='cpu'):
+    def initVnetParams2D(self,A, device='cpu'):
         # A = [ inChan, OutChan, number of layers in this res, ConvSize]
         print('Initializing network  ')
         nL = A.shape[0]
-        K = []
+        K = nn.ParameterList([])
         npar = 0
         cnt = 1
         for i in range(nL):
@@ -165,8 +176,9 @@ class vnet2D(nn.Module):
                 Ki.to(device)
                 K.append(Ki)
 
-        W = nn.Parameter(1e-4 * torch.randn(4, 64, 1, 1))
-        npar += W.numel()
+        W = nn.Parameter(1e-4 * torch.randn(1,A[0,1] , 1, 1))
+        W = nn.ParameterList([W])
+        #npar += W.numel()
         print('Number of parameters  ', npar)
         return K, W
 
@@ -237,7 +249,7 @@ class vnet2D(nn.Module):
                 z  = F.instance_norm(z)
                 x  = F.relu(z) + xS[n_scales]
 
-        x = conv2(x, self.W)
+        x = conv2(x, self.W[0])
         return x
 
 
@@ -342,5 +354,166 @@ class TransformerModel(nn.Module):
         return output
 
 ######
+class pEnergyNet(nn.Module):
+    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
+    def __init__(self, Arch,nout):
+        super(pEnergyNet, self).__init__()
+        Kx, Kn, Wx = self.init_weights(Arch,nout)
+        self.Kx  = Kx
+        self.Kn = Kn
+        self.Wx = Wx
+        #self.Wn = Wn
 
+        self.h = 0.1
+
+    def init_weights(self,A,nout):
+        print('Initializing network  ')
+        nL = A.shape[0]
+        Kx = nn.ParameterList([])
+        Kn = nn.ParameterList([])
+        npar = 0
+        cnt = 1
+        for i in range(nL):
+            for j in range(A[i, 2]):
+
+                stdv = 1e-2 * A[i, 0] / A[i, 1]
+                Kxi = torch.zeros(A[i, 1], A[i, 0])
+                Kxi.data.uniform_(-stdv, stdv)
+                Kxi = nn.Parameter(Kxi.t())
+                Kni = torch.zeros(A[i, 1], A[i, 0])
+                Kni.data.uniform_(-stdv, stdv)
+                Kni = nn.Parameter(Kni.t())
+
+                print('layer number', cnt, 'layer size', Kxi.shape[0], Kxi.shape[1])
+                cnt += 1
+                npar += 2*np.prod(Kxi.shape)
+                #Ki.to(device)
+                Kx.append(Kxi)
+                Kn.append(Kni)
+
+        Wx = nn.Parameter(1e-1*torch.randn(400))
+        #Wn = nn.Parameter(1e-1 * torch.randn(nout, A[0, 1], 1))
+
+        npar += Wx.numel()
+        print('Number of parameters  ', npar)
+        return Kx, Kn, Wx
+
+    def forward(self, XX, NN):
+        """ Forward propagation through the network """
+
+        n = int(np.sqrt(XX.shape[1]))
+        for i in range(len(self.Kx)):
+             Kxi = self.Kx[i]
+             Kni = self.Kn[i]
+             if Kxi.shape[0] == Kxi.shape[1]:
+                XX = XX - self.h*Kni.t()@torch.relu((Kni@NN))
+                NN = NN + self.h*Kxi.t()@torch.relu((Kxi@XX))
+             else:
+                XX = torch.relu(Kxi@XX)
+                NN = torch.relu(Kni@NN)
+
+        #E = torch.sum((self.Wx * XX) ** 2) + torch.sum((self.Wn * NN) ** 2)
+        D  = (XX.t()@self.Wx).reshape((n,n))
+        XX = XX.reshape((20,20,n,n))
+        NN = NN.reshape((20,20,n,n))
+
+        D = D - torch.diag(torch.diag(D)) + torch.eye(n,n)
+        return XX, NN, D
+
+##### Module Graph Convolution Neural Networks ######
+
+class gNNC(nn.Module):
+    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
+
+    def __init__(self, Arch):
+        super(gNNC, self).__init__()
+        K, W = self.init_weights(Arch)
+        self.K = K
+        self.W = W
+        self.h = 0.1
+
+    def init_weights(self,A):
+        print('Initializing network  ')
+        nlayers = A[1]
+        nopen   = A[0]
+        Kopen = torch.zeros(nopen, 23)
+        stdv = 1e-2 * Kopen.shape[0]/Kopen.shape[1]
+        Kopen.data.uniform_(-stdv, stdv)
+        Kopen = nn.Parameter(Kopen)
+
+        Knet = torch.zeros(nlayers, 3)
+        stdv = 1e-1 * Kopen.shape[0] / Kopen.shape[1]
+        Knet.data.uniform_(-stdv, stdv)
+        Knet = nn.Parameter(Knet)
+
+        K = nn.ParameterList([Kopen, Knet])
+
+        W = torch.zeros(nlayers, 3, nopen, nopen, 1)
+        stdv = 1e-1
+        W.data.uniform_(-stdv, stdv)
+        W = nn.Parameter(W)
+
+        return K, W
+
+    def forward(self, Z, sig=0.2):
+        n = Z.shape[1]
+        h = self.h
+        l = self.W.shape[0]
+        K0 = self.K[0]
+        Knet = self.K[1]
+        # opening layer
+        Z = torch.tanh(K0@Z)
+        for i in range(l):
+            # Compute the graph
+            L, D = utils.getGraphLap(Z, sig=sig)
+            Ki = Knet[i]
+            Wi = self.W[i]
+
+            # Layer
+            Ai0 = Ki[0]*conv1(Z.unsqueeze(0), Wi[0]).squeeze(0)
+            Ai1 = Ki[1]*conv1(Z.unsqueeze(0), Wi[1]).squeeze(0)@L
+            Ai2 = (Ki[2]*conv1(Z.unsqueeze(0), Wi[2]).squeeze(0)@L)@L.t()
+            Ai = Ai0 + Ai1 + Ai2
+
+            Ai = Ai - Ai.mean(dim=0, keepdim=True)
+            Ai = Ai/torch.sqrt(torch.sum(Ai ** 2, dim=0, keepdim=True) + 1e-3)
+            Ai = torch.relu(Ai)
+
+            # Layer T
+            Ai0 = Ki[0]*conv1T(Ai.unsqueeze(0), Wi[0]).squeeze(0)
+            Ai1 = Ki[1]*conv1T(Ai.unsqueeze(0), Wi[1]).squeeze(0)@L
+            Ai2 = (Ki[2]*conv1T(Ai.unsqueeze(0), Wi[2]).squeeze(0)@L)@L.t()
+            Ai = Ai0 + Ai1 + Ai2
+
+            Z = Z - h*Ai
+
+        return Z
+
+##### END Module Graph Convolution Neural Networks ######
+
+def gNN(Z, K, W, sig=0.2):
+
+    n = Z.shape[1]
+    h = 0.1
+    l = W.shape[0]
+
+    # opening layer
+    Z = torch.tanh(K@Z)
+    for i in range(l):
+        # Compute the graph
+        L, D = utils.getGraphLap(Z, sig=0.2)
+        L = L.t()@L
+
+        Wi = W[i, :]
+
+        # Layer
+        Ai = conv1(Z.unsqueeze(0), Wi).squeeze(0)
+        Ai = Ai@L
+        Ai = Ai - Ai.mean(dim=0, keepdim=True)
+        Ai = Ai/torch.sqrt(torch.sum(Ai ** 2, dim=0, keepdim=True) + 1e-3)
+        Ai = torch.relu(Ai)
+        Ai = conv1T(Ai.unsqueeze(0), Wi).squeeze(0)
+        Z = Z - h*Ai@L.t()
+
+    return Z

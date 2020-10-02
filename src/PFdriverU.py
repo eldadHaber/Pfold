@@ -49,11 +49,11 @@ lr = 1e-3 # learning rate
 #optimizer = optim.SGD(model.parameters(), lr=lr)
 optimizer = optim.Adam([{'params': model.K, 'lr': lr},{'params': model.W, 'lr': lr}], lr=lr)
 #scheduler = optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.99)
-iters = 5
+iters = 50
 hist = []
 model.train() # Turn on the train mode
 for itr in range(iters):
-    idx = torch.randint(0,40,(1,))
+    idx = torch.randint(4,5,(1,))
     # Arrange the data for a convolution
     Z  = S[idx].transpose(1,2)
     no = Z.shape[2]
@@ -65,7 +65,7 @@ for itr in range(iters):
     Msk     = torch.zeros(n, n)
     Msk[:no,:no] = M[idx]
     optimizer.zero_grad()
-    Ypred = model(data)
+    Ypred = model(data, Msk[:,0])
     output = Ypred.squeeze(0).t().unsqueeze(0)
     output = utils.tr2Dist(output)
 

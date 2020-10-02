@@ -7,80 +7,84 @@ import math
 from src import networks
 from src import pnetProcess
 from src import utils
-import matplotlib.pylab as P
+import matplotlib.pyplot as plt
+import torch.optim as optim
+
+
 from src import networks
 
-def h_poly(t):
-    n = torch.linspace(0, 3, 4)
-    tt = t**n
-    A = torch.tensor([
-        [1, 0, -3, 2],
-        [0, 1, -2, 1],
-        [0, 0, 3, -2],
-        [0, 0, -1, 1]])
-    return A@tt
+#X    = torch.load('../../../data/casp12Testing/Xtest.pt')
+Yobs = torch.load('../../../data/casp12Testing/Coordtest.pt')
+MSK  = torch.load('../../../data/casp12Testing/Masktest.pt')
+
+S     = torch.load('../../../data/casp12Testing/Seqtest.pt')
+Seq   = S[0].t()
+n = Seq.shape[1]
+Xtrue = Yobs[0][0,0,:n,:n]
+M     = MSK[0]
+
+M = torch.ger(M[:n],M[:n])
+X0 = torch.zeros(3,n)
+X0[0,:] = torch.linspace(-0.3309,0.9591,n)
+
+# initialization
+Z = torch.zeros(23,n)
+Z[:20,:] = 0.05*Seq
+Z[20:,:] = X0
 
 
-def interp(x, y, xs):
-  m = (y[1:] - y[:-1])/(x[1:] - x[:-1])
-  m = torch.cat([m[[0]], (m[1:] + m[:-1])/2, m[[-1]]])
-  I = P.searchsorted(x[1:], xs)
-  dx = (x[I+1]-x[I])
-  hh = h_poly((xs-x[I])/dx)
-  return hh[0]*y[I] + hh[1]*m[I]*dx + hh[2]*y[I+1] + hh[3]*m[I+1]*dx
+def gNN(Z,K,W):
 
+    n = Seq.shape[1]
+    h = 0.1
+    l = W.shape[0]
+    # opening layer
+    Z = K@Z
+    for i in range(l):
+        # Compute eignevectors of the graph
+        L, D = utils.getGraphLap(Z, sig=2)
+        #L = L + 0.1*torch.eye(L.shape[0])
+        L    = L.t()@L
+        Wi = W[i, :, :]
 
-# Example
-#if __name__ == "__main__":
-#  x = torch.linspace(0, 6, 7)
-#  y = x.sin()
-#  xs = torch.linspace(0, 6, 101)
-#  ys = interp(x, y, xs)
-#  P.scatter(x, y, label='Samples', color='purple')
-#  P.plot(xs, ys, label='Interpolated curve')
-#  P.plot(xs, xs.sin(), '--', label='True Curve')
-#  P.legend()
-#  P.show()
+        # Layer
+        Z  = Z@L
+        Ai = Wi@Z
+        Ai = Ai - Ai.mean(dim=0,keepdim=True)
+        Ai = Ai/torch.sqrt(torch.sum(Ai**2,dim=0,keepdim=True)+1e-3)
+        Z  = Z - h*Wi.t()@torch.relu(Ai)@L.t()
 
-jj = 1
-while flag:
-    Xi = X[jj]
-    Yi = Yobs[jj][:, 0, :, :]
-    Mi = MSK[jj]
-    input = torch.zeros(1, 24, Xi.shape[2])
-    input[:, :21, :] = Xi
-    input[:, 21:, :] = Yi
-    # try to obtain in-out patches
-    patchIn, patches = utils.getRandomCrop(input, Mi, winsize=winsize, batchSize=[32])
-    if len(patchIn) > 0:
-        # patchOut =  patchIn[:, 21:, :]
-        patchOut = patches[:, 21:, :]
-        flag = False
-    else:
-        jj += 1
-# Now train the generator
-maskSize = torch.randint(16, 32, (1,)).item()
-randomMask = utils.getRandomMask(maskSize, winsize)
-mm = torch.ones(24, 128);
-mm[21:, :] = randomMask
-# patchOutFake = netG(randomMask*patchIn, randomMask)
-patchesIn = mm * patches
-patchOutFake = netG(patchesIn, randomMask)
+    return Z
 
-X = patchOut[16,:,:]; Xf = patchOutFake[16,:,:].detach()
+nopen = 128
+nlayers = 50
+K = nn.Parameter(1e-1*torch.rand(nopen,23))
+W = nn.Parameter(1e-5*torch.randn(nlayers,128,nopen))
+#Z = 0.5*Z
+lr = 1e-2
+sig = 0.2
+optimizer = optim.Adam([{'params': K},{'params': W}], lr=lr)
 
-Df = torch.sqrt(torch.relu(torch.sum(Xf**2,dim=0,keepdim=True) + torch.sum(Xf**2,dim=0,keepdim=True).t() - 2*Xf.t()@Xf))
-D = torch.sqrt(torch.relu(torch.sum(X**2,dim=0,keepdim=True) + torch.sum(X**2,dim=0,keepdim=True).t() - 2*X.t()@X))
-plt.figure(1)
-plt.imshow(Df)
-plt.colorbar()
-plt.figure(2)
-plt.imshow(D)
-plt.colorbar()
-mmm = randomMask.unsqueeze(1)@randomMask.unsqueeze(0)
-plt.figure(3)
-plt.imshow(mmm*D)
-plt.colorbar()
-plt.figure(4)
-plt.imshow(torch.abs(D-Df))
-plt.colorbar()
+print('Number of parameters   ',W.numel() + K.numel())
+
+Kbest = K
+Wbest = W
+for j in range(1000):
+
+    optimizer.zero_grad()
+    Zout = gNN(Z,K,W)
+    D = torch.exp(-utils.getDistMat(Zout)/sig)
+    Dt = torch.exp(-utils.getDistMat(Xtrue)/sig)
+    loss = torch.norm(M*Dt-M*D)**2/torch.norm(M*Dt-0*D)**2
+
+    loss.backward(retain_graph=True)
+    torch.nn.utils.clip_grad_norm_(K, 0.5)
+    torch.nn.utils.clip_grad_norm_(W, 0.5)
+
+    optimizer.step()
+    print(j,'     ',torch.sqrt(loss).item())
+
+plt.subplot(1,2,1)
+plt.imshow(D.detach())
+plt.subplot(1,2,2)
+plt.imshow(M*Dt)

@@ -1,12 +1,21 @@
-import numpy as np
-import torch
-from src import networks, optimizeNet, pnetProcess
+from src import proTerp
+from src import pnetProcess
+from src import utils
+from src import networks
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
+import os
+import numpy as np
+import random
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.utils.data
 
 dataFile ='./../data/testing'
 id, seq, pssm2, entropy, dssp, RN, RCa, RCb, mask = pnetProcess.parse_pnet(dataFile)
 
-idx     = np.arange(0,1)
+idx     = np.arange(0,3)
 ncourse = 4
 X = []; Yobs = []; M = []; Sh = []
 for i in idx:
@@ -18,44 +27,68 @@ for i in idx:
     
     print('Image ',i, 'imsize ', Xi.shape)
 
+
 # Initialize a network
-A = torch.tensor([[21,   64,   1, 3],
-                  [64,   64,   5, 3],
-                  [64,   128,  1, 3],
-                  [128,  128,  5, 3],
-                  [128,  256,  1, 3],
-                  [256,  256,  5, 3],
-                  [256,  512,  1, 3],
-                  [512,  512,  5, 3],
-                  [512, 1024,  1, 3]])
+nc = 32
+A = torch.tensor([[400,  nc,  1, 3],
+                  [nc,  nc,  5, 3],
+                  [nc, 2*nc,  1, 3]])
 
 dvc = 'cpu'
-K, W  = networks.initVnetParams(A, device=dvc)
-VN    = networks.vnet2D(K, W, 0.01)
+vnet    = networks.vnet2D(A, 0.01)
 
 ii = 0
-Ypred     = VN(X[ii])
+Ypred     = vnet(X[ii].unsqueeze(0))
 
-loss = networks.misfitFun(Ypred, Yobs[ii], M[ii])
-print('Initial misfit ', loss.item())
+optimizer = optim.Adam(vnet.parameters(), lr=1e-3)
+epochs     = 300
 
-reg, normGrad = networks.TVreg(Ypred, M[ii])
-print('Initial reg ', reg.item())
-iters    = 200 #40*1500
-lr       = [1e-3, 1e-1]
-rp       = 1e-4
-dweights = torch.tensor([0.1, 1.0, 1.0, 1.0])
+numdat = 3
+ehist = torch.zeros(epochs)
+hist = torch.zeros(numdat)
+for epoch in range(epochs):
+    for i in range(numdat-1):
+        # Get a protein
+        input = X[i].unsqueeze(0)
 
-#A = Yobs[0][201:312,201:312]
-#S, As = QuadTree.createQuadTreeFromImage(A, 19)
+        vnet.zero_grad()
+        outputFake = vnet(input)
+        Dfake = torch.exp(-outputFake[0,0,:,:])
+        nx = Dfake.shape[0]
+        Dfake = Dfake - torch.diag(torch.diag(Dfake)) + torch.eye(nx,nx)
+        Dtrue = torch.exp(-Yobs[i][0,0,:,:])
+        loss = F.mse_loss(M[i][0]*Dfake, M[i][0]*Dtrue)/F.mse_loss(M[i][0]*Dtrue, 0*Dtrue)
+        #misfit = alpha*errGD + (1-alpha)*errGC
+        #if errGD >5:
+        #    error
+        loss.backward()
+        optimizer.step()
+        hist[i] = torch.sqrt(loss.detach()).item()
+        print('[%d / %d][%d / %d]  Loss: %.4f '
+              % (epoch, epochs, i,numdat,  torch.sqrt(loss)))
 
-VN, hist = optimizeNet.trainNetwork(VN, X, Yobs, M, iters, lr, regpar = rp, dweights = dweights)
+    print('   ')
+    print('======== EPOCH %d  avmisfit = %.4f ================'%(epoch, torch.mean(hist)))
+    print('   ')
+    ehist[epoch] = torch.mean(hist)
+    hist = 0 * hist
 
-Ypred     = VN(X[0])
 
-pnetProcess.plotProteinData(Yobs[0], 1)
-pnetProcess.plotProteinData(M[0] * Ypred.detach(), 2)
+input = X[numdat].unsqueeze(0)
 
-#R = nn.Parameter(torch.randn(X.shape[2],3))
-#D = Yobs[0,0,:,:]
-#R = optimizeNet.getCoordsFromDist(R,D, lr=1e-2,niter=100)
+vnet.zero_grad()
+outputFake = vnet(input)
+Dfake = torch.exp(-outputFake[0, 0, :, :])
+nx = Dfake.shape[0]
+Dfake = Dfake - torch.diag(torch.diag(Dfake)) + torch.eye(nx, nx)
+Dtrue = torch.exp(-Yobs[numdat][0, 0, :, :])
+loss = F.mse_loss(M[numdat][0] * Dfake, M[numdat][0] * Dtrue) / F.mse_loss(M[numdat][0] * Dtrue, 0 * Dtrue)
+
+plt.figure(1)
+plt.plot(ehist)
+plt.figure(2)
+plt.subplot(1,2,1)
+plt.imshow(M[numdat][0]*Dtrue)
+plt.subplot(1,2,2)
+plt.imshow(M[numdat][0]*Dfake.detach())
+print(loss)

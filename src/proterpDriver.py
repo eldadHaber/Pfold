@@ -50,7 +50,7 @@ lrG   = 1e-3
 beta1 = 0.5
 #optimizerD = optim.Adam(netD.parameters(), lr=lrD, betas=(beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=lrG, betas=(beta1, 0.999))
-epochs     = 300
+epochs     = 3
 winsize    = 128
 
 numdat = 10

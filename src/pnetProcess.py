@@ -274,12 +274,11 @@ def getProteinData(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse):
     nc = ncourse
     kp = S.shape[0]
     k  = (2**nc)*(kp//(2**nc) + 1)
-    X  = torch.zeros(21,k,k)
+    X  = torch.zeros(20,20,k,k)
     for i in range(20):
-        X[i,:kp,:kp] = S[:,i].unsqueeze(1)@S[:,i].unsqueeze(1).t()
-    X[-1,:kp,:kp] = E.unsqueeze(1)@E.unsqueeze(1).t()
-    X = X.unsqueeze(0)
-
+        for j in range(20):
+            X[i,j, :kp,:kp] = S[:,i].unsqueeze(1)@S[:,j].unsqueeze(1).t()
+    X = X.reshape((400,k,k))
     rN, m  = interpolateRes(rN,msk) #torch.tensor(rN)
     rCa, m = interpolateRes(rCa,msk) #torch.tensor(rCa)
     rCb, m = interpolateRes(rCb,msk) #torch.tensor(rCb)
@@ -341,7 +340,7 @@ def getProteinDataLinear(seq, pssm2, entropy, RN, RCa, RCb, mask, idx, ncourse, 
 
     msk = torch.zeros(k)
     msk[:kp] = m
-    return X, Yobs, msk
+    return X, Yobs, msk, S
 
 
 def plotProteinData(Y,j):

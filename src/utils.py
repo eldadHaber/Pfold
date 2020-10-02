@@ -174,15 +174,80 @@ def determine_network_param(net):
 
 
 
-#def tr2Dist(Y):
-#
-#    k = Y.shape[2]
-#    D = 0.0
-#    for i in range(k):
-#        Z = Y[:,:,i]
-#        Z = Z - torch.mean(Z,dim=1,keepdim=True)
-#        D = D + torch.sum(Z**2,dim=1).unsqueeze(0) + torch.sum(Z**2,dim=1).unsqueeze(1) - 2*Z@Z.t()
-#    D = D/k
-#    return D
+def getDistMat(X,msk=torch.tensor([1.0])):
+    D = torch.sum(torch.pow(X,2), dim=0, keepdim=True) + torch.sum(torch.pow(X,2), dim=0, keepdim=True).t() - 2*X.t()@X
+    mm = torch.ger(msk,msk)
+    return mm*torch.sqrt(torch.relu(D))
 
+def getNormMat(N,msk=torch.tensor([1.0])):
+    N = N/torch.sqrt(torch.sum(N**2,dim=0,keepdim=True)+1e-9)
+    D = N.t()@N
+    mm = torch.ger(msk, msk)
+    return mm*D
 
+def orgProtData(x,normals,s, msk, sigma=1.0):
+    n = s.shape[1]
+    D = getDistMat(x,msk)
+    D = torch.exp(-sigma*D)
+    N = getNormMat(normals,msk)
+    XX = torch.zeros(20, 20, n, n)
+    NN = torch.zeros(20, 20, n, n)
+    mm = torch.ger(msk, msk)
+    mm = mm.view(-1)
+
+    for i in range(20):
+        for j in range(20):
+            sij = 0.5*(torch.ger(s[i, :], s[j, :]) + torch.ger(s[j, :], s[i, :]))
+            XX[i, j, :, :] = sij * D
+            NN[i, j, :, :] = sij * N
+
+    XX = XX.reshape((400, -1))
+    NN = NN.reshape((400, -1))
+    # XX = XX[:, mm > 0]
+    # NN = NN[:, mm > 0]
+    return XX, NN
+
+def getGraphLap(X,sig=0.2):
+
+    # normalize the data
+    X = X - torch.mean(X, dim=1, keepdim=True)
+    X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True)/X.shape[1] + 1e-4)
+    # add  position vector
+    pos = 0.5*torch.linspace(0, 1, X.shape[1]).unsqueeze(0)
+    Xa = torch.cat((X, pos), dim=0)
+    W = getDistMat(Xa)
+    W = torch.exp(-W/sig)
+    D = torch.diag(torch.sum(W, dim=0))
+    L = D - W
+    Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
+    L = Dh * L * Dh
+
+    L = 0.5 * (L + L.t())
+
+    return L, W
+
+def randsvd(A,k):
+
+    n = A.shape
+    Omega = torch.randn(n[1],k,dtype=A.dtype)
+    Y     = A@Omega
+    Q,R   = torch.qr(Y)
+    B     = Q.t()@A
+    U, S, V = torch.svd(B)
+    U = Q@U
+    return U, S, V
+
+def cheby(K,L,Z):
+# apply T_k(x) = 2x*T_{k-1}(x) - T_{k-2}(x)
+# KZ = \sum K[i] T_i(Z)
+    n  = len(K)
+    T0 = torch.ones(Z.shape) #torch.eye(L.shape[0])
+    A  = K[0]*T0 #K[0]*Z@T0
+    T1 = Z@L #L
+    A  = A + K[1]*T1 #A + K[1]*Z@T1
+    for i in range(2,n):
+        T2 = 2*T1@L - T0
+        A  = A + K[i]*T2
+        T0 = T1.clone()
+        T1 = T2.clone()
+    return A
