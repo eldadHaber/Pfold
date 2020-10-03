@@ -29,7 +29,7 @@ def getIterData(S,Yobs,MSK,i):
 
     # initialization
     Z = torch.zeros(23, n)
-    Z[:20, :] = 0.05*Seq
+    Z[:20, :] = 0.5*Seq
     Z[20:, :] = X0
     return Z, Xtrue, M
 
@@ -48,16 +48,16 @@ optimizer = optim.Adam([{'params': model.K, 'lr': lr},{'params': model.W, 'lr': 
 
 alossBest = 1e6
 ndata = len(S)-1
-epochs = 1000
+epochs = 500
 sig = 0.2
 
-ndata = 1
+ndata = 4
 bestModel = model
 hist = torch.zeros(epochs)
 for j in range(epochs):
     # Prepare the data
     aloss = 0
-    for i in range(0,ndata):
+    for i in range(1,ndata):
     #for i in range(0, 1):
 
         Z, Xtrue, M = getIterData(S, Yobs, MSK, i)
@@ -67,7 +67,7 @@ for j in range(epochs):
 
         D = torch.exp(-utils.getDistMat(Zout)/sig)
         Dt = torch.exp(-utils.getDistMat(Xtrue)/sig)
-        loss = torch.norm(M*Dt-M*D)**2/torch.norm(M*Dt-0*D)**2
+        loss = torch.norm(M*Dt-M*D)**2/torch.norm(M*Dt)**2
         loss.backward(retain_graph=True)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
         aloss += torch.sqrt(loss).detach()
@@ -83,7 +83,7 @@ for j in range(epochs):
         Zout = model(Z)
         D = torch.exp(-utils.getDistMat(Zout) / sig)
         Dt = torch.exp(-utils.getDistMat(Xtrue) / sig)
-        lossV = torch.norm(M * Dt - M * D) ** 2 / torch.norm(M * Dt - 0 * D) ** 2
+        lossV = torch.norm(M*Dt - M*D)**2 / torch.norm(M * Dt)**2
 
     print('==== Epoch =======',j, '        ', (aloss).item()/(ndata),'   ',lossV.item())
     hist[j] = (aloss).item()/(ndata)
