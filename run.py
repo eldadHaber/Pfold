@@ -15,9 +15,11 @@ if __name__ == '__main__':
     parser.add_argument('--feature-type', default='1D', type=str, metavar='N', help='Input feature types')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
+    parser.add_argument('--dataset-train', default='f:/training_95_80_320_tmp.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='f:/training_95_80_320_tmp.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='e:/training30_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='e:/training_100_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='e:/training_100_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='e:/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='e:/testing_small_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='e:/testing_small_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')

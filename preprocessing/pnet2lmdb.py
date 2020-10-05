@@ -181,13 +181,13 @@ if __name__ == "__main__":
     import argparse
     from pathlib import Path
     parser = argparse.ArgumentParser()
-    # parser.add_argument("-f", "--folder", type=str, default='./../data/training_100.pnet')
+    parser.add_argument("-f", "--folder", type=str, default='./../data/training_100.pnet')
     # parser.add_argument("-f", "--folder", type=str, default='./../data/training_30.pnet')
     # parser.add_argument("-f", "--folder", type=str, default='./../data/testing.pnet')
-    parser.add_argument("-f", "--folder", type=str, default='./../data/training.pnet')
+    # parser.add_argument("-f", "--folder", type=str, default='./../data/training.pnet')
     args = parser.parse_args()
     max_seq_len = 320
     min_seq_len = 80
-    lmdb_name = "e:/{:}_{:}_{:}.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
-    lmdb_name = "D:/Pytorch/Pfold/data/lmdb/{:}_{:}_{:}.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
-    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=300e9, report_freq=1000, write_freq=5000)
+    lmdb_name = "e:/{:}_{:}_{:}_tmp.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
+    # lmdb_name = "D:/Pytorch/Pfold/data/lmdb/{:}_{:}_{:}_tmp.lmdb".format(Path(args.folder).stem,min_seq_len,max_seq_len)
+    read_pnet_into_lmdb(args.folder, lmdb_name, min_seq_len=min_seq_len, max_seq_len=max_seq_len, db_size=1e13, report_freq=1000, write_freq=5000)

@@ -1,5 +1,8 @@
 import os.path as osp
 import random
+import sys
+import time
+
 import lmdb
 import pyarrow as pa
 import torch.utils.data as data
@@ -39,13 +42,19 @@ class Dataset_lmdb(data.Dataset):
         self.draw_prob = 0.5
 
     def __getitem__(self, index):
+        index = 402
+        t0 = time.time()
         env = self.env
         with env.begin(write=False) as txn:
             byteflow = txn.get(self.keys[index])
         unpacked = pa.deserialize(byteflow)
+        t1 = time.time()
         features = copy.deepcopy(unpacked[0])
-        features = self.select_features(features)
+        t2 = time.time()
+        print(sys.getsizeof(features)/1024/1024/1024)
+        print("times {:2.2f}, {:2.2f}".format(t1-t0,t2-t1))
 
+        features = self.select_features(features)
         targets = copy.deepcopy(unpacked[1])
         targets = self.match_target_channels(targets)
 
