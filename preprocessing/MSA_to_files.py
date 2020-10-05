@@ -299,16 +299,8 @@ if __name__ == "__main__":
             pssm = np.mean(np.asarray(pssms), axis=0)
 
             #SAVE FILE HERE
-            data = {
-                "protein": protein,
-                "pssm": pssm,
-                "dca": dca,
-                "r1": r1[org_id].T,
-                "r2": r2[org_id].T,
-                "r3": r3[org_id].T
-            }
             fullfileout = "{:}/ID_{:}".format(outputfolder,i)
-            np.save(fullfileout,data)
+            np.savez(fullfileout,protein=protein,pssm=pssm,dca=dca,r1=r1[org_id].T,r2=r2[org_id].T,r3=r3[org_id].T)
 
 
             cnt += 1
