@@ -115,7 +115,10 @@ class ConvertPnetFeaturesTo1D(object):
             else:
                 f1d = np.concatenate((seq_onehot, features[1]), axis=1).transpose(1, 0)
         elif len(features) == 3:
-            f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
+            if features[2].ndim == 1:
+                f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
+            else:
+                f1d = np.concatenate((seq_onehot, features[1], features[2]), axis=1).transpose(1, 0)
         else:
             raise NotImplementedError("ConvertPnetFeaturesTo1D has not been generalized to handle the amount of features you used.")
 
@@ -250,12 +253,14 @@ class MaskRandomSubset(object):
         pass
 
     def __call__(self, r):
+        m = np.ones(r.shape[1])
         pos_range = np.arange(10,r.shape[1]-10)
         endpoints = np.random.choice(pos_range,size=2,replace=False)
         endpoints = np.sort(endpoints)
         r_m = r
         r_m[:,endpoints[0]:endpoints[1]] = 0
-        return r_m
+        m[endpoints[0]:endpoints[1]] = 0
+        return r_m, m
 
 
 def one_hot(targets, nb_classes):

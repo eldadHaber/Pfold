@@ -55,7 +55,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
         args.network_args = {
-        'chan_in': 24,  # the number of channels in (21 for one-hot, 22 for one-hot + entropy, 41 for one-hot + pssm, 42 for one-hot + pssm + entropy)
+        'chan_in': 25,  # the number of channels in (21 for one-hot, 22 for one-hot + entropy, 41 for one-hot + pssm, 42 for one-hot + pssm + entropy)
         'emsize': 128,  # embedding dimension
         'nhid': 256, # nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
         'nlayers': 2,  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder

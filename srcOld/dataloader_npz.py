@@ -76,12 +76,14 @@ class Dataset_npz(data.Dataset):
                 features = (self.draw(pssm, seq=seq), entropy)
             else:
                 features = (seq, entropy)
-        elif self.chan_in == 24:
-            #We use this for inpainting, channels are 1hot + coords
+        elif self.chan_in == 25:
+            #We use this for inpainting, channels are 1hot + coords + mask
             if mask_random_seq:
-                features = (seq, self.seq_mask(targets[0]).T)
+                r, m = self.seq_mask(targets[0])
             else:
-                features = (seq, targets[0].T)
+                r = targets[0]
+                m = np.ones(r.shape[1])
+            features = (seq, r.T, m)
         elif self.chan_in == 41:
             features = (seq, pssm)
         elif self.chan_in == 42:
