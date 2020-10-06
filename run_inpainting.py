@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # parser.add_argument('--dataset-train', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/testing.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-train', default='./data/clean_pnet_train/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./data/clean_pnet_train/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/clean_pnet_test/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/lmdb/training_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/lmdb/testing_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
@@ -35,9 +35,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--SL-lr', default=1e-4, type=float, metavar='N', help='Learning Rate')
     # parser.add_argument('--SL-network', default='unet', type=str, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--max-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=1, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--draw-seq-from-msa', default=True, type=bool, help='Draws the sequence from the pssm matrix, using it for data augmentation')
+    parser.add_argument('--max-iter', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--draw-seq-from-msa', default=False, type=bool, help='Draws the sequence from the pssm matrix, using it for data augmentation')
     # parser.add_argument('--epochs', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='./results/checkpoints/790000_checkpoint.tar', type=str, metavar='N', help='select the neural network to train (resnet)')
     # parser.add_argument('--load-state', default='', type=str, metavar='N', help='select the neural network to train (resnet)')
@@ -55,11 +55,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
         args.network_args = {
-        'chan_in': 22,  # the number of channels in (21 for one-hot, 22 for one-hot + entropy, 41 for one-hot + pssm, 42 for one-hot + pssm + entropy)
+        'chan_in': 24,  # the number of channels in (21 for one-hot, 22 for one-hot + entropy, 41 for one-hot + pssm, 42 for one-hot + pssm + entropy)
         'emsize': 128,  # embedding dimension
         'nhid': 256, # nhid = 1024  # the dimension of the feedforward network model in nn.TransformerEncoder
         'nlayers': 2,  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-        'nhead': 2,  # the number of heads in the multiheadattention models
+        'nhead': 8,  # the number of heads in the multiheadattention models
         'dropout': 1e-2,  # 0.2 # the dropout value
         'chan_out': 3,  # the output channels, need 3 for each atom type
         'stencil': 5}
