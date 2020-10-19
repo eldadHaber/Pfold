@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 from numpy.linalg import norm
 import random
@@ -257,9 +259,10 @@ class MaskRandomSubset(object):
         pos_range = np.arange(10,r.shape[1]-10)
         endpoints = np.random.choice(pos_range,size=2,replace=False)
         endpoints = np.sort(endpoints)
-        r_m = r
+        r_m = copy.deepcopy(r)
         r_m[:,endpoints[0]:endpoints[1]] = 0
-        m[endpoints[0]:endpoints[1]] = 0
+        idx = r_m[0,:] == 0
+        m[idx] = 0
         return r_m, m
 
 

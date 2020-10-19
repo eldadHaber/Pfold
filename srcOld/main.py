@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from src.utils import determine_network_param
 from srcOld import log
 from srcOld.dataloader import select_dataset
-from srcOld.loss import MSELoss, LossMultiTargets
+from srcOld.loss import MSELoss, LossMultiTargets, EMSELoss
 from srcOld.network import select_network
 from srcOld.network_vnet import vnet1D
 from srcOld.network_transformer import TransformerModel
@@ -47,7 +47,10 @@ def main(c):
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training
-    loss_inner_fnc = MSELoss()
+    if c.sigma > 0:
+        loss_inner_fnc = EMSELoss()
+    else:
+        loss_inner_fnc = MSELoss()
     loss_fnc = LossMultiTargets(loss_inner_fnc)
 
     c.LOG.info('Date:{}'.format(datetime.now()))
@@ -60,7 +63,7 @@ def main(c):
     scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma)
     eval_net(net, dl_test, loss_fnc, device=c.device, plot_results=True)
     torch.save(net, "{:}/network.pt".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))

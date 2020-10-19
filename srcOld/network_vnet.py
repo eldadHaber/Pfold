@@ -72,42 +72,45 @@ def conv1T(X, Kernel):
 
 class vnet1D(nn.Module):
     """ VNet """
-    def __init__(self, arch, chan_out):
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block):
         super(vnet1D, self).__init__()
-        K, W = self.init_weights(arch, chan_out)
+        K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block)
         self.K = K
         self.W = W
         self.h = 0.1
 
-    def init_weights(self,A,nout):
-        # print('Initializing network  ')
-        A = np.array(A)
-        nL = A.shape[0]
+    def init_weights(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size = 3):
         K = nn.ParameterList([])
-        npar = 0
-        cnt = 1
-        for i in range(nL):
-            for j in range(A[i, 2]):
-                if A[i, 1] == A[i, 0]:
+        for i in range(nblocks):
+            # First the channel change.
+            if i == 0:
+                chan_i = chan_in
+            else:
+                chan_i = channels * 2**(i - 1)
+            chan_o = channels * 2**i
+            stdv = 1e-2 * chan_i / chan_o
+            Ki = torch.zeros(chan_o, chan_i, stencil_size)
+            Ki.data.uniform_(-stdv, stdv)
+            Ki = nn.Parameter(Ki)
+            K.append(Ki)
+
+            if i != nblocks-1:
+                # Last block is just a coarsening, since it is a vnet and not a unet
+                for j in range(nlayers_pr_block):
                     stdv = 1e-3
-                else:
-                    stdv = 1e-2 * A[i, 0] / A[i, 1]
+                    chan = channels * 2 ** i
+                    Ki = torch.zeros(chan, chan, stencil_size)
+                    Ki.data.uniform_(-stdv, stdv)
+                    Ki = nn.Parameter(Ki)
+                    K.append(Ki)
 
-                Ki = torch.zeros(A[i, 1], A[i, 0], A[i, 3])
-                Ki.data.uniform_(-stdv, stdv)
-                Ki = nn.Parameter(Ki)
-                # print('layer number', cnt, 'layer size', Ki.shape[0], Ki.shape[1], Ki.shape[2])
-                cnt += 1
-                npar += np.prod(Ki.shape)
-                #Ki.to(device)
-                K.append(Ki)
-
-        W = nn.Parameter(1e-4*torch.randn(nout, A[0,1], 1))
-        npar += W.numel()
-        # print('Number of parameters  ', npar)
+        W = nn.Parameter(1e-4*torch.randn(chan_out, channels, 1))
         return K, W
 
-    def forward(self, x, mask):
+    def forward(self, x, mask=None):
+        if mask is None:
+            mask = torch.ones_like(x[:,0,:])
+
         """ Forward propagation through the network """
 
         mask = mask.unsqueeze(1)
@@ -183,17 +186,21 @@ class vnet1D(nn.Module):
                 x = F.relu(z) + xS[n_scales]
 
         x = conv1(x, self.W) * mask
-        D = tr2DistSmall(x)
-        return (D,)
+
+        dists = ()
+        for i in range(x.shape[1]//3):
+            dists += (tr2DistSmall(x[:,i:i+3,:]),)
+
+        return dists, x
 
 def masked_instance_norm(x, mask, eps = 1e-5):
     # ins_norm = F.instance_norm(x)
     mean = torch.sum(x * mask, dim=2) / torch.sum(mask, dim=2)
     # mean = mean.detach()
-    mean_reshaped = mean.unsqueeze(2).expand_as(x)  # (N, L, C)
+    mean_reshaped = mean.unsqueeze(2).expand_as(x) * mask  # (N, L, C)
     var_term = ((x - mean_reshaped) * mask)**2  # (N,L,C)
     var = (torch.sum(var_term, dim=2) / torch.sum(mask, dim=2))  #(N,C)
     # var = var.detach()
     var_reshaped = var.unsqueeze(2).expand_as(x)    # (N, L, C)
-    ins_norm = (x - mean_reshaped * mask) / torch.sqrt(var_reshaped + eps)   # (N, L, C)
+    ins_norm = (x - mean_reshaped) / torch.sqrt(var_reshaped + eps)   # (N, L, C)
     return ins_norm

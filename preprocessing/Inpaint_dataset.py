@@ -27,9 +27,9 @@ if __name__ == "__main__":
     transform_target_test = transforms.Compose([ConvertCoordToDists()])
 
     dataset = Dataset_npz(dataset_in, transform=transform_test, target_transform=transform_target_test,
-                               chan_in=24, chan_out=3, draw_seq_from_pssm=False, mask_random_seq=False)
+                               chan_in=25, chan_out=3, draw_seq_from_pssm=False, mask_random_seq=False)
 
-    dl = torch.utils.data.DataLoader(dataset, batch_size=min(batch_size,len(dataset)), shuffle=True, num_workers=0, collate_fn=PadCollate(),
+    dl = torch.utils.data.DataLoader(dataset, batch_size=min(batch_size,len(dataset)), shuffle=False, num_workers=0, collate_fn=PadCollate(),
                                            drop_last=False)
 
 

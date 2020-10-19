@@ -19,6 +19,12 @@ def move_tuple_to(args,device,non_blocking=True):
         new_args += (arg.to(device,non_blocking=non_blocking),)
     return new_args
 
+def exp_tuple(args, sigma):
+    new_args = ()
+    for arg in args:
+        new_args += (torch.exp(-arg / sigma),)
+    return new_args
+
 
 def fix_seed(seed, include_cuda=True):
     torch.manual_seed(seed)
