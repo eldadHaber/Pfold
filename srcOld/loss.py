@@ -42,6 +42,33 @@ class MSELoss(torch.nn.Module):
 
         return result/nb
 
+
+class EMSELoss(torch.nn.Module):
+    """
+    Exponential MSE loss
+    """
+    def __init__(self):
+        super(EMSELoss,self).__init__()
+
+    def forward(self, input, target, sigma=0.5):
+        #We only want places where the target is larger than zero (remember this is for distances)
+        mask = target > 0
+
+        batch_mask = torch.sum(mask, dim=(1, 2)) > 0
+        input = input[batch_mask, :, :]
+        target = target[batch_mask, :, :]
+        mask = mask[batch_mask, :, :]
+        nb = target.shape[0]
+
+        input_e = torch.exp(-input/sigma)
+        target_e = torch.exp(-target/sigma)
+
+        result = torch.sum(torch.norm(input_e * mask - target_e * mask,dim=(1,2)) ** 2 / torch.norm(target_e * mask,dim=(1,2)) ** 2)
+
+        return result/nb
+
+
+
 def loss_tr(r1,r2, return_coords=False):
     '''
     Given two sets of 3D points of equal size. It computes the distance between these two sets of points, when allowing translation and rotation of the point clouds.

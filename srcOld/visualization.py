@@ -1,10 +1,13 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+matplotlib.use('TkAgg') #TkAgg
+
 # from scipy.special import softmax
 # from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def compare_distogram(outputs, targets):
+def compare_distogram(outputs, targets,highlight=None):
 
     plt.figure(num=1, figsize=[15, 10])
     plt.clf()
@@ -19,30 +22,49 @@ def compare_distogram(outputs, targets):
             target = torch.squeeze(target[-1,:,:]).cpu().detach().numpy()
             mask = target > 0
 
-        plt.subplot(n,3, i*3+1)
-        plt.imshow(output, vmin=0)
+        vmax = max(np.max(output),np.max(target))
+        if highlight is not None:
+            plt.subplot(n,4, i*4+1)
+        else:
+            plt.subplot(n,3, i*3+1)
+
+        plt.imshow(output, vmin=0, vmax=vmax)
         plt.colorbar()
         tit = name + "(prediction)"
         plt.title(tit)
 
-        plt.subplot(n,3, i*3+2)
-        plt.imshow(target, vmin=0)
+        if highlight is not None:
+            plt.subplot(n,4, i*4+2)
+        else:
+            plt.subplot(n,3, i*3+2)
+        plt.imshow(target, vmin=0, vmax=vmax)
         plt.colorbar()
         tit = name + "(target)"
         plt.title(tit)
 
-        plt.subplot(n, 3, i * 3 + 3)
+        if highlight is not None:
+            plt.subplot(n,4, i*4+3)
+        else:
+            plt.subplot(n,3, i*3+3)
         plt.imshow(np.abs(mask * output - target), vmin=0)
         plt.colorbar()
         tit = name + "(diff)"
         plt.title(tit)
+        if highlight is not None:
+            plt.subplot(n,4, i*4+4)
+            plt.imshow(highlight)
+            plt.colorbar()
+            tit = name + "(highlight)"
+            plt.title(tit)
+
+
 
     plt.pause(0.5)
 
     return
 
 
-def plotfullprotein(ps,ts):
+def plotfullprotein(ps,ts,highlight=None):
     plt.figure(num=2, figsize=[15, 10])
     plt.clf()
     axes = plt.axes(projection='3d')
@@ -54,8 +76,11 @@ def plotfullprotein(ps,ts):
 
     # We start by plotting the target protein
     # First we plot the backbone
-    t1 = ts[0]
+    t1 = ts[-1]
     target_h, = axes.plot3D(t1[0, :], t1[1, :], t1[2, :], 'red', marker='x')
+    if highlight is not None:
+        idxs = torch.where(highlight)[0]
+        target_h, = axes.plot3D(t1[0, idxs], t1[1, idxs], t1[2, idxs], 'black', marker='x')
 
     if len(ts) > 1: # If we have more than the backbone, we add those atoms to the protein as well
         t2 = ts[1]
@@ -87,8 +112,12 @@ def plotfullprotein(ps,ts):
 
     # Now we do the prediction protein
     # First we plot the backbone
-    p1 = ps[0]
+    p1 = ps[-1]
     pred_h, = axes.plot3D(p1[0, :], p1[1, :], p1[2, :], 'blue', marker='x')
+    if highlight is not None:
+        idxs = torch.where(highlight)[0]
+        pred_h, = axes.plot3D(p1[0, idxs], p1[1, idxs], p1[2, idxs], 'black', marker='x')
+
     if len(ps) > 1:
         p2 = ps[1]
         a = p1[0,:].T

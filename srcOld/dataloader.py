@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 
 from srcOld.dataloader_a3m import Dataset_a3m
 from srcOld.dataloader_lmdb import Dataset_lmdb
+from srcOld.dataloader_npz import Dataset_npz
 from srcOld.dataloader_pnet import Dataset_pnet
 from srcOld.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2D, ConvertCoordToDists, \
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
@@ -24,7 +25,13 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
 
     Flip = SeqFlip()
     if os.path.isdir(path_train):
-        dataset_train = Dataset_a3m(path_train)
+        # if os.path.
+        transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo1D()])
+        transform_target_train = transforms.Compose([Flip, ConvertCoordToDists()])
+        transform_mask_train = transforms.Compose([Flip])
+
+        dataset_train = Dataset_npz(path_train, transform=transform_train, target_transform=transform_target_train, mask_transform=transform_mask_train, chan_in=chan_in, chan_out=chan_out, draw_seq_from_pssm=draw_seq_from_msa)
+        # dataset_train = Dataset_a3m(path_train)
     elif os.path.isfile(path_train) and os.path.splitext(path_train)[1].lower() == '.pnet':
         if type == '2D':
             transform_train = transforms.Compose([Flip, ConvertPnetFeaturesTo2D()])
@@ -51,7 +58,10 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
 
     # Test Dataset
     if os.path.isdir(path_test):
-        dataset_test = Dataset_a3m(path_test)
+        transform_test = transforms.Compose([ConvertPnetFeaturesTo1D()])
+        transform_target_test = transforms.Compose([ConvertCoordToDists()])
+
+        dataset_test = Dataset_npz(path_test, transform=transform_test, target_transform=transform_target_test, chan_in=chan_in, chan_out=chan_out, draw_seq_from_pssm=draw_seq_from_msa)
     elif os.path.isfile(path_test) and os.path.splitext(path_test)[1].lower() == '.pnet':
         if type == '2D':
             transform_test = transforms.Compose([ConvertPnetFeaturesTo2D()])
@@ -79,8 +89,10 @@ def select_dataset(path_train,path_test,type='2D',batch_size=1, network=None, ch
 
     dl_train = torch.utils.data.DataLoader(dataset_train, batch_size=min(batch_size,len(dataset_train)), shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=True)
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=False)
+    # dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=min(batch_size,len(dataset_test)), shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
+    #                                        drop_last=False)
 
     return dl_train, dl_test
 

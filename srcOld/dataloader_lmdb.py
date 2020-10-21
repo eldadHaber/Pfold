@@ -42,17 +42,12 @@ class Dataset_lmdb(data.Dataset):
         self.draw_prob = 0.5
 
     def __getitem__(self, index):
-        index = 402
         t0 = time.time()
         env = self.env
         with env.begin(write=False) as txn:
             byteflow = txn.get(self.keys[index])
         unpacked = pa.deserialize(byteflow)
-        t1 = time.time()
         features = copy.deepcopy(unpacked[0])
-        t2 = time.time()
-        print(sys.getsizeof(features)/1024/1024/1024)
-        print("times {:2.2f}, {:2.2f}".format(t1-t0,t2-t1))
 
         features = self.select_features(features)
         targets = copy.deepcopy(unpacked[1])

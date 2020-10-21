@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 from numpy.linalg import norm
 import random
@@ -110,9 +112,15 @@ class ConvertPnetFeaturesTo1D(object):
         if len(features) == 1:
             f1d = seq_onehot.transpose(1, 0)
         elif len(features) == 2:
-            f1d = np.concatenate((seq_onehot, features[1][:, None]), axis=1).transpose(1, 0)
+            if features[1].ndim == 1:
+                f1d = np.concatenate((seq_onehot, features[1][:, None]), axis=1).transpose(1, 0)
+            else:
+                f1d = np.concatenate((seq_onehot, features[1]), axis=1).transpose(1, 0)
         elif len(features) == 3:
-            f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
+            if features[2].ndim == 1:
+                f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
+            else:
+                f1d = np.concatenate((seq_onehot, features[1], features[2]), axis=1).transpose(1, 0)
         else:
             raise NotImplementedError("ConvertPnetFeaturesTo1D has not been generalized to handle the amount of features you used.")
 
@@ -124,7 +132,7 @@ class SeqFlip(object):
     '''
     This function is specially designed for flipping the features made in pnet. For other types of features, this might not work.
     '''
-    def __init__(self, prob = 0.5):
+    def __init__(self, prob = 1.5):
         self.prob = prob
         self.p = random.random()
 
@@ -236,6 +244,26 @@ class DrawFromProbabilityMatrix(object):
     def run_sanity_check(self,P):
         assert (np.abs(np.sum(P,axis=1) - 1) < 1e-6 ).all()
         return
+
+
+
+class MaskRandomSubset(object):
+    '''
+    '''
+    def __init__(self):
+        self.max_ratio = 0.3
+        pass
+
+    def __call__(self, r):
+        m = np.ones(r.shape[1])
+        pos_range = np.arange(10,r.shape[1]-10)
+        endpoints = np.random.choice(pos_range,size=2,replace=False)
+        endpoints = np.sort(endpoints)
+        r_m = copy.deepcopy(r)
+        r_m[:,endpoints[0]:endpoints[1]] = 0
+        idx = r_m[0,:] == 0
+        m[idx] = 0
+        return r_m, m
 
 
 def one_hot(targets, nb_classes):

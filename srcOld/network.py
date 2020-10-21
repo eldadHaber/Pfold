@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
+from srcOld.network_graph import gNNC
 from srcOld.network_transformer import TransformerModel
 from srcOld.network_vnet import vnet1D
 
@@ -16,7 +17,8 @@ def select_network(network,network_args):
         net = vnet1D(**network_args)
     elif network.lower() == 'transformer':
         net = TransformerModel(**network_args)  # .to(device)
-
+    elif network.lower() == 'graph':
+        net = gNNC(**network_args)  # .to(device)
     else:
         raise NotImplementedError("The network you have selected has not been implemented: {}".format(network))
     # layers = [(c.nlayers, None),]
