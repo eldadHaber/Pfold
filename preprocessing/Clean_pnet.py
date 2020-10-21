@@ -1,6 +1,6 @@
 """
 This file takes the protein net database and cleans it.
-Cleaning involves length and whether sufficient info is known
+Cleaning involves length filtering and whether sufficient coordinate info is known
 """
 import os
 

@@ -140,7 +140,7 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries):
+def read_record(file_, num_evo_entries, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
     """ Read all protein records from pnet file. """
     id = []
     seq = []
@@ -167,61 +167,112 @@ def read_record(file_, num_evo_entries):
                 evolutionary = []
                 for residue in range(num_evo_entries):
                     evolutionary.append([float(step) for step in file_.readline().split()])
-                pssm.append(evolutionary)
-                entropy.append([float(step) for step in file_.readline().split()])
+                if use_pssm:
+                    pssm.append(evolutionary)
+                entropy_i = [float(step) for step in file_.readline().split()]
+                if use_entropy:
+                    entropy.append(entropy_i)
             elif case('[SECONDARY]' + '\n'):
-                dssp.append(letter_to_num(file_.readline()[:-1], DSSP_DICT))
+                dssp_i = letter_to_num(file_.readline()[:-1], DSSP_DICT)
+                if use_dssp:
+                    dssp.append(dssp_i)
             elif case('[TERTIARY]' + '\n'):
                 tertiary = []
-                for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord)*scaling for coord in file_.readline().split()])
-                coord.append(tertiary)
+                for axis in range(NUM_DIMENSIONS):
+                    tertiary.append([float(coord)*scaling for coord in file_.readline().split()])
+                if use_coord:
+                    coord.append(tertiary)
             elif case('[MASK]' + '\n'):
-                mask.append(letter_to_bool(file_.readline()[:-1], MASK_DICT))
+                mask_i = letter_to_bool(file_.readline()[:-1], MASK_DICT)
+                if use_mask:
+                    mask.append(mask_i)
             elif case(''):
-
-
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
+#
+# def parse_pnet(file,max_seq_len=-1):
+#     with open(file, 'r') as f:
+#         t0 = time.time()
+#         id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20)
+#         #NOTE THAT THE RESULT IS RETURNED IN ANGSTROM
+#         print("loading data complete! Took: {:2.2f}".format(time.time()-t0))
+#         r1 = []
+#         r2 = []
+#         r3 = []
+#         pssm2 = []
+#         coords = coords
+#         for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
+#             pssm2.append(flip_multidimensional_list(pssm[i]))
+#             # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
+#             r1.append(flip_multidimensional_list(separate_coords(coords[i], 1)))
+#             r2.append(flip_multidimensional_list(separate_coords(coords[i], 2)))
+#             r3.append(flip_multidimensional_list(separate_coords(coords[i], 0)))
+#
+#             if i+1 % 1000 == 0:
+#                 print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
+#
+#         args = (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len)
+#         if max_seq_len > 0:
+#             filter = np.full(len(seq), True, dtype=bool)
+#             for i,seq_i in enumerate(seq):
+#                 if len(seq_i) > max_seq_len:
+#                     filter[i] = False
+#             new_args = ()
+#             for list_i in (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len):
+#                 new_args += (list(compress(list_i,filter)),)
+#         else:
+#             new_args = args
+#         convert = ListToNumpy()
+#         seq = convert(new_args[0])
+#         r1 = convert(new_args[4])
+#         r2 = convert(new_args[5])
+#         r3 = convert(new_args[6])
+#         seq_len = np.array(new_args[-1])
+#         new_args = (seq, r1, r2, r3,seq_len)
+#
+#         print("parse complete! Took: {:2.2f}".format(time.time() - t0))
+#     return new_args
 
-def parse_pnet(file,max_seq_len=-1):
+
+
+def parse_pnet(file, min_seq_len=-1, max_seq_len=-1):
     with open(file, 'r') as f:
         t0 = time.time()
         id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20)
-        #NOTE THAT THE RESULT IS RETURNED IN ANGSTROM
-        print("loading data complete! Took: {:2.2f}".format(time.time()-t0))
+        # NOTE THAT THE RESULT IS RETURNED IN ANGSTROM
+        print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
         r1 = []
         r2 = []
         r3 = []
         pssm2 = []
-        coords = coords
-        for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
-            pssm2.append(flip_multidimensional_list(pssm[i]))
-            # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
-            r1.append(flip_multidimensional_list(separate_coords(coords[i], 1)))
-            r2.append(flip_multidimensional_list(separate_coords(coords[i], 2)))
-            r3.append(flip_multidimensional_list(separate_coords(coords[i], 0)))
+        for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
+            #     pssm2.append(flip_multidimensional_list(pssm[i]))
+            #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
+            r1.append((separate_coords(coords[i], 1)))
+            r2.append((separate_coords(coords[i], 2)))
+            r3.append((separate_coords(coords[i], 0)))
 
-            if i+1 % 1000 == 0:
-                print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
-
-        args = (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len)
-        if max_seq_len > 0:
+        args = (seq, r1,r2,r3,seq_len,id)
+        if max_seq_len > 0 or min_seq_len > 0:
             filter = np.full(len(seq), True, dtype=bool)
             for i,seq_i in enumerate(seq):
-                if len(seq_i) > max_seq_len:
+                if len(seq_i) > max_seq_len or len(seq_i) < min_seq_len:
                     filter[i] = False
             new_args = ()
-            for list_i in (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len):
+            for list_i in args:
                 new_args += (list(compress(list_i,filter)),)
         else:
             new_args = args
+
+
         convert = ListToNumpy()
         seq = convert(new_args[0])
-        r1 = convert(new_args[4])
-        r2 = convert(new_args[5])
-        r3 = convert(new_args[6])
-        seq_len = np.array(new_args[-1])
-        new_args = (seq, r1, r2, r3,seq_len)
+        r1 = convert(new_args[1])
+        r2 = convert(new_args[2])
+        r3 = convert(new_args[3])
+        seq_len = np.array(new_args[4])
+        id = new_args[5]
 
         print("parse complete! Took: {:2.2f}".format(time.time() - t0))
-    return new_args
+    return seq, seq_len, id, r1, r2, r3
+
 

@@ -12,6 +12,10 @@ NUM_DIMENSIONS = 3
 AA_DICT = {'A': '0', 'C': '1', 'D': '2', 'E': '3', 'F': '4', 'G': '5', 'H': '6', 'I': '7', 'K': '8', 'L': '9',
             'M': '10', 'N': '11', 'P': '12', 'Q': '13', 'R': '14', 'S': '15', 'T': '16', 'V': '17', 'W': '18',
             'Y': '19','-': '20'}
+
+AA_LIST = list(AA_DICT)
+# AA_LIST = 'ACDEFGHIKLMNPQRSTVWY-'
+
 AA_PAD_VALUE = 20
 DSSP_DICT = {'L': '0', 'H': '1', 'B': '2', 'E': '3', 'G': '4', 'I': '5', 'T': '6', 'S': '7'}
 DSSP_PAD_VALUE = 0 #TODO I DONT KNOW WHETHER THIS IS RIGHT

@@ -6,8 +6,8 @@ import time
 import math
 from scipy.sparse import csr_matrix
 
-print(sys.version)
-print("NMSLIB version:", nmslib.__version__)
+# print(sys.version)
+# print("NMSLIB version:", nmslib.__version__)
 
 
 def ANN_hnsw(x, k=10, euclidian_metric=False, union=True, eff=None,cutoff=False):
