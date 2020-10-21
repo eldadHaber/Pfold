@@ -177,7 +177,6 @@ class Counters:
         self.match = 0
         self.MSAs_no_match = 0
         self.MSAs_multi_match = 0
-        self.cnt = 0
         self.excluded = 0
 
 
