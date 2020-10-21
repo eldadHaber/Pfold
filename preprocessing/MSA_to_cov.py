@@ -4,10 +4,8 @@ import glob
 
 from preprocessing.ANN import ANN_sparse
 from preprocessing.MSA_reader import read_a2m_gz_file
-from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT
-import re
+from srcOld.dataloader_pnet import parse_pnet
 
-from srcOld.dataloader_pnet import read_record, parse_pnet, separate_coords, parse_pnet_for_comparison
 from srcOld.utils import Timer
 
 
@@ -184,9 +182,9 @@ class Counters:
 
 
 if __name__ == "__main__":
-    pnet_file = "./../data/training_70.pnet"
-    MSA_folder = "F:/Globus/raw/"
-    outputfolder = "F:/Output2/"
+    pnet_file = "./../data/testing.pnet"
+    MSA_folder = "./../data/MSA/"
+    outputfolder = "./../data/cov/"
     max_seq_len = 320
     min_seq_len = 80
     write_freq = 2
@@ -199,9 +197,14 @@ if __name__ == "__main__":
     c = Counters()
 
     t0 = time.time()
-    seqs, seqs_len, id, r1, r2, r3 = parse_pnet_for_comparison(pnet_file, max_seq_len=max_seq_len, min_seq_len=min_seq_len)
+    args = parse_pnet(pnet_file, max_seq_len=max_seq_len, min_seq_len=min_seq_len, use_dssp=False, use_pssm=False, use_mask=False, use_entropy=False)
+    seqs = args['seq']
+    seqs_len = args['seq_len']
+    r1 = args['r1']
+    r2 = args['r2']
+    r3 = args['r3']
     n_samples = len(seqs_len)
-    print("Read the pnet_file, took {:2.2f}, contains {:} samples".format(time.time() - t0, n_samples))
+    print("Read the pnet_file, took {:2.2f}s, contains {:} samples".format(time.time() - t0, n_samples))
 
     seqs_list, seqs_list_org_id, lookup = setup_protein_comparison(seqs, seqs_len)
 

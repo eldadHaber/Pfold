@@ -71,7 +71,7 @@ def read_a2m_gz_folder(folder,AA_LIST=AA_LIST):
         msas.append(msa)
     return msas, proteins
 
-def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=9999999):
+def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=9999999, verbose=False):
     """
     This will read and return the MSAs from a single a2m.gz file.
     The MSA will be returned as a numpy array.
@@ -102,9 +102,6 @@ def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=999999
     table = str.maketrans(dict.fromkeys(string.ascii_lowercase))
     seqs = []
     seq = ""
-    # read file line by line
-    # with gzip.open(a2mfile,'r') as fin:
-    t0 = time.time()
     check_length = True
     with xopen(a2mfile) as fin:
         for text in fin:
@@ -116,15 +113,15 @@ def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=999999
                     seq = ""
                     if check_length:
                         if len(seqs[-1]) > max_seq_len or len(seqs[-1]) <= min_seq_len:
+                            if verbose:
+                                print("Skipping MSA since sequence length is outside allowed range: {:}".format(len(seqs[-1])))
                             msa = None
                             return msa
             else:
                 seq += text.rstrip().translate(table)
     seqs.append(seq)  # We include the parent protein in the MSA sequence
     # convert letters into numbers
-    t1 = time.time()
     alphabet = np.array(AA_LIST, dtype='|S1').view(np.uint8)
-    # print("msas: {:}".format(len(seqs)))
     msa = np.array([list(s) for s in seqs], dtype='|S1').view(np.uint8)
 
     for i in range(alphabet.shape[0]):
@@ -132,15 +129,13 @@ def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=999999
 
     # treat all unknown characters as gaps
     msa[msa > 20] = 20
-    t2 = time.time()
-    # print("read {:2.2f}, msa {:2.2f}".format(t1-t0, t2-t1))
     return msa
 
 
 
 
 if __name__ == "__main__":
-    MSA_folder = "F:/Globus/raw_subset/"
+    MSA_folder = "./../data/MSA/"
     search_command = MSA_folder + "*.a2m.gz"
     a2mfiles = [f for f in glob.glob(search_command)]
     max_seq_len = 320
@@ -150,11 +145,10 @@ if __name__ == "__main__":
     n_repeats = 9
     for i, a2mfile in enumerate(a2mfiles):
         t0 = time.time()
-        msas = read_a2m_gz_file(a2mfile, max_seq_len=max_seq_len, min_seq_len=min_seq_len)
+        msas = read_a2m_gz_file(a2mfile, max_seq_len=max_seq_len, min_seq_len=min_seq_len, verbose=True)
         if msas is None:
             continue
         else:
             n = msas.shape[0]
             l = msas.shape[1]
-            print("# MSAs = {:}, time taken: {:2.2f}".format(n, time.time()- t0))
-
+            print("# MSAs = {:}, sequence length {:}, time taken: {:2.2f}".format(n, l, time.time()- t0))

@@ -16,6 +16,13 @@ def extract_1d_features(A,k=10,debug=False,safety=True, show_figures=-1, print_a
     Does an eigen decomposition of an array of symmetric 2D matrices (n,m,m), with n being the batch size, and mxm the matrix shape
     Returns the k eigenvectors with largest absolute eigenvalue.
 
+    safety = True, ensures that the matrix is symmetric.
+    debug = True, prints the mean and max error when using the k eigenvectors in comparison to the full 2D matrix.
+        Furthermore if debug = True, it also enables the possibility of using the following:
+
+        show_figures, if set to an integer n>0, will print n, random comparisons of the 2D matrix and the corresponding matrix made with k eigenvectors.
+        print_all, if not None, will attempt to save all possible 2D matrix comparisons to the folder given by print_all.
+
     """
     t0 = time.time()
     nb = A.shape[0]
@@ -49,6 +56,7 @@ def extract_1d_features(A,k=10,debug=False,safety=True, show_figures=-1, print_a
                 plt.title("eig={:}".format(k))
                 plt.colorbar()
                 plt.subplot(1, 3, 3)
+                plt.title("error={:2.2f}%".format(A_dif_percent[i]))
                 plt.imshow(np.abs(A_dif[i,:,:]))
                 plt.colorbar()
 
@@ -74,16 +82,15 @@ def extract_1d_features(A,k=10,debug=False,safety=True, show_figures=-1, print_a
     return V[:,:,:k]
 
 if __name__ == "__main__":
-    from pathlib import Path
-    MSA_folder = "./../data/MSA/"
-    main_folder = "./../data/clean_pnet_train/"
+    cov_folder = "./../data/cov/"
+    main_dataset_folder = "./../data/clean_pnet_train/"
     output_folder = "./../data/train/"
     report_iter = 500
     k_cov = 9
     k_contact = 19
 
     # Read all of main_folder in
-    search_command = main_folder + "*.npz"
+    search_command = main_dataset_folder + "*.npz"
     main_files = [f for f in glob.glob(search_command)]
 
     seqs = []
@@ -110,10 +117,10 @@ if __name__ == "__main__":
     seqs_list, seqs_list_org_id, lookup = setup_protein_comparison(seqs, seqs_len)
 
     # Read MSA_folder in one at a time and match them up against main
-    search_command = MSA_folder + "*.npz"
-    MSA_files = [f for f in glob.glob(search_command)]
-    for i, MSA_file in enumerate(MSA_files):
-        data = np.load(MSA_file, allow_pickle=True)
+    search_command = cov_folder + "*.npz"
+    cov_files = [f for f in glob.glob(search_command)]
+    for i, cov_file in enumerate(cov_files):
+        data = np.load(cov_file, allow_pickle=True)
         dca = data['dca']
         protein = data['protein']
         seq_len = len(protein)
@@ -163,9 +170,5 @@ if __name__ == "__main__":
         fullfileout = "{:}/ID_{:}".format(output_folder, i)
 
         np.savez(fullfileout, protein=protein, pssm=pssm, cov2d=cov, contact2d=contact2d, r1=r1, r2=r2, r3=r3, cov1d=cov1d, contact1d=contact1d)
-
-        print("hes")
-
-
 
 

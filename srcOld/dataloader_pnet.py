@@ -12,16 +12,15 @@ from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DIC
 
 class Dataset_pnet(Dataset):
     def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300, chan_in=21, chan_out=3, draw_seq_from_msa=False):
-        seq,pssm,entropy,dssp,r1,r2,r3,mask = parse_pnet(file,max_seq_len=max_seq_len)
+        args = parse_pnet(file,max_seq_len=max_seq_len, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True)
         self.file = file
-        self.seq = seq
-        self.pssm = pssm
-        self.entropy = entropy
-        self.dssp = dssp
-        self.mask = mask
-        self.r1 = r1  # Ca
-        self.r2 = r2  # Cb
-        self.r3 = r3  # N
+        self.seq = args['seq']
+        self.pssm = args['pssm']
+        self.entropy = args['entropy']
+        self.mask = args['mask']
+        self.r1 = args['r1']  # Ca
+        self.r2 = args['r2']  # Cb
+        self.r3 = args['r3']  # N
 
         self.transform = transform
         self.transform_target = transform_target
@@ -140,8 +139,12 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
-    """ Read all protein records from pnet file. """
+def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, report_iter=1000, min_seq_len=-1, max_seq_len=999999):
+    """
+    Read all protein records from pnet file.
+    Note that pnet files have coordinates saved in picometers, but we load it in in nanometers instead, since that works better with the neural networks.
+    """
+
     id = []
     seq = []
     pssm = []
@@ -153,126 +156,93 @@ def read_record(file_, num_evo_entries, use_entropy=True, use_pssm=True, use_dss
     scaling = 0.001 # converts from pico meters to nanometers
 
     t0 = time.time()
+    cnt = 0
     while True:
         next_line = file_.readline()
         for case in switch(next_line):
             if case('[ID]' + '\n'):
-                id.append(file_.readline()[:-1])
-                if len(id) % 1000 == 0:
-                    print("loading sample: {:}, Time: {:2.2f}".format(len(id),time.time() - t0))
+                cnt += 1
+                id_i = file_.readline()[:-1]
             elif case('[PRIMARY]' + '\n'):
-                seq.append(letter_to_num(file_.readline()[:-1], AA_DICT))
-                seq_len.append(len(seq[-1]))
+                seq_i = letter_to_num(file_.readline()[:-1], AA_DICT)
+                seq_len_i = len(seq_i)
+                if seq_len_i <= max_seq_len and seq_len_i >= min_seq_len:
+                    seq_ok = True
+                    id.append(id_i)
+                    seq.append(seq_i)
+                    seq_len.append(seq_len_i)
+                else:
+                    seq_ok = False
+                if (cnt + 1) % report_iter == 0:
+                    print("Reading sample: {:}, accepted samples {:} Time: {:2.2f}".format(cnt, len(id), time.time() - t0))
             elif case('[EVOLUTIONARY]' + '\n'):
                 evolutionary = []
                 for residue in range(num_evo_entries):
                     evolutionary.append([float(step) for step in file_.readline().split()])
-                if use_pssm:
+                if use_pssm and seq_ok:
                     pssm.append(evolutionary)
                 entropy_i = [float(step) for step in file_.readline().split()]
-                if use_entropy:
+                if use_entropy and seq_ok:
                     entropy.append(entropy_i)
             elif case('[SECONDARY]' + '\n'):
                 dssp_i = letter_to_num(file_.readline()[:-1], DSSP_DICT)
-                if use_dssp:
+                if use_dssp and seq_ok:
                     dssp.append(dssp_i)
             elif case('[TERTIARY]' + '\n'):
                 tertiary = []
                 for axis in range(NUM_DIMENSIONS):
                     tertiary.append([float(coord)*scaling for coord in file_.readline().split()])
-                if use_coord:
+                if use_coord and seq_ok:
                     coord.append(tertiary)
             elif case('[MASK]' + '\n'):
                 mask_i = letter_to_bool(file_.readline()[:-1], MASK_DICT)
-                if use_mask:
+                if use_mask and seq_ok:
                     mask.append(mask_i)
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
-#
-# def parse_pnet(file,max_seq_len=-1):
-#     with open(file, 'r') as f:
-#         t0 = time.time()
-#         id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20)
-#         #NOTE THAT THE RESULT IS RETURNED IN ANGSTROM
-#         print("loading data complete! Took: {:2.2f}".format(time.time()-t0))
-#         r1 = []
-#         r2 = []
-#         r3 = []
-#         pssm2 = []
-#         coords = coords
-#         for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
-#             pssm2.append(flip_multidimensional_list(pssm[i]))
-#             # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
-#             r1.append(flip_multidimensional_list(separate_coords(coords[i], 1)))
-#             r2.append(flip_multidimensional_list(separate_coords(coords[i], 2)))
-#             r3.append(flip_multidimensional_list(separate_coords(coords[i], 0)))
-#
-#             if i+1 % 1000 == 0:
-#                 print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
-#
-#         args = (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len)
-#         if max_seq_len > 0:
-#             filter = np.full(len(seq), True, dtype=bool)
-#             for i,seq_i in enumerate(seq):
-#                 if len(seq_i) > max_seq_len:
-#                     filter[i] = False
-#             new_args = ()
-#             for list_i in (seq, pssm2, entropy, dssp, r1,r2,r3, mask, seq_len):
-#                 new_args += (list(compress(list_i,filter)),)
-#         else:
-#             new_args = args
-#         convert = ListToNumpy()
-#         seq = convert(new_args[0])
-#         r1 = convert(new_args[4])
-#         r2 = convert(new_args[5])
-#         r3 = convert(new_args[6])
-#         seq_len = np.array(new_args[-1])
-#         new_args = (seq, r1, r2, r3,seq_len)
-#
-#         print("parse complete! Took: {:2.2f}".format(time.time() - t0))
-#     return new_args
 
-
-
-def parse_pnet(file, min_seq_len=-1, max_seq_len=-1):
+def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
     with open(file, 'r') as f:
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20)
-        # NOTE THAT THE RESULT IS RETURNED IN ANGSTROM
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len)
         print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
         r1 = []
         r2 = []
         r3 = []
-        pssm2 = []
         for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
-            #     pssm2.append(flip_multidimensional_list(pssm[i]))
             #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
             r1.append((separate_coords(coords[i], 1)))
             r2.append((separate_coords(coords[i], 2)))
             r3.append((separate_coords(coords[i], 0)))
 
-        args = (seq, r1,r2,r3,seq_len,id)
-        if max_seq_len > 0 or min_seq_len > 0:
-            filter = np.full(len(seq), True, dtype=bool)
-            for i,seq_i in enumerate(seq):
-                if len(seq_i) > max_seq_len or len(seq_i) < min_seq_len:
-                    filter[i] = False
-            new_args = ()
-            for list_i in args:
-                new_args += (list(compress(list_i,filter)),)
-        else:
-            new_args = args
-
-
         convert = ListToNumpy()
-        seq = convert(new_args[0])
-        r1 = convert(new_args[1])
-        r2 = convert(new_args[2])
-        r3 = convert(new_args[3])
-        seq_len = np.array(new_args[4])
-        id = new_args[5]
+        seq = convert(seq)
+        seq_len = np.array(seq_len)
+        args = {'id': id,
+                'seq': seq,
+                'seq_len': seq_len,
+                }
 
-        print("parse complete! Took: {:2.2f}".format(time.time() - t0))
-    return seq, seq_len, id, r1, r2, r3
+        if use_coord:
+            r1 = convert(r1)
+            r2 = convert(r2)
+            r3 = convert(r3)
+            args['r1'] = r1
+            args['r2'] = r2
+            args['r3'] = r3
+        if use_entropy:
+            entropy = convert(entropy)
+            args['entropy'] = entropy
+        if use_pssm:
+            pssm = convert(pssm)
+            args['pssm'] = pssm
+        if use_dssp:
+            dssp = convert(dssp)
+            args['dssp'] = dssp
+        if use_mask:
+            mask = convert(mask)
+            args['mask'] = mask
+        print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
+    return args
 
 
