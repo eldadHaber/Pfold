@@ -160,8 +160,6 @@ if __name__ == "__main__":
     nsub_size = 8000
     n_repeats = 3
 
-    db_size = int(1e12)
-    lmdb_name = "f:/{:}_{:}_{:}_tmp.lmdb".format(Path(pnet_file).stem,min_seq_len,max_seq_len)
 
     t0 = time.time()
     seqs, seqs_len, id, r1, r2, r3 = parse_pnet_for_comparison(pnet_file, max_seq_len=max_seq_len, min_seq_len=min_seq_len)
@@ -217,23 +215,29 @@ if __name__ == "__main__":
     MSA_in_protein_net_more_than_once = 0
 
     MSA_folder = "F:/Globus/raw/"
-    outputfolder = "F:/Output"
+    outputfolder = "F:/Output2/"
     avg_read_time = 0
     avg_lookup_time = 0
     avg_ann_time = 0
     avg_dca_time = 0
-    # MSA_folder = "F:/Globus/raw_subset/"
     search_command = MSA_folder + "*.a2m.gz"
     a2mfiles = [f for f in glob.glob(search_command)]
 
-    isdir = os.path.isdir(lmdb_name)
-
+    search_command = outputfolder + "*.npz"
+    outputfiles = [f for f in glob.glob(search_command)]
+    ite_start = -1
+    for outputfile in outputfiles:
+        str_tmp = outputfile.split(sep="ID")[-1]
+        num = int("".join(filter(str.isdigit, str_tmp)))
+        ite_start = max(num,ite_start)
     problems = 0
     t0 = time.time()
     cnt = 0
     n_excluded = 0
 
     for i, a2mfile in enumerate(a2mfiles):
+        if i <= ite_start:
+            continue
         # print("{:}".format(i))
         tt0 = time.time()
 
@@ -299,8 +303,8 @@ if __name__ == "__main__":
             pssm = np.mean(np.asarray(pssms), axis=0)
 
             #SAVE FILE HERE
-            fullfileout = "{:}/ID_{:}".format(outputfolder,i)
-            np.savez(fullfileout,protein=protein,pssm=pssm,dca=dca,r1=r1[org_id].T,r2=r2[org_id].T,r3=r3[org_id].T)
+            fullfileout = "{:}ID_{:}".format(outputfolder,i)
+            np.savez(fullfileout,protein=protein,pssm=pssm,dca=f2d_dca,r1=r1[org_id].T,r2=r2[org_id].T,r3=r3[org_id].T)
 
 
             cnt += 1
