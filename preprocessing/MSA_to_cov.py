@@ -181,16 +181,17 @@ class Counters:
 
 
 if __name__ == "__main__":
-    pnet_file = "./../data/testing.pnet"
-    MSA_folder = "./../data/MSA/"
-    outputfolder = "./../data/cov/"
-    max_seq_len = 320
+    pnet_file = "./data/testing.pnet"
+    MSA_folder = "./data/MSA/"
+    outputfolder = "./data/cov/"
+    max_seq_len = 10000
     min_seq_len = 80
     write_freq = 2
     report_freq = 5
     max_samples = 20000
     nsub_size = 8000
     n_repeats = 3
+    min_msas = 0
 
     t = Timers()
     c = Counters()
@@ -226,9 +227,9 @@ if __name__ == "__main__":
         if i <= ite_start:
             continue
         t1 = time.time()
-        msas = read_a2m_gz_file(a2mfile,max_seq_len=max_seq_len,min_seq_len=min_seq_len)
+        msas = read_a2m_gz_file(a2mfile,max_seq_len=max_seq_len,min_seq_len=min_seq_len, verbose=True)
 
-        if msas is None:
+        if msas is None or msas.shape[0] < min_msas:
             c.excluded += 1
             continue
         t2 = time.time()
@@ -295,11 +296,12 @@ if __name__ == "__main__":
         else:
             c.MSAs_multi_match += 1
         if (i + 1) % report_freq == 0:
-            print("Compared {:} proteins. Matches: {:}, MSA not in pnet: {:}, MSAs in pnet more than once {:}, excluded: {:}, Time(read): {:2.2f}, Time(lookup): {:2.2f}, Time(ANN): {:2.2f}, Time(DCA): {:2.2f}, Time(total): {:2.2f}".format(
-                  i + 1, c.match, c.MSAs_no_match, c.MSAs_multi_match, c.excluded, t.read_time(),t.lookup_time(),t.ann_time(),t.dca_time(),time.time()-t.t0))
+            print("Compared {:} proteins. Matches: {:}, MSA not in pnet: {:}, MSAs in pnet more than once {:}, excluded: {:}, Avr Time(read): {:2.2f}, Avr Time(lookup): {:2.2f}, Avr Time(ANN): {:2.2f}, Avr Time(DCA): {:2.2f}, Total Time(read): {:2.2f}, Total Time(lookup): {:2.2f}, Total Time(ANN): {:2.2f}, Total Time(DCA): {:2.2f} Time(total): {:2.2f}".format(
+                  i + 1, c.match, c.MSAs_no_match, c.MSAs_multi_match, c.excluded, t.read_time(),t.lookup_time(),t.ann_time(),t.dca_time(), t.read_time(total=True),t.lookup_time(total=True),t.ann_time(total=True),t.dca_time(total=True),time.time()-t.t0))
 
     # finish iterating through dataset
     print(
-        "Compared {:} proteins. Matches: {:}, MSA not in pnet: {:}, MSAs in pnet more than once {:}, excluded: {:}, Time(read): {:2.2f}, Time(lookup): {:2.2f}, Time(ANN): {:2.2f}, Time(DCA): {:2.2f}, Time(total): {:2.2f}".format(
+        "Compared {:} proteins. Matches: {:}, MSA not in pnet: {:}, MSAs in pnet more than once {:}, excluded: {:}, Avr Time(read): {:2.2f}, Avr Time(lookup): {:2.2f}, Avr Time(ANN): {:2.2f}, Avr Time(DCA): {:2.2f}, Total Time(read): {:2.2f}, Total Time(lookup): {:2.2f}, Total Time(ANN): {:2.2f}, Total Time(DCA): {:2.2f} Time(total): {:2.2f}".format(
             i + 1, c.match, c.MSAs_no_match, c.MSAs_multi_match, c.excluded, t.read_time(), t.lookup_time(),
-            t.ann_time(), t.dca_time(), time.time() - t.t0))
+            t.ann_time(), t.dca_time(), t.read_time(total=True), t.lookup_time(total=True), t.ann_time(total=True),
+            t.dca_time(total=True), time.time() - t.t0))

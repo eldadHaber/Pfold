@@ -9,7 +9,7 @@ import copy
 from preprocessing.MSA_to_cov import setup_protein_comparison
 from srcOld.utils import check_symmetric
 
-matplotlib.use('TkAgg') #TkAgg
+# matplotlib.use('TkAgg') #TkAgg
 
 def extract_1d_features(A,k=10,debug=False,safety=True, show_figures=-1, print_all=None):
     """

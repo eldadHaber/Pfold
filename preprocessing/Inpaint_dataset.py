@@ -6,7 +6,7 @@ import torchvision.transforms as transforms
 import numpy as np
 from torch.utils.data import Dataset
 import matplotlib
-matplotlib.use('TkAgg') #TkAgg
+# matplotlib.use('TkAgg') #TkAgg
 
 from srcOld.dataloader import PadCollate
 from srcOld.dataloader_npz import Dataset_npz

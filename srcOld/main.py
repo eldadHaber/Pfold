@@ -16,7 +16,7 @@ from srcOld.network_transformer import TransformerModel
 from srcOld.optimization import train, eval_net
 from srcOld.utils import fix_seed
 
-matplotlib.use('TkAgg') #TkAgg
+# matplotlib.use('TkAgg') #TkAgg
 
 import pandas as pd
 desired_width = 600

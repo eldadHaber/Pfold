@@ -98,7 +98,7 @@ def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=999999
     So in the above example we have 2 sequences and the origin sequence.
     Note this has only been tested on windows.
     """
-
+    t0 = time.time()
     table = str.maketrans(dict.fromkeys(string.ascii_lowercase))
     seqs = []
     seq = ""
@@ -114,7 +114,7 @@ def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=999999
                     if check_length:
                         if len(seqs[-1]) > max_seq_len or len(seqs[-1]) <= min_seq_len:
                             if verbose:
-                                print("Skipping MSA since sequence length is outside allowed range: {:}".format(len(seqs[-1])))
+                                print("Skipping MSA since sequence length is outside allowed range: {:}. Time taken {:2.2f}".format(len(seqs[-1]),time.time()-t0))
                             msa = None
                             return msa
             else:
@@ -137,7 +137,7 @@ def read_a2m_gz_file(a2mfile, AA_LIST=AA_LIST, max_seq_len=-1,min_seq_len=999999
 if __name__ == "__main__":
     MSA_folder = "./../data/MSA/"
     search_command = MSA_folder + "*.a2m.gz"
-    a2mfiles = [f for f in glob.glob(search_command)]
+    a2mfiles = [f for f in sorted(glob.glob(search_command))]
     max_seq_len = 320
     min_seq_len = 80
     max_samples = 30000
