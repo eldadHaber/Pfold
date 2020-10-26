@@ -4,6 +4,8 @@ import glob
 
 from preprocessing.ANN import ANN_sparse
 from preprocessing.MSA_reader import read_a2m_gz_file
+from preprocessing.MSA_to_cov import compute_cov_from_msa
+from preprocessing.sftp_copy import establish_connection, get_data_batch, send_data_batch, clean_folder
 from srcOld.dataloader_pnet import parse_pnet
 
 from srcOld.utils import Timer
@@ -163,110 +165,6 @@ def sparse_one_hot_encoding(data,cat=21):
     onehot = scsp.coo_matrix((v.flatten(), (ii.flatten(), jj.flatten())), dtype=np.float32)
     return scsp.csr_matrix(onehot)
 
-def compute_cov_from_msa(MSA_folder, outputfolder, lookup, seqs_list,seqs_list_org_id, r1, r2, r3, start_from_previous=False, IDs=None):
-    t = Timers()
-    c = Counters()
-
-    search_command = MSA_folder + "*.a2m.gz"
-    a2mfiles = [f for f in sorted(glob.glob(search_command))]
-
-    # We search the outputfolder to see whether there already exists some files, if there do, we find the largest number and start reading the MSAs from that number onwards.
-    if start_from_previous:
-        search_command = outputfolder + "*.npz"
-        outputfiles = [f for f in sorted(glob.glob(search_command))]
-        ite_start = -1
-        for outputfile in outputfiles:
-            str_tmp = outputfile.split(sep="ID")[-1]
-            num = int("".join(filter(str.isdigit, str_tmp)))
-            ite_start = max(num,ite_start)
-    else:
-        ite_start = -1
-
-
-    for i, a2mfile in enumerate(a2mfiles):
-        if i <= ite_start:
-            continue
-        t1 = time.time()
-        msas = read_a2m_gz_file(a2mfile,max_seq_len=max_seq_len,min_seq_len=min_seq_len, verbose=True)
-
-        if msas is None or msas.shape[0] < min_msas:
-            c.excluded += 1
-            continue
-        t2 = time.time()
-        t.read_time.add_time(t2-t1)
-
-        protein = msas[-1, :]
-        seq_len = len(protein)
-        try:
-            seq_idx = lookup[seq_len]
-        except:
-            c.MSAs_no_match += 1
-            continue
-        seqs_i = seqs_list[seq_idx]
-        res = np.mean(protein == seqs_i, axis=1) == 1
-        t3 = time.time()
-        t.lookup_time.add_time(t3-t2)
-        if np.sum(res) == 1:
-            c.match += 1
-            org_id = (seqs_list_org_id[seq_idx][res]).squeeze()
-
-            n = msas.shape[0]
-            indices = np.random.permutation(n)
-            pssms = []
-            f2d_dcas = []
-            for j in range(max(min(n_repeats, n // max_samples), 1)):
-                t4 = time.time()
-                idx = indices[j * max_samples:min((j + 1) * max_samples, n)]
-                msa = msas[idx, :]
-                x_sp = sparse_one_hot_encoding(msa)
-
-                nsub = min(nsub_size, n)
-                w = ANN_sparse(x_sp[0:nsub], x_sp, k=100, eff=300, cutoff=True)
-                mask = w == np.min(w)
-                wm = np.sum(w[mask])
-                if wm > 0.01 * np.sum(w):  # If these account for more than 1% of the total weight, we scale them down to almost 1%.
-                    scaling = wm / np.sum(w) / 0.01
-                else:
-                    scaling = 1
-                w[mask] /= scaling
-
-                wn = w / np.sum(w)
-                msa_1hot = np.eye(21, dtype=np.float32)[msa]
-                t5 = time.time()
-                t.ann_time.add_time(t5-t4)
-                pssms.append(msa2pssm(msa_1hot, w))
-                f2d_dcas.append(dca(msa_1hot, w))
-                t6 = time.time()
-                t.dca_time.add_time(t6-t5)
-            f2d_dca = np.mean(np.asarray(f2d_dcas), axis=0)
-            pssm = np.mean(np.asarray(pssms), axis=0)
-
-            # SAVE FILE HERE
-            if IDs is None:
-                fullfileout = "{:}ID_{:}".format(outputfolder,i)
-            else:
-                fullfileout = "{:}ID_{:}".format(outputfolder,IDs[i])
-            np.savez(fullfileout,protein=protein,pssm=pssm,dca=f2d_dca,r1=r1[org_id].T,r2=r2[org_id].T,r3=r3[org_id].T)
-
-        elif np.sum(res) == 0:
-            c.MSAs_no_match += 1
-        else:
-            c.MSAs_multi_match += 1
-        if (i + 1) % report_freq == 0:
-            print("Compared {:} proteins. Matches: {:}, MSA not in pnet: {:}, MSAs in pnet more than once {:}, excluded: {:}, Avr Time(read): {:2.2f}, Avr Time(lookup): {:2.2f}, Avr Time(ANN): {:2.2f}, Avr Time(DCA): {:2.2f}, Total Time(read): {:2.2f}, Total Time(lookup): {:2.2f}, Total Time(ANN): {:2.2f}, Total Time(DCA): {:2.2f} Time(total): {:2.2f}".format(
-                  i + 1, c.match, c.MSAs_no_match, c.MSAs_multi_match, c.excluded, t.read_time(),t.lookup_time(),t.ann_time(),t.dca_time(), t.read_time(total=True),t.lookup_time(total=True),t.ann_time(total=True),t.dca_time(total=True),time.time()-t.t0))
-
-    # finish iterating through dataset
-    print(
-        "Compared {:} proteins. Matches: {:}, MSA not in pnet: {:}, MSAs in pnet more than once {:}, excluded: {:}, Avr Time(read): {:2.2f}, Avr Time(lookup): {:2.2f}, Avr Time(ANN): {:2.2f}, Avr Time(DCA): {:2.2f}, Total Time(read): {:2.2f}, Total Time(lookup): {:2.2f}, Total Time(ANN): {:2.2f}, Total Time(DCA): {:2.2f} Time(total): {:2.2f}".format(
-            i + 1, c.match, c.MSAs_no_match, c.MSAs_multi_match, c.excluded, t.read_time(), t.lookup_time(),
-            t.ann_time(), t.dca_time(), t.read_time(total=True), t.lookup_time(total=True), t.ann_time(total=True),
-            t.dca_time(total=True), time.time() - t.t0))
-
-
-
-
-
 class Timers:
     def __init__(self):
         self.read_time = Timer()
@@ -285,11 +183,19 @@ class Counters:
 
 
 if __name__ == "__main__":
-    pnet_file = "./data/testing.pnet"
-    MSA_folder = "./data/MSA/"
-    outputfolder = "./data/cov/"
-    max_seq_len = 10000
-    min_seq_len = 80
+    pnet_file = "./data/training_30.pnet"
+
+    local_data_in = './data/input/'
+    local_data_out = './data/output/'
+    local_book = './data/'
+
+    remote_data_folder = './raw/'
+    remote_booking_folder = './bookkeeping/'
+    remote_result_folder = './cov/'
+
+
+    max_seq_len = 1000
+    min_seq_len = 321
     write_freq = 2
     report_freq = 5
     max_samples = 20000
@@ -297,6 +203,8 @@ if __name__ == "__main__":
     n_repeats = 3
     min_msas = 0
 
+    t = Timers()
+    c = Counters()
 
     t0 = time.time()
     args = parse_pnet(pnet_file, max_seq_len=max_seq_len, min_seq_len=min_seq_len, use_dssp=False, use_pssm=False, use_mask=False, use_entropy=False)
@@ -310,7 +218,18 @@ if __name__ == "__main__":
 
     seqs_list, seqs_list_org_id, lookup = setup_protein_comparison(seqs, seqs_len)
 
-    compute_cov_from_msa(MSA_folder, outputfolder, lookup, seqs_list, seqs_list_org_id, r1, r2, r3,
-                         start_from_previous=False)
+    while True:
+        ids, files_to_get, bookkeeper_name = get_data_batch(remote_booking_folder, remote_data_folder, local_book,
+                                                            local_data_in)
+        if ids is None:
+            print("No more jobs found, exiting")
+            break
 
+        compute_cov_from_msa(local_data_in, local_data_out, lookup, seqs_list, seqs_list_org_id, r1, r2, r3,
+                             start_from_previous=False, IDs=ids)
 
+        #Next we wish to transfer output files
+        send_data_batch(remote_result_folder,local_data_out,bookkeeper_name)
+
+        clean_folder(local_data_in)
+        clean_folder(local_data_out)

@@ -35,11 +35,14 @@ def create_bookkeeper(files,folder_out,max_size):
     return
 
 if __name__ == "__main__":
-    MSA_folder = "./../data/MSA/"
+    # MSA_folder = "./../data/MSA/"
+    MSA_folder = "F:/Globus/raw/"
     search_command = MSA_folder + "*.a2m.gz"
     a2mfiles = [f for f in sorted(glob.glob(search_command))]
-    bookkeeping = "./../data/bookkeeping/"
-    max_size = 100
+    # bookkeeping = "./../data/bookkeeping/"
+    bookkeeping = "F:/Globus/bookkeeping/"
+
+    max_size = 10000
     create_bookkeeper(a2mfiles, bookkeeping, max_size)
     print("done")
 
