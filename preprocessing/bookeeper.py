@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # bookkeeping = "./../data/bookkeeping/"
     bookkeeping = "F:/Globus/bookkeeping/"
 
-    max_size = 10000
+    max_size = 100
     create_bookkeeper(a2mfiles, bookkeeping, max_size)
     print("done")
 

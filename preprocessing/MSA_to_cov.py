@@ -163,7 +163,7 @@ def sparse_one_hot_encoding(data,cat=21):
     onehot = scsp.coo_matrix((v.flatten(), (ii.flatten(), jj.flatten())), dtype=np.float32)
     return scsp.csr_matrix(onehot)
 
-def compute_cov_from_msa(MSA_folder, outputfolder, lookup, seqs_list,seqs_list_org_id, r1, r2, r3, start_from_previous=False, IDs=None):
+def compute_cov_from_msa(MSA_folder, outputfolder, lookup, seqs_list,seqs_list_org_id, r1, r2, r3, max_seq_len, min_seq_len, start_from_previous=False, IDs=None):
     t = Timers()
     c = Counters()
 

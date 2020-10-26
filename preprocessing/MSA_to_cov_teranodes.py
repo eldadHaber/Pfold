@@ -225,7 +225,7 @@ if __name__ == "__main__":
             print("No more jobs found, exiting")
             break
 
-        compute_cov_from_msa(local_data_in, local_data_out, lookup, seqs_list, seqs_list_org_id, r1, r2, r3,
+        compute_cov_from_msa(local_data_in, local_data_out, lookup, seqs_list, seqs_list_org_id, r1, r2, r3, max_seq_len=max_seq_len, min_seq_len=min_seq_len,
                              start_from_previous=False, IDs=ids)
 
         #Next we wish to transfer output files
