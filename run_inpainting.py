@@ -12,7 +12,7 @@ if __name__ == '__main__':
     # General
     parser.add_argument('--seed', default=123558, type=int, metavar='N', help='seed number')
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
-    parser.add_argument('--feature-type', default='1D', type=str, metavar='N', help='Input feature types')
+    parser.add_argument('--feature-dim', default=1, type=int, metavar='N', help='Input feature types')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
     # parser.add_argument('--dataset-train', default='e:/training30_80_320.lmdb', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # parser.add_argument('--dataset-train', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/testing_small.pnet', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--batch-size', default=10, type=int, metavar='N', help='batch size used in dataloader')
-    parser.add_argument('--network', default='graph', type=str, metavar='N', help='network to use')
+    parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
 
     # Learning
 
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         'chan_in': 25,
         'nblocks': 4,
         'nlayers_pr_block': 5,
-        'channels': 128,
+        'channels': 256,
         'chan_out': 3
         }
     else:

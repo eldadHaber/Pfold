@@ -41,11 +41,9 @@ class Dataset_npz(data.Dataset):
         self.apply_mask = mask_random_seq
 
     def __getitem__(self, index):
-        t0 = time.time()
         data = np.load(self.files[index]) #Probably need to folder structure as well here
         features = (data['seq'], data['pssm'], data['entropy'])
         targets = (data['r1'],data['r2'],data['r3'])
-        # mask = data['mask']
 
         features = self.select_features(features,targets,mask_random_seq=self.apply_mask)
         targets = self.match_target_channels(targets)
@@ -58,24 +56,6 @@ class Dataset_npz(data.Dataset):
         if self.target_transform is not None:
             distances, coords = self.target_transform(targets)
 
-        # import matplotlib.pyplot as plt
-        # plt.imshow(distances[0])
-        # plt.title("Distances")
-        # m = features[-1,:]
-        # mm = m[:,None] @ m[None,:]
-        # r = features[21:-1,:]
-        # mask = r[0, :] != 0
-        # M = mask[:, None] @ mask[None, :]
-        # d = np.sum(r ** 2, axis=0)[:, None] + np.sum(r ** 2, axis=0)[None, :] - 2 * (r.T @ r)
-        # d_r = np.sqrt(d)
-        # d_masked = np.sqrt(np.maximum(M * d, 0))
-        # plt.figure()
-        # plt.imshow(d_r)
-        # plt.title("Distances made from input data")
-        # plt.figure()
-        # plt.imshow(mm)
-        # plt.title("input mask")
-        # plt.pause(1)
         return features, distances, coords
 
     def __len__(self):
