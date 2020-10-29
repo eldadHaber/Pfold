@@ -2,7 +2,7 @@ import string
 import numpy as np
 import os
 from torch.utils.data import Dataset
-from Bio.PDB import PDBParser
+# from Bio.PDB import PDBParser
 
 
 class Dataset_a3m(Dataset):

@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
-from srcOld.network_transformer import tr2DistSmall
+from src.network_transformer import tr2DistSmall
 
 
 def conv2(X, Kernel):
@@ -284,12 +284,6 @@ class vnet2D(nn.Module):
         mm = mask.transpose(1,2) * mask
         mm = mm.unsqueeze(1)
 
-        # import matplotlib
-        # import matplotlib.pyplot as plt
-        # matplotlib.use('TkAgg') #TkAgg
-        # plt.spy(mm[0,:,:].squeeze().cpu().detach())
-        # plt.pause(1)
-
         # Number of layers
         nL = len(self.K)
 
@@ -346,7 +340,7 @@ class vnet2D(nn.Module):
                 z = conv2T(x, self.K[i]) * mm
                 z = masked_instance_norm_2d(z,mm)
                 z = F.relu(z)
-                z = conv1(z, self.K[i]) * mm
+                z = conv2(z, self.K[i]) * mm
                 x = x - self.h*z
 
             # Change number of channels/resolution

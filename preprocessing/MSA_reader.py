@@ -5,7 +5,7 @@ import numpy as np
 import string
 import glob
 
-from srcOld.dataloader_utils import AA_LIST
+from src.dataloader_utils import AA_LIST
 
 def read_a2m_gz_folder(folder,AA_LIST=AA_LIST):
     """

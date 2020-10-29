@@ -7,7 +7,7 @@ import matplotlib
 import copy
 
 from preprocessing.MSA_to_cov import setup_protein_comparison
-from srcOld.utils import check_symmetric
+from src.utils import check_symmetric
 
 # matplotlib.use('TkAgg') #TkAgg
 
@@ -82,12 +82,16 @@ def extract_1d_features(A,k=10,debug=False,safety=True, show_figures=-1, print_a
     return V[:,:,:k]
 
 if __name__ == "__main__":
-    cov_folder = "./../data/cov/"
-    main_dataset_folder = "./../data/clean_pnet_train/"
-    output_folder = "./../data/train/"
+    # cov_folder = "./../data/cov/"
+    cov_folder = "F:/Output/"
+    # main_dataset_folder = "./../data/clean_pnet_train/"
+    main_dataset_folder = "./../data/clean_pnet_test/"
+
+    output_folder = "F:/final_dataset_test/"
     report_iter = 500
     k_cov = 9
     k_contact = 19
+    dt_save = np.float32
 
     # Read all of main_folder in
     search_command = main_dataset_folder + "*.npz"
@@ -119,27 +123,45 @@ if __name__ == "__main__":
     # Read MSA_folder in one at a time and match them up against main
     search_command = cov_folder + "*.npz"
     cov_files = [f for f in glob.glob(search_command)]
+    nmatches = 0
+    t1 = time.time()
     for i, cov_file in enumerate(cov_files):
+        if (i+1) % 1000 == 0:
+            print("Done {:}, time {:2.2f}".format(i+1,time.time()-t1))
         data = np.load(cov_file, allow_pickle=True)
-        dca = data['dca']
         protein = data['protein']
         seq_len = len(protein)
         try:
             seq_idx = lookup[seq_len]
         except:
-            print("Protein length not in database")
             continue
+
         seqs_i = seqs_list[seq_idx]
         res = np.mean(protein == seqs_i, axis=1) == 1
         org_id = (seqs_list_org_id[seq_idx][res]).squeeze()
-        if len(org_id) != 1:
+        if org_id.size != 1:
+            if org_id.size == 0:
+                continue
             print("Protein matching problems. org_id= {:}".format(org_id))
+        else:
+            print("Found one!")
+            nmatches += 1
 
-        pssm = pssms[org_id]
-        entropy = entropys[org_id]
-        r1 = r1s[org_id]
-        r2 = r2s[org_id]
-        r3 = r3s[org_id]
+        r1 = data['r1']
+        r2 = data['r2']
+        r3 = data['r3']
+        dca = data['dca']
+        tmp = data['pssm']
+
+        pssm = tmp[:,:-1]
+        entropy = tmp[:,-1]
+
+
+        # pssm = pssms[org_id]
+        # entropy = entropys[org_id]
+        # r1 = r1s[org_id]
+        # r2 = r2s[org_id]
+        # r3 = r3s[org_id]
 
         # Ensure dca is symmetric, which it was supposed to be
         dca = 0.5 * (dca + np.swapaxes(dca,0,1))
@@ -169,6 +191,6 @@ if __name__ == "__main__":
         # SAVE FILE HERE
         fullfileout = "{:}/ID_{:}".format(output_folder, i)
 
-        np.savez(fullfileout, protein=protein, pssm=pssm, cov2d=cov, contact2d=contact2d, r1=r1, r2=r2, r3=r3, cov1d=cov1d, contact1d=contact1d)
+        np.savez(fullfileout, protein=dt_save(protein), pssm=dt_save(pssm), cov2d=dt_save(cov), contact2d=dt_save(contact2d), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), cov1d=dt_save(cov1d), contact1d=dt_save(contact1d), entropy=dt_save(entropy))
 
 

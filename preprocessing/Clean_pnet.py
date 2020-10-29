@@ -7,9 +7,9 @@ import os
 import numpy as np
 import time
 
-from srcOld.dataloader_pnet import read_record, switch, letter_to_num, letter_to_bool, flip_multidimensional_list, \
+from src.dataloader_pnet import read_record, switch, letter_to_num, letter_to_bool, flip_multidimensional_list, \
     separate_coords
-from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, ListToNumpy
+from src.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, ListToNumpy
 
 
 def read_and_clean_pnet(pnet_file, output_folder,max_seq_len=320,min_seq_len=80,num_evo_entries=20,min_ratio=0):
@@ -55,7 +55,7 @@ def read_and_clean_pnet(pnet_file, output_folder,max_seq_len=320,min_seq_len=80,
                         n_excluded += 1
                         continue
                     #Save data
-                    fullfileout = "{:}/{:}".format(output_folder, id)
+                    fullfileout = "{:}{:}".format(output_folder, id)
                     np.savez(fullfileout, seq=seq, pssm=pssm, entropy=entropy, r1=r1,r2=r2,r3=r3, mask=mask)
 
                     cnt += 1
@@ -79,13 +79,14 @@ def process_data(seq,pssm,entropy,coord,mask):
 
 
 if __name__ == "__main__":
-    pnet_file = "./../data/training_30.pnet"
-    # pnet_file = "./../data/testing.pnet"
+    # pnet_file = "./../data/training_30.pnet"
+    pnet_file = "./../data/testing.pnet"
     max_seq_len = 320
     min_seq_len = 80
     min_ratio_coords_known = 0.7
-    output_folder = './../data/clean_pnet_train'
-    # output_folder = './../data/clean_pnet_test'
+    # output_folder = './../data/clean_pnet_train/'
+
+    output_folder = './../data/clean_pnet_test/'
 
     read_and_clean_pnet(pnet_file, output_folder, max_seq_len=max_seq_len, min_seq_len=min_seq_len, min_ratio=min_ratio_coords_known)
 

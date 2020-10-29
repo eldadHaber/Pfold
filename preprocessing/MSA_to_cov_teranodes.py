@@ -6,9 +6,9 @@ from preprocessing.ANN import ANN_sparse
 from preprocessing.MSA_reader import read_a2m_gz_file
 from preprocessing.MSA_to_cov import compute_cov_from_msa
 from preprocessing.sftp_copy import establish_connection, get_data_batch, send_data_batch, clean_folder
-from srcOld.dataloader_pnet import parse_pnet
+from src.dataloader_pnet import parse_pnet
 
-from srcOld.utils import Timer
+from src.utils import Timer
 
 
 def setup_protein_comparison(seqs, seqs_len):

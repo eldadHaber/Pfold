@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 from src.dataloader_utils import ListToNumpy, AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, ConvertCoordToDistAnglesVec
-from srcOld.dataloader_utils import ConvertCoordToDists
+from src.dataloader_utils import ConvertCoordToDists
 
 
 def raw_reader(path):

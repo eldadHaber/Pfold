@@ -8,12 +8,12 @@ from torch.utils.data import Dataset
 import matplotlib
 # matplotlib.use('TkAgg') #TkAgg
 
-from srcOld.dataloader import PadCollate
-from srcOld.dataloader_npz import Dataset_npz
-from srcOld.dataloader_utils import ConvertPnetFeaturesTo1D, ConvertCoordToDists
-from srcOld.loss import loss_tr_tuples
-from srcOld.utils import move_tuple_to
-from srcOld.visualization import compare_distogram, plotfullprotein
+from src.dataloader import PadCollate
+from src.dataloader_npz import Dataset_npz
+from src.dataloader_utils import ConvertPnetFeaturesTo1D, ConvertCoordToDists
+from src.loss import loss_tr_tuples
+from src.utils import move_tuple_to
+from src.visualization import compare_distogram, plotfullprotein
 
 if __name__ == "__main__":
     dataset_in = "./../data/clean_pnet_test/"
