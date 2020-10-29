@@ -1,6 +1,9 @@
+import copy
+
 import numpy as np
 from numpy.linalg import norm
 import random
+import matplotlib.pyplot as plt
 
 # Constants
 NUM_DIMENSIONS = 3
@@ -9,6 +12,10 @@ NUM_DIMENSIONS = 3
 AA_DICT = {'A': '0', 'C': '1', 'D': '2', 'E': '3', 'F': '4', 'G': '5', 'H': '6', 'I': '7', 'K': '8', 'L': '9',
             'M': '10', 'N': '11', 'P': '12', 'Q': '13', 'R': '14', 'S': '15', 'T': '16', 'V': '17', 'W': '18',
             'Y': '19','-': '20'}
+
+AA_LIST = list(AA_DICT)
+# AA_LIST = 'ACDEFGHIKLMNPQRSTVWY-'
+
 AA_PAD_VALUE = 20
 DSSP_DICT = {'L': '0', 'H': '1', 'B': '2', 'E': '3', 'G': '4', 'I': '5', 'T': '6', 'S': '7'}
 DSSP_PAD_VALUE = 0 #TODO I DONT KNOW WHETHER THIS IS RIGHT
@@ -17,6 +24,17 @@ MASK_PAD_VALUE = 0
 PSSM_PAD_VALUE = 0
 ENTROPY_PAD_VALUE = 0
 COORDS_PAD_VALUE = 0
+
+def convert_seq_to_onehot(seq):
+    return np.eye(len(AA_DICT)-1, dtype=np.float32)[np.int64(seq)]
+
+def convert_1d_features_to_2d(f1d):
+    f1d = np.concatenate(f1d, axis=0).swapaxes(0, 1)
+    f2d = np.concatenate(
+        [np.tile(f1d[:, None, :], [1, f1d.shape[0], 1]), np.tile(f1d[None, :, :], [f1d.shape[0], 1, 1])],
+        axis=-1).transpose((-1, 0, 1))
+    return f2d
+
 
 class SeqResizeAndFlip(object):
     def __init__(self, seq_len):
@@ -98,34 +116,54 @@ class ConvertPnetFeaturesTo2D(object):
             axis=-1).transpose((-1, 0, 1))
         return f2d
 
+class ConvertPnetFeaturesTo1D(object):
+    """
+    This assumes that the first feature needs to be converted to a one_hot sequence, and that the rest just needs to be stacked.
+    """
+    def __init__(self):
+        pass
+    def __call__(self, features):
+        seq_onehot = np.eye(len(AA_DICT), dtype=np.float32)[features[0]]
+        if len(features) == 1:
+            f1d = seq_onehot.transpose(1, 0)
+        elif len(features) == 2:
+            if features[1].ndim == 1:
+                f1d = np.concatenate((seq_onehot, features[1][:, None]), axis=1).transpose(1, 0)
+            else:
+                f1d = np.concatenate((seq_onehot, features[1]), axis=1).transpose(1, 0)
+        elif len(features) == 3:
+            if features[2].ndim == 1:
+                f1d = np.concatenate((seq_onehot, features[1], features[2][:, None]), axis=1).transpose(1, 0)
+            else:
+                f1d = np.concatenate((seq_onehot, features[1], features[2]), axis=1).transpose(1, 0)
+        else:
+            raise NotImplementedError("ConvertPnetFeaturesTo1D has not been generalized to handle the amount of features you used.")
+
+        return f1d
+
+
 
 class SeqFlip(object):
     '''
-    This function is specially designed for flipping the features made in pnet. For other types of features, this might not work.
+    This function will flip all dimensions except the first one.
     '''
     def __init__(self, prob = 0.5):
         self.prob = prob
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
-        if random.random() > self.prob:
-            new_args = ()
-            for arg in args:
-                if isinstance(arg,list):
-                    arg.reverse()
-                    new_args += (arg,)
-                elif isinstance(arg,np.ndarray):
-                    if arg.ndim == 1:
-                        new_args += (np.flip(arg, axis=0),)
-                    elif arg.ndim == 2:
-                        if arg.shape[0] == arg.shape[1]:
-                            new_args += (np.flip(arg, axis=(0, 1)),)  # = np.flip(arg),axis=(0, 1))
-                        else:
-                            new_args += (np.flip(arg, axis=0),)
-                    else:
-                        raise NotImplementedError("the array you are attempting to flip does not have an implemented shape")
-            args = new_args
+        self.p = random.random()
+
+    def __call__(self, args):
+        if self.p < self.prob:
+            nd = args.ndim
+            if nd == 2:
+                args = np.flip(args,axis=(-1))
+            elif nd == 3:
+                args = np.flip(args,axis=(-1,-2))
         return args
+
+    def reroll(self):
+        self.p = random.random()
+        return
+
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
@@ -133,159 +171,97 @@ class SeqFlip(object):
 class ListToNumpy(object):
     def __init__(self):
         pass
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
+    def __call__(self, args):
         args_array = ()
         for arg in args:
-            if type(arg[0]) == int:  # Note that this will only work for this particular list system, for deeper lists this will need to be looped.
-                dtype = np.int
-            elif type(arg[0]) == bool:
-                dtype = np.bool
-            else:
-                dtype = np.float32
-            args_array += (np.asarray(arg, dtype=dtype),)
+            args_array += (np.asarray(arg),)
         return args_array
 
 
-
-
-class ConvertCoordToDistAnglesVec(object):
+class ConvertCoordToDists(object):
     def __init__(self):
         pass
 
-    def __call__(self, *args):
-        if len(args) == 1:
-            args = args[0]
+    def __call__(self, args):
+        distances = ()
+        for r in args:
+            mask = r[0,:] != 0
+            M = mask[:,None] @  mask[None,:]
+            d = np.sum(r ** 2, axis=0)[:,None] + np.sum(r ** 2, axis=0)[None,:] - 2 * (r.T @ r)
+            d = np.sqrt(np.maximum(M*d,0))
+            distances += (d,)
 
-        rN = args[0]
-        rCa = args[1]
-        rCb = args[2]
-        mask = args[3]
-
-        # Get D
-        D = np.sum(rCb ** 2, axis=1)[:,None] + np.sum(rCb ** 2, axis=1)[None,:] - 2 * (rCb @ rCb.transpose())
-        M = mask[:,None] @  mask[None,:]
-        D = np.sqrt(np.maximum(M*D,0))
-
-        # Get Upper Phi
-        # TODO clean Phi to be the same as OMEGA
-        V1x = (rCa[:, 0])[:,None] - (rCb[:, 0])[:,None]
-        V1y = (rCa[:, 1])[:,None] - (rCb[:, 1])[:,None]
-        V1z = (rCa[:, 2])[:,None] - (rCb[:, 2])[:,None]
-        V2x = (rCb[:, 0])[:,None] - (rCb[:, 0])[:,None].transpose()
-        V2y = (rCb[:, 1])[:,None] - (rCb[:, 1])[:,None].transpose()
-        V2z = (rCb[:, 2])[:,None] - (rCb[:, 2])[:,None].transpose()
-        # Normalize them
-        V1n = np.sqrt(V1x**2 + V1y**2 + V1z**2)
-        V1x = V1x/V1n
-        V1y = V1y/V1n
-        V1z = V1z/V1n
-        V2n = np.sqrt(V2x**2 + V2y**2 + V2z**2)
-        V2x = V2x/V2n
-        V2y = V2y/V2n
-        V2z = V2z/V2n
-        # go for it
-        # PHI is the angle between v1 and -v2 the way the two vectors are defined.
-        PHI = M*(V1x * -V2x + V1y * -V2y + V1z * -V2z)
-        PHI = np.degrees(np.arccos(PHI))
-        indnan = np.isnan(PHI)
-        PHI[indnan] = 0.0
-
-        # Omega
-        nat = rCa.shape[0]
-        V1 = np.zeros((nat, nat, 3))
-        V2 = np.zeros((nat, nat, 3))
-        V3 = np.zeros((nat, nat, 3))
-        # Ca1 - Cb1
-        V1[:,:,0] = ((rCa[:,0])[:,None] - (rCb[:,0])[:,None]).repeat(nat,axis=1)
-        V1[:,:,1] = ((rCa[:,1])[:,None] - (rCb[:,1])[:,None]).repeat(nat,axis=1)
-        V1[:,:,2] = ((rCa[:,2])[:,None] - (rCb[:,2])[:,None]).repeat(nat,axis=1)
-        # Cb1 - Cb2
-        V2[:,:,0] = (rCb[:,0])[:,None] - (rCb[:,0])[:,None].transpose()
-        V2[:,:,1] = (rCb[:,1])[:,None] - (rCb[:,1])[:,None].transpose()
-        V2[:,:,2] = (rCb[:,2])[:,None] - (rCb[:,2])[:,None].transpose()
-        # Cb2 - Ca2
-        V3[:,:,0] = ((rCb[:,0])[None,:] - (rCa[:,0])[None,:]).repeat(nat,axis=0)
-        V3[:,:,1] = ((rCb[:,1])[None,:] - (rCa[:,1])[None,:]).repeat(nat,axis=0)
-        V3[:,:,2] = ((rCb[:,2])[None,:] - (rCa[:,2])[None,:]).repeat(nat,axis=0)
-
-        OMEGA,OMEGA_DOT,OMEGA_DET = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
-        indnan = np.isnan(OMEGA)
-        OMEGA[indnan] = 0.0
-
-        # Theta
-        V1 = np.zeros((nat, nat, 3))
-        V2 = np.zeros((nat, nat, 3))
-        V3 = np.zeros((nat, nat, 3))
-        # N - Ca
-        V1[:,:,0] = (rN[:,0][:,None] - rCa[:,0][:,None]).repeat(nat,axis=1)
-        V1[:,:,1] = (rN[:,1][:,None] - rCa[:,1][:,None]).repeat(nat,axis=1)
-        V1[:,:,2] = (rN[:,2][:,None] - rCa[:,2][:,None]).repeat(nat,axis=1)
-        # Ca - Cb # TODO - repeated computation
-        V2[:,:,0] = (rCa[:,0][:,None] - rCb[:,0][:,None]).repeat(nat,axis=1)
-        V2[:,:,1] = (rCa[:,1][:,None] - rCb[:,1][:,None]).repeat(nat,axis=1)
-        V2[:,:,2] = (rCa[:,2][:,None] - rCb[:,2][:,None]).repeat(nat,axis=1)
-        # Cb1 - Cb2 # TODO - repeated computation
-        V3[:,:,0] = rCb[:,0][:,None] - rCb[:,0][:,None].transpose()
-        V3[:,:,1] = rCb[:,1][:,None] - rCb[:,1][:,None].transpose()
-        V3[:,:,2] = rCb[:,2][:,None] - rCb[:,2][:,None].transpose()
-
-        THETA, THETA_DOT, THETA_DET = M*ang_between_planes_matrix_360(V1, V2, V2, V3)
-        indnan = np.isnan(THETA)
-        THETA[indnan] = 0.0
-        import matplotlib.pyplot as plt
-        plt.clf()
-        plt.subplot(1,3,1)
-        plt.imshow(OMEGA)
-        plt.colorbar()
-        plt.subplot(1,3,2)
-        plt.imshow(OMEGA_DOT)
-        plt.colorbar()
-        plt.subplot(1,3,3)
-        plt.imshow(OMEGA_DET)
-        plt.colorbar()
+        return distances
 
 
-        plt.clf()
-        plt.imshow(PHI)
-        plt.colorbar()
+class DrawFromProbabilityMatrix(object):
+    '''
+    Given a probability matrix P, we generate a vector where each element in the vector is drawn randomly according to the probabilities in the probability matrix.
+    P: ndarray of shape (l,n), where l length of the protein (in amino acids), and n is the number of possible amino acids in the one hot encoding.
+    NOTE it is assumed that each row in the probability matrix P sums to 1.
+    '''
+    def __init__(self,sanity_check=False,fraction_of_seq_drawn=1):
+        self.sanity_check = sanity_check
+        self.fraction_drawn = fraction_of_seq_drawn
 
-        plt.clf()
-        plt.subplot(1,3,1)
-        plt.imshow(THETA)
-        plt.colorbar()
-        plt.subplot(1,3,2)
-        plt.imshow(THETA_DOT)
-        plt.colorbar()
-        plt.subplot(1,3,3)
-        plt.imshow(THETA_DET)
-        plt.colorbar()
+    def __call__(self, P, seq=None, debug=False):
+        if self.sanity_check:
+            self.run_sanity_check(P)
+        if debug:
+            self.run_debug(P, seq)
+        u = np.random.rand(P.shape[0])
+        idxs = (P.cumsum(1) < u[:, None]).sum(1)
+        if self.fraction_drawn < 1:
+            u2 = np.random.rand(P.shape[0])
+            replace = u2 > self.fraction_drawn
+            idxs[replace] = seq[replace]
+        return idxs
 
-        return D, OMEGA, PHI, THETA
+    def run_debug(self,P, seq):
+        if seq is not None:
+            p = seq
+        else:
+            p = np.argmax(P,axis=1)
+        n = P.shape[0]
+        iter = 10000
+        counter = np.zeros_like(P)
+        ndif = np.zeros(n+1)
+        for i in range(iter):
+            t = self.__call__(P, seq=seq)
+            counter[np.arange(n),t] += 1
+            tmp = np.sum(t != p)
+            ndif[tmp] += 1
 
-def crossProdMat(V1, V2):
-    Vcp = np.zeros(V1.shape)
-    Vcp[:, :, 0] = V1[:, :, 1] * V2[:, :, 2] - V1[:, :, 2] * V2[:, :, 1]
-    Vcp[:, :, 1] = -V1[:, :, 0] * V2[:, :, 2] + V1[:, :, 2] * V2[:, :, 0];
-    Vcp[:, :, 2] = V1[:, :, 0] * V2[:, :, 1] - V1[:, :, 1] * V2[:, :, 0];
-    return Vcp
+        P_pred = counter/ iter
+        dif = np.linalg.norm(P - P_pred)
+        print("Difference between cumulated drawn examples, and the probability distribution {:2.4e}".format(dif))
+        plt.plot(np.arange(n+1)/n,ndif)
+        plt.pause(0.5)
+        return
+
+    def run_sanity_check(self,P):
+        assert (np.abs(np.sum(P,axis=1) - 1) < 1e-6 ).all()
+        return
 
 
-def ang_between_planes_matrix_360(v1, v2, v3, v4):
-    nA = crossProdMat(v1, v2)
-    nB = crossProdMat(v3, v4)
-    nA = nA / (np.sqrt(np.sum(nA ** 2, axis=2))[:, :, None])
-    nB = nB / (np.sqrt(np.sum(nB ** 2, axis=2))[:, :, None])
 
-    v2n = v2 / (np.sqrt(np.sum(v2 ** 2, axis=2))[:, :, None])
-    det = np.sum(v2n * crossProdMat(nA, nB), axis=2)
-    dot = np.sum(nA * nB, axis=2)
-    angle = (np.degrees(np.arctan2(det, dot))+360) % 360
+class MaskRandomSubset(object):
+    '''
+    '''
+    def __init__(self):
+        self.max_ratio = 0.3
+        pass
 
-    # Psi    = torch.acos(cosPsi)
-    return angle,dot,det
-
+    def __call__(self, r):
+        m = np.ones(r.shape[1])
+        pos_range = np.arange(10,r.shape[1]-10)
+        endpoints = np.random.choice(pos_range,size=2,replace=False)
+        endpoints = np.sort(endpoints)
+        r_m = copy.deepcopy(r)
+        r_m[:,endpoints[0]:endpoints[1]] = 0
+        idx = r_m[0,:] == 0
+        m[idx] = 0
+        return r_m, m
 
 
 def one_hot(targets, nb_classes):

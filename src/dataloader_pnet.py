@@ -1,42 +1,83 @@
 import numpy as np
+import random
+
 import re
 from torch.utils.data import Dataset
 import time
-from src.dataloader_utils import AA_DICT, MASK_DICT, DSSP_DICT, NUM_DIMENSIONS
 from itertools import compress
+import copy
+from src.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
+    DrawFromProbabilityMatrix
+
 
 class Dataset_pnet(Dataset):
-    def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300):
-        id,seq,pssm,entropy,dssp,r1,r2,r3,mask = parse_pnet(file,max_seq_len=max_seq_len)
+    def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300, chan_in=21, chan_out=3, draw_seq_from_msa=False):
+        args = parse_pnet(file,max_seq_len=max_seq_len, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True)
         self.file = file
-        self.id = id
-        self.seq = seq
-        self.pssm = pssm
-        self.entropy = entropy
-        self.dssp = dssp
-        self.mask = mask
-        self.r1 = r1
-        self.r2 = r2
-        self.r3 = r3
+        self.seq = args['seq']
+        self.pssm = args['pssm']
+        self.entropy = args['entropy']
+        self.mask = args['mask']
+        self.r1 = args['r1']  # Ca
+        self.r2 = args['r2']  # Cb
+        self.r3 = args['r3']  # N
 
         self.transform = transform
         self.transform_target = transform_target
         self.transform_mask = transform_mask
-        self.nfeatures = 84
+        self.chan_in = chan_in
+        self.chan_out = chan_out
+        self.draw_seq_from_msa = draw_seq_from_msa
+        self.draw = DrawFromProbabilityMatrix(fraction_of_seq_drawn=0.2)
+        self.draw_prob = 0.5
+        # self.nfeatures = 84
 
     def __getitem__(self, index):
-        features = (self.seq[index], self.pssm[index], self.entropy[index])
-        mask = self.mask[index]
-        target = (self.r1[index], self.r2[index], self.r3[index], mask)
+        features = self.select_features(index)
+        target = (self.r1[index], self.r2[index], self.r3[index])
 
+        target = self.match_target_channels(target)
+
+        if isinstance(self.transform.transforms[0], SeqFlip):
+            self.transform.transforms[0].reroll()
         if self.transform is not None:
             features = self.transform(features)
         if self.transform_target is not None:
-            target = self.transform_target(target)
-        if self.transform_mask is not None:
-            mask = self.transform_mask(mask) #TODO CHECK THAT THIS IS NOT DOUBLE FLIPPED!
+            distances, coords = self.transform_target(target)
 
-        return features, target, mask
+        return features, distances, coords
+
+    def select_features(self,index):
+        p = random.random()
+        if self.chan_in == 21:
+            if self.draw_seq_from_msa and p > self.draw_prob:
+                features = (self.draw(self.pssm[index], seq=self.seq[index]),)
+            else:
+                features = (self.seq[index],)
+        elif self.chan_in == 22:
+            if self.draw_seq_from_msa and p > self.draw_prob:
+                features = (self.draw(self.pssm[index], seq=self.seq[index]), self.entropy[index])
+            else:
+                features = (self.seq[index], self.entropy[index])
+        elif self.chan_in == 41:
+            features = (self.seq[index], self.pssm[index])
+        elif self.chan_in == 42:
+            features = (self.seq[index], self.pssm[index], self.entropy[index])
+        else:
+            raise NotImplementedError("The selected number of channels in is not currently supported")
+        return features
+
+    def match_target_channels(self,target):
+        if self.chan_out == 3:
+            target = (target[0],)
+        elif self.chan_out == 6:
+            target = target[0:2]
+        elif self.chan_out == 9:
+            pass
+        else:
+            raise NotImplementedError("Chan_out is {}, which is not implemented".format(self.chan_out))
+        return target
+
 
     def __len__(self):
         return len(self.seq)
@@ -98,8 +139,11 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries):
-    """ Read all protein records from pnet file. """
+def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, report_iter=1000, min_seq_len=-1, max_seq_len=999999):
+    """
+    Read all protein records from pnet file.
+    Note that pnet files have coordinates saved in picometers, but we load it in in nanometers instead, since that works better with the neural networks.
+    """
 
     id = []
     seq = []
@@ -108,64 +152,97 @@ def read_record(file_, num_evo_entries):
     dssp = []
     coord = []
     mask = []
+    seq_len = []
+    scaling = 0.001 # converts from pico meters to nanometers
 
     t0 = time.time()
+    cnt = 0
     while True:
         next_line = file_.readline()
         for case in switch(next_line):
             if case('[ID]' + '\n'):
-                id.append(file_.readline()[:-1])
-                if len(id) % 1000 == 0:
-                    print("loading sample: {:}, Time: {:2.2f}".format(len(id),time.time() - t0))
+                cnt += 1
+                id_i = file_.readline()[:-1]
             elif case('[PRIMARY]' + '\n'):
-                seq.append(letter_to_num(file_.readline()[:-1], AA_DICT))
+                seq_i = letter_to_num(file_.readline()[:-1], AA_DICT)
+                seq_len_i = len(seq_i)
+                if seq_len_i <= max_seq_len and seq_len_i >= min_seq_len:
+                    seq_ok = True
+                    id.append(id_i)
+                    seq.append(seq_i)
+                    seq_len.append(seq_len_i)
+                else:
+                    seq_ok = False
+                if (cnt + 1) % report_iter == 0:
+                    print("Reading sample: {:}, accepted samples {:} Time: {:2.2f}".format(cnt, len(id), time.time() - t0))
             elif case('[EVOLUTIONARY]' + '\n'):
                 evolutionary = []
                 for residue in range(num_evo_entries):
                     evolutionary.append([float(step) for step in file_.readline().split()])
-                pssm.append(evolutionary)
-                entropy.append([float(step) for step in file_.readline().split()])
+                if use_pssm and seq_ok:
+                    pssm.append(evolutionary)
+                entropy_i = [float(step) for step in file_.readline().split()]
+                if use_entropy and seq_ok:
+                    entropy.append(entropy_i)
             elif case('[SECONDARY]' + '\n'):
-                dssp.append(letter_to_num(file_.readline()[:-1], DSSP_DICT))
+                dssp_i = letter_to_num(file_.readline()[:-1], DSSP_DICT)
+                if use_dssp and seq_ok:
+                    dssp.append(dssp_i)
             elif case('[TERTIARY]' + '\n'):
                 tertiary = []
-                for axis in range(NUM_DIMENSIONS): tertiary.append([float(coord) for coord in file_.readline().split()])
-                coord.append(tertiary)
+                for axis in range(NUM_DIMENSIONS):
+                    tertiary.append([float(coord)*scaling for coord in file_.readline().split()])
+                if use_coord and seq_ok:
+                    coord.append(tertiary)
             elif case('[MASK]' + '\n'):
-                mask.append(letter_to_bool(file_.readline()[:-1], MASK_DICT))
+                mask_i = letter_to_bool(file_.readline()[:-1], MASK_DICT)
+                if use_mask and seq_ok:
+                    mask.append(mask_i)
             elif case(''):
+                return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
-
-                return id,seq,pssm,entropy,dssp,coord,mask
-
-def parse_pnet(file,max_seq_len=-1):
+def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
     with open(file, 'r') as f:
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask = read_record(f, 20)
-        print("loading data complete! Took: {:2.2f}".format(time.time()-t0))
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len)
+        print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
         r1 = []
         r2 = []
         r3 = []
-        pssm2 = []
-        for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
-            pssm2.append(flip_multidimensional_list(pssm[i]))
-            r1.append(separate_coords(coords[i], 0))
-            r2.append(separate_coords(coords[i], 1))
-            r3.append(separate_coords(coords[i], 2))
-            if i+1 % 1000 == 0:
-                print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
+        for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
+            #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
+            r1.append((separate_coords(coords[i], 1)))
+            r2.append((separate_coords(coords[i], 2)))
+            r3.append((separate_coords(coords[i], 0)))
 
-        args = (id, seq, pssm2, entropy, dssp, r1,r2,r3, mask)
-        if max_seq_len > 0:
-            filter = np.full(len(seq), True, dtype=bool)
-            for i,seq_i in enumerate(seq):
-                if len(seq_i) > max_seq_len:
-                    filter[i] = False
-            new_args = ()
-            for list_i in (id, seq, pssm2, entropy, dssp, r1,r2,r3, mask):
-                new_args += (list(compress(list_i,filter)),)
-        else:
-            new_args = args
-        print("parse complete! Took: {:2.2f}".format(time.time() - t0))
-    return new_args
+        convert = ListToNumpy()
+        seq = convert(seq)
+        seq_len = np.array(seq_len)
+        args = {'id': id,
+                'seq': seq,
+                'seq_len': seq_len,
+                }
+
+        if use_coord:
+            r1 = convert(r1)
+            r2 = convert(r2)
+            r3 = convert(r3)
+            args['r1'] = r1
+            args['r2'] = r2
+            args['r3'] = r3
+        if use_entropy:
+            entropy = convert(entropy)
+            args['entropy'] = entropy
+        if use_pssm:
+            pssm = convert(pssm)
+            args['pssm'] = pssm
+        if use_dssp:
+            dssp = convert(dssp)
+            args['dssp'] = dssp
+        if use_mask:
+            mask = convert(mask)
+            args['mask'] = mask
+        print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
+    return args
+
 

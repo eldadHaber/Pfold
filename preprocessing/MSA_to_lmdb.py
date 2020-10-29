@@ -11,12 +11,12 @@ import glob
 from preprocessing.ANN import ANN_sparse
 from preprocessing.MSA_reader import read_a2m_gz_file, sparse_one_hot_encoding, msa2pssm, dca
 from preprocessing.pnet2lmdb import dumps_pyarrow
-from srcOld.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
+from src.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
     DrawFromProbabilityMatrix
 import re
 from itertools import compress
 
-from srcOld.dataloader_pnet import read_record, parse_pnet, separate_coords
+from src.dataloader_pnet import read_record, parse_pnet, separate_coords
 
 AA_LIST = 'ACDEFGHIKLMNPQRSTVWY-'
 

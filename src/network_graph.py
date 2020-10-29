@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import math
 from src import utils
-from srcOld.network_transformer import tr2DistSmall
+from src.network_transformer import tr2DistSmall
 
 
 def conv2(X, Kernel):

@@ -4,9 +4,9 @@ import glob
 
 from preprocessing.ANN import ANN_sparse
 from preprocessing.MSA_reader import read_a2m_gz_file
-from srcOld.dataloader_pnet import parse_pnet
+from src.dataloader_pnet import parse_pnet
 
-from srcOld.utils import Timer
+from src.utils import Timer
 
 
 def setup_protein_comparison(seqs, seqs_len):
