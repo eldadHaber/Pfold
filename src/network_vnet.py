@@ -82,9 +82,9 @@ class ResidualBlock(nn.Module):
 
 class vnet1D(nn.Module):
     """ VNet """
-    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block):
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size):
         super(vnet1D, self).__init__()
-        K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block)
+        K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=stencil_size)
         self.K = K
         self.W = W
         self.h = 0.1
@@ -234,9 +234,9 @@ def masked_instance_norm_2d(x, mask, eps = 1e-5):
 
 class vnet2D(nn.Module):
     """ VNet """
-    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block):
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size):
         super(vnet2D, self).__init__()
-        K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block)
+        K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=stencil_size)
         self.K = K
         self.W = W
         self.h = 0.1

@@ -7,7 +7,8 @@ import matplotlib
 import copy
 
 from preprocessing.MSA_to_cov import setup_protein_comparison
-from src.utils import check_symmetric
+from src.utils import check_symmetric, Timer
+
 
 # matplotlib.use('TkAgg') #TkAgg
 
@@ -81,13 +82,18 @@ def extract_1d_features(A,k=10,debug=False,safety=True, show_figures=-1, print_a
                 plt.savefig("{:}/{:}.png".format(print_all,i))
     return V[:,:,:k]
 
+
 if __name__ == "__main__":
     # cov_folder = "./../data/cov/"
     cov_folder = "F:/Output/"
-    # main_dataset_folder = "./../data/clean_pnet_train/"
-    main_dataset_folder = "./../data/clean_pnet_test/"
+    main_dataset_folder = "./../data/clean_pnet_train/"
+    # main_dataset_folder = "./../data/clean_pnet_test/"
 
-    output_folder = "F:/final_dataset_test/"
+    # output_folder = "F:/final_dataset_test/"
+    output_folder_2d_everything = "F:/final_dataset_2d_all/"
+    output_folder_2d_smart = "F:/final_dataset_2d/"
+    output_folder_1d_everything = "F:/final_dataset_1d_all/"
+    output_folder_1d_smart = "F:/final_dataset_1d/"
     report_iter = 500
     k_cov = 9
     k_contact = 19
@@ -142,9 +148,10 @@ if __name__ == "__main__":
         if org_id.size != 1:
             if org_id.size == 0:
                 continue
+                # pass
             print("Protein matching problems. org_id= {:}".format(org_id))
         else:
-            print("Found one!")
+            # print("Found one!")
             nmatches += 1
 
         r1 = data['r1']
@@ -182,15 +189,59 @@ if __name__ == "__main__":
 
         contact1d = extract_1d_features(contact[None,:,:], k=k_contact, debug=False, safety=True, show_figures=1)
         cov1d = extract_1d_features(cov, k=k_cov, debug=False, safety=True, show_figures=20)
-        # contact_features = extract_1d_features(contact[None,:,:], k=k_contact, debug=True, safety=True, show_figures=5,print_all='./../figures/contact/')
-        # cov_features = extract_1d_features(cov, k=k_cov, debug=True, safety=True, show_figures=0,print_all='./../figures/covariance')
+        # contact1d = extract_1d_features(contact[None,:,:], k=k_contact, debug=True, safety=True, show_figures=5,print_all='./../figures/contact/')
+        # cov1d = extract_1d_features(cov, k=k_cov, debug=True, safety=True, show_figures=0,print_all='./../figures/covariance/')
 
         contact1d = np.concatenate((contact_diag[None,:,None],contact1d),axis=2)
         cov1d = np.concatenate((cov_diag[:,:,None],cov1d),axis=2)
 
-        # SAVE FILE HERE
-        fullfileout = "{:}/ID_{:}".format(output_folder, i)
 
-        np.savez(fullfileout, protein=dt_save(protein), pssm=dt_save(pssm), cov2d=dt_save(cov), contact2d=dt_save(contact2d), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), cov1d=dt_save(cov1d), contact1d=dt_save(contact1d), entropy=dt_save(entropy))
+        pssm = pssm.swapaxes(0, 1)
+        cov1d = cov1d.swapaxes(1,2)
+        contact1d = contact1d.swapaxes(1,2)
+        entropy = entropy[None,:]
+
+        # For the smart datasets we only save the contact and the Cov[20+n*21]
+
+        cov_smart = cov[20::21,:,:]
+        cov1d_smart = cov1d[20::21,:,:]
+        # import matplotlib
+        # matplotlib.use('TkAgg') #TkAgg
+        # import matplotlib.pyplot as plt
+        #
+        # plt.figure()
+        # plt.imshow(cov_smart[0, :, :])
+        # plt.figure()
+        # plt.imshow(cov[20,:,:])
+        #
+        # plt.figure()
+        # plt.imshow(cov_smart[1, :, :])
+        # plt.figure()
+        # plt.imshow(cov[41,:,:])
+        # plt.pause(1)
+
+        # We want to save 4 different datasets
+        # 2D datasets, with everything
+        fullfileout = "{:}/ID_{:}".format(output_folder_2d_everything, i)
+        np.savez(fullfileout, seq=np.int32(protein), pssm=dt_save(pssm), cov2d=dt_save(cov), contact2d=dt_save(contact2d), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), entropy=dt_save(entropy))
+
+        fullfileout = "{:}/ID_{:}".format(output_folder_2d_smart, i)
+        np.savez(fullfileout, seq=np.int32(protein), pssm=dt_save(pssm), cov2d=dt_save(cov_smart), contact2d=dt_save(contact2d), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), entropy=dt_save(entropy))
+
+        # 1D dataset, with everything
+        fullfileout = "{:}/ID_{:}".format(output_folder_1d_everything, i)
+        np.savez(fullfileout, seq=np.int32(protein), pssm=dt_save(pssm), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), cov1d=dt_save(cov1d), contact1d=dt_save(contact1d), entropy=dt_save(entropy))
+
+        fullfileout = "{:}/ID_{:}".format(output_folder_1d_smart, i)
+        np.savez(fullfileout, seq=np.int32(protein), pssm=dt_save(pssm), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), cov1d=dt_save(cov1d_smart), contact1d=dt_save(contact1d), entropy=dt_save(entropy))
+
+
+        # np.savez(fullfileout, seq=np.int32(protein), pssm=dt_save(pssm), cov2d=dt_save(cov), contact2d=dt_save(contact2d), r1=dt_save(r1), r2=dt_save(r2), r3=dt_save(r3), cov1d=dt_save(cov1d), contact1d=dt_save(contact1d), entropy=dt_save(entropy))
+
+
+        # 2D dataset, with only the smart points
+
+        # SAVE FILE HERE
+
 
 
