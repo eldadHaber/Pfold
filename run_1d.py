@@ -28,8 +28,8 @@ if __name__ == '__main__':
     parser.add_argument('--i-contact', default=True, type=bool, metavar='N', help='Input feature types')
 
     # Learning
-    parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--network', default='graph', type=str, metavar='N', help='network to use')
+    parser.add_argument('--batch-size', default=10, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=50, type=int, metavar='N', help='select the neural network to train (resnet)')
@@ -50,14 +50,16 @@ if __name__ == '__main__':
         'nblocks': 4,
         'nlayers_pr_block': 5,
         'channels': 512,
-        'chan_out': 3
+        'chan_out': 3,
+        'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':
         args.network_args = {
         'nblocks': 4,
         'nlayers_pr_block': 5,
-        'channels': 256,
-        'chan_out': 3
+        'channels': 1024,
+        'chan_out': 3,
+        'stencil_size': 3,
         }
     else:
         raise UserWarning("network: {:} not recognised for arg.network_args".format(args.network))

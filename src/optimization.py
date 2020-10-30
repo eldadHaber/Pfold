@@ -33,12 +33,15 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     loss_train_d = 0
     loss_train_c = 0
     loss_train = 0
+
     while True:
         for i,(seq, dists,mask, coords) in enumerate(dataloader_train):
             seq = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
+
+            w = ite / max_iter
             optimizer.zero_grad()
             dists_pred, coords_pred = net(seq,mask)
 
@@ -46,7 +49,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if coords_pred is not None:
                 loss_c = loss_tr_tuples(coords_pred, coords)
                 loss_train_c += loss_c.cpu().detach()
-                loss = 0.5 * loss_d + 0.5 * loss_c
+                loss = (1-w) * loss_d + w * loss_c
             else:
                 loss = loss_d
 
@@ -69,7 +72,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
                         '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/2/report_iter*100, loss_train_c/2/report_iter*100, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train_d = 0
                     loss_train_c = 0
