@@ -14,8 +14,11 @@ if __name__ == '__main__':
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
-    parser.add_argument('--dataset-train', default='f:/final_dataset/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='f:/final_dataset_test/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='f:/final_dataset_test/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='f:/final_dataset/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='f:/final_dataset_test/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     # Input features
     parser.add_argument('--seq-flip-prop', default=0.5, type=float, metavar='N', help='Input feature types')

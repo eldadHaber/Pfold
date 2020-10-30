@@ -77,23 +77,23 @@ class Dataset_npz(data.Dataset):
 
         features_1d = ()
         if self.i_seq:
-            features_1d += (convert_seq_to_onehot(data['protein']).T,)
+            features_1d += (convert_seq_to_onehot(data['seq']),)
         if self.i_pssm:
-            features_1d += (data['pssm'].T,)
+            features_1d += (data['pssm'],)
         if self.i_entropy:
-            features_1d += (data['entropy'][None,:],)
+            features_1d += (data['entropy'],)
         if self.inpainting:
             r, m = self.seq_mask(coords)
             features_1d += (r,m[None,:],)
 
         if self.feature_dim == 1:
             if self.i_cov:
-                cov = data['cov1d'].swapaxes(1,2)
+                cov = data['cov1d']
                 cov = cov.reshape(-1,cov.shape[-1])
                 features_1d += (cov,)
             if self.i_contact:
-                contact = data['contact1d'].squeeze().swapaxes(0,1)
-                features_1d += (contact,)
+                contact = data['contact1d']
+                features_1d += (contact.reshape(-1,contact.shape[-1]),)
             features = features_1d
         elif self.feature_dim == 2:
             features_2d = (convert_1d_features_to_2d(features_1d),)
