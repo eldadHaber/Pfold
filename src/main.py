@@ -43,7 +43,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_dim,batch_size=c.batch_size, network=c.network, i_seq=c.i_seq, i_pssm=c.i_pssm, i_entropy=c.i_entropy, i_cov=c.i_cov, i_contact=c.i_contact,inpainting=c.inpainting, seq_flip_prop=c.seq_flip_prop)
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_dim,batch_size=c.batch_size, network=c.network, i_seq=c.i_seq, i_pssm=c.i_pssm, i_entropy=c.i_entropy, i_cov=c.i_cov, i_cov_all=c.i_cov_all, i_contact=c.i_contact,inpainting=c.inpainting, seq_flip_prop=c.seq_flip_prop)
     c.network_args['chan_in'] = dl_train.dataset.chan_in
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 

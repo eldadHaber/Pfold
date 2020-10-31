@@ -12,7 +12,7 @@ from src.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2D, 
     ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
-def select_dataset(path_train,path_test,feature_dim=1,batch_size=1, network=None, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_contact=False,inpainting=False, seq_flip_prop=0.5):
+def select_dataset(path_train,path_test,feature_dim=1,batch_size=1, network=None, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False,inpainting=False, seq_flip_prop=0.5):
     '''
     This is a wrapper routine for various dataloaders.
     Currently supports:
@@ -25,13 +25,13 @@ def select_dataset(path_train,path_test,feature_dim=1,batch_size=1, network=None
 
 
     if os.path.isdir(path_train):
-        dataset_train = Dataset_npz(path_train, feature_dim=feature_dim, seq_flip_prop=seq_flip_prop, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_contact=i_contact,inpainting=inpainting)
+        dataset_train = Dataset_npz(path_train, feature_dim=feature_dim, seq_flip_prop=seq_flip_prop, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_cov_all=i_cov_all, i_contact=i_contact,inpainting=inpainting)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
     # Test Dataset
     if os.path.isdir(path_test):
-        dataset_test = Dataset_npz(path_test, feature_dim=feature_dim, seq_flip_prop=0, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_contact=i_contact,inpainting=inpainting)
+        dataset_test = Dataset_npz(path_test, feature_dim=feature_dim, seq_flip_prop=0, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_cov_all=i_cov_all, i_contact=i_contact,inpainting=inpainting)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 

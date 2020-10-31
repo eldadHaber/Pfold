@@ -28,9 +28,9 @@ def tv_norm(X, eps=1e-3):
 class gNNC(nn.Module):
     """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
-    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block):
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=3):
         super(gNNC, self).__init__()
-        K0, K, W, Wend = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block)
+        K0, K, W, Wend = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=stencil_size)
         self.K = K
         self.K0 = K0
         self.Wend = Wend

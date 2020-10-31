@@ -23,7 +23,7 @@ class Dataset_npz(data.Dataset):
         target = (r1, r2, r3)
 
     '''
-    def __init__(self, folder, seq_flip_prop=0.5, chan_out=3, feature_dim=1, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_contact=False, inpainting=False):
+    def __init__(self, folder, seq_flip_prop=0.5, chan_out=3, feature_dim=1, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False, inpainting=False):
 
         search_command = folder + "*.npz"
         npzfiles = [f for f in glob.glob(search_command)]
@@ -41,12 +41,14 @@ class Dataset_npz(data.Dataset):
         self.i_pssm = i_pssm
         self.i_entropy = i_entropy
         self.i_cov = i_cov
+        self.i_cov_all = i_cov_all
         self.i_contact = i_contact
         self.inpainting = inpainting
         self.chan_in = self.calculate_chan_in()
         self.coord_to_dist = ConvertCoordToDists()
 
     def calculate_chan_in(self):
+        assert (self.i_cov is False or self.i_cov_all is False), "You can only have one of (i_cov, i_cov_all) = True"
         chan_in = 0
         if self.i_seq:
             chan_in += 20
@@ -57,16 +59,21 @@ class Dataset_npz(data.Dataset):
         if self.inpainting:
             chan_in += 4 # 3 coordinates + 1 mask
         if self.feature_dim == 1:
-            if self.i_cov:
+            if self.i_cov_all:
                 chan_in += 10*441
+            elif self.i_cov:
+                chan_in += 10*21
             if self.i_contact:
                 chan_in += 20
         elif self.feature_dim == 2:
             chan_in *= 2
-            if self.i_cov:
+            if self.i_cov_all:
                 chan_in += 441
+            elif self.i_cov:
+                chan_in += 21
             if self.i_contact:
                 chan_in += 1
+        print("Number of features used this run {:}".format(chan_in))
         return chan_in
 
 
