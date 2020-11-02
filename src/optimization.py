@@ -9,7 +9,7 @@ from src.visualization import compare_distogram, plotcoordinates, plotfullprotei
 
 # from torch_lr_finder import LRFinder
 
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 
 import torch
 
@@ -94,7 +94,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     return net
 
 
-def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False):
+def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=False):
     '''
     Standard training routine.
     :param net: Network to train
@@ -123,9 +123,13 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False):
             else:
                 loss = loss_d
             loss_v += loss
-    if plot_results:
-        compare_distogram(dists_pred, dists)
-        # plotfullprotein(coords_pred_tr, coords_tr)
+
+            if save_results:
+                compare_distogram(dists_pred, dists, save_results="{:}_dist_{:}".format(save_results,i))
+                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}_coord_{:}".format(save_results,i))
+        if plot_results :
+            compare_distogram(dists_pred, dists, plot_results=plot_results)
+            plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
     net.train()
     return loss_v/len(dl)
 

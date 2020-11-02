@@ -16,7 +16,7 @@ from src.network_transformer import TransformerModel
 from src.optimization import train, eval_net
 from src.utils import fix_seed
 
-# matplotlib.use('TkAgg') #TkAgg
+matplotlib.use('TkAgg') #TkAgg
 
 import pandas as pd
 desired_width = 600
@@ -62,7 +62,7 @@ def main(c):
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
-    eval_net(net, dl_test, loss_fnc, device=c.device, plot_results=True)
+    eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     torch.save(net, "{:}/network.pt".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))
     print("Done")
