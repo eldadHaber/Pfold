@@ -171,8 +171,8 @@ def loss_tr_tuples(r1s,r2s, return_coords=False):
 
         loss_tr += torch.mean(torch.norm(r1cr - r2c, dim=(1, 2)) ** 2 / torch.norm(r2c, dim=(1, 2)) ** 2)
         if return_coords:
-            coords_pred += (r1cr[-1,:,:].squeeze().cpu().detach().numpy(),)
-            coords_target += (r2c[-1,:,:].squeeze().cpu().detach().numpy(),)
+            coords_pred += (r1cr[:,:].squeeze().cpu().detach().numpy(),)
+            coords_target += (r2c[:,:].squeeze().cpu().detach().numpy(),)
     loss_tr / len(r2s)
     if return_coords:
         return loss_tr, coords_pred, coords_target

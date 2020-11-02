@@ -16,6 +16,8 @@ if __name__ == '__main__':
     # data
     parser.add_argument('--dataset-train', default='f:/final_dataset_1d_train/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-test', default='f:/final_dataset_1d_validate/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     # Input features
     parser.add_argument('--seq-flip-prop', default=0.5, type=float, metavar='N', help='Input feature types')
@@ -32,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
-    parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--max-iter', default=5, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
 
     args = parser.parse_args()
