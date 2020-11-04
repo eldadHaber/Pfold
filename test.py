@@ -15,3 +15,4 @@ if __name__ == '__main__':
 
    # Close the file
    fileHandler.close()
+   print("Horse completed")
