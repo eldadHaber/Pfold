@@ -1,7 +1,10 @@
-import string
-import numpy as np
 import os
+import string
+
+import numpy as np
 from torch.utils.data import Dataset
+
+
 # from Bio.PDB import PDBParser
 
 

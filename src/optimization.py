@@ -1,11 +1,10 @@
 import time
 
 import matplotlib
-import numpy as np
 
-from src.loss import loss_tr, loss_tr_all, loss_tr_tuples
-from src.utils import move_tuple_to, exp_tuple
-from src.visualization import compare_distogram, plotcoordinates, plotfullprotein
+from src.loss import loss_tr_tuples
+from src.utils import move_tuple_to
+from src.visualization import compare_distogram, plotfullprotein
 
 # from torch_lr_finder import LRFinder
 

@@ -1,19 +1,18 @@
 import os
 from datetime import datetime
-import numpy as np
+
 import matplotlib
+import numpy as np
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import OneCycleLR
 
-from src.utils import determine_network_param
 from src import log
 from src.dataloader import select_dataset
-from src.loss import MSELoss, LossMultiTargets, EMSELoss
+from src.loss import MSELoss, LossMultiTargets
 from src.network import select_network
-from src.network_vnet import vnet1D
-from src.network_transformer import TransformerModel
-from src.optimization import train, eval_net
+from src.optimization import eval_net
+from src.utils import determine_network_param
 from src.utils import fix_seed
 
 matplotlib.use('Agg') #TkAgg

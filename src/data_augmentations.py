@@ -1,6 +1,5 @@
 import numpy as np
-from numpy.linalg import norm
-import random
+
 
 def draw_from_probability_matrix(P):
     '''

@@ -1,9 +1,9 @@
 import copy
+import random
 
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import norm
-import random
-import matplotlib.pyplot as plt
 
 # Constants
 NUM_DIMENSIONS = 3

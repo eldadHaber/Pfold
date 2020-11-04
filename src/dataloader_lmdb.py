@@ -1,12 +1,11 @@
+import copy
 import os.path as osp
 import random
-import sys
 import time
 
 import lmdb
 import pyarrow as pa
 import torch.utils.data as data
-import copy
 
 from src.dataloader_utils import SeqFlip, DrawFromProbabilityMatrix
 

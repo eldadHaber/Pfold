@@ -1,11 +1,10 @@
-import numpy as np
 import random
-
 import re
-from torch.utils.data import Dataset
 import time
-from itertools import compress
-import copy
+
+import numpy as np
+from torch.utils.data import Dataset
+
 from src.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
     DrawFromProbabilityMatrix
 

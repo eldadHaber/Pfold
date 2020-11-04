@@ -1,15 +1,10 @@
 import os
-import torch
-import torchvision.transforms as transforms
+
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
-from src.dataloader_a3m import Dataset_a3m
-from src.dataloader_lmdb import Dataset_lmdb
 from src.dataloader_npz import Dataset_npz
-from src.dataloader_pnet import Dataset_pnet
-from src.dataloader_utils import SeqFlip, ListToNumpy, ConvertPnetFeaturesTo2D, ConvertCoordToDists, \
-    ConvertDistAnglesToBins, ConvertPnetFeaturesTo1D
 
 
 def select_dataset(path_train,path_test,feature_dim=1,batch_size=1, network=None, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False,inpainting=False, seq_flip_prop=0.5):

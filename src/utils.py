@@ -1,14 +1,11 @@
-import numpy as np
 # import scipy
 # import scipy.spatial
-import string
 # import tensorflow as tf
 
 import random
-import torch
 
 import numpy as np
-import torch.nn as nn
+import torch
 
 
 # Define some functions
