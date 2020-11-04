@@ -14,8 +14,8 @@ if __name__ == '__main__':
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
-    parser.add_argument('--dataset-train', default='f:/final_dataset_1d_train/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='f:/final_dataset_1d_validate/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./../data/train/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./../data/test/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
@@ -66,7 +66,6 @@ if __name__ == '__main__':
         }
     else:
         raise UserWarning("network: {:} not recognised for arg.network_args".format(args.network))
-
 
     losses = main(args)
 
