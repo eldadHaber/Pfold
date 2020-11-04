@@ -133,3 +133,38 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
     net.train()
     return loss_v/len(dl)
 
+
+
+
+def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False):
+    '''
+    Standard training routine.
+    :param net: Network to train
+    :param optimizer: Optimizer to use
+    :param dataloader_train: data to train on
+    :param loss_fnc: loss function to use
+    :param device: device to perform computation on
+    :param dataloader_test: Dataloader to test the accuracy on after each epoch.
+    :param epochs: Number of epochs to train
+    :return:
+    '''
+    net.to(device)
+    net.eval()
+    with torch.no_grad():
+        loss_v = 0
+        for i,(seq, dists,mask, coords) in enumerate(dl):
+            seq = seq.to(device, non_blocking=True)
+            dists = move_tuple_to(dists, device, non_blocking=True)
+            coords = move_tuple_to(coords, device, non_blocking=True)
+            mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
+            dists_pred, coords_pred = net(seq,mask)
+            _, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
+            if save_results:
+                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i))
+                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i))
+        if plot_results :
+            compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
+            plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
+    net.train()
+    return
+

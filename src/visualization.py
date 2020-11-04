@@ -18,12 +18,16 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
     if save_results:
         idxs = range(nb)
     else:
-        idxs = nb
+        idxs = [nb-1]
     for idx in idxs:
         fig = plt.figure(3, figsize=[20, 10])
         plt.clf()
         for i,(output,target,name) in enumerate(zip(outputs,targets,names)):
-            j = np.where(padding_mask[idx,:].cpu().numpy() == np.int64(0))[0][0]
+            tmp = np.where(padding_mask[idx, :].cpu().numpy() == np.int64(0))[0]
+            if tmp.size > 0:
+                j = tmp[0]
+            else:
+                j = padding_mask.shape[-1] + 1
             if isinstance(output, torch.Tensor):
                 output = torch.squeeze(output[idx,:j,:j]).cpu().detach().numpy()
 
@@ -80,7 +84,7 @@ def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False
     if save_results:
         indices = range(nb)
     else:
-        indices = nb
+        indices = [nb-1]
     for idx in indices:
         fig = plt.figure(num=2, figsize=[15, 10])
         plt.clf()
