@@ -9,7 +9,7 @@ from src.visualization import compare_distogram, plotcoordinates, plotfullprotei
 
 # from torch_lr_finder import LRFinder
 
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 
 import torch
 
@@ -64,7 +64,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v = eval_net(net, dl_test, loss_fnc, device=device, plot_results=True)
+                    loss_v = eval_net(net, dl_test, loss_fnc, device=device, plot_results=False)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
