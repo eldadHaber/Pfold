@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=2, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--sigma', default=0.5, type=float, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--sigma', default=5, type=float, metavar='N', help='select the neural network to train (resnet)')
 
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
