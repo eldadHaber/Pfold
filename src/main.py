@@ -63,7 +63,7 @@ def main(c):
     scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler)
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma)
     torch.save(net, "{:}/network.pt".format(c.result_dir))
     eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))

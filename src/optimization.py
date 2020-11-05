@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1):
     '''
     Standard training routine.
     :param net: Network to train
@@ -45,7 +45,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             dists_pred, coords_pred = net(seq,mask)
 
             loss_d = loss_fnc(dists_pred, dists)
-            if coords_pred is not None:
+            if coords_pred is not None and sigma<0:
                 loss_c = loss_tr_tuples(coords_pred, coords)
                 loss_train_c += loss_c.cpu().detach()
                 loss = (1-w) * loss_d + w * loss_c
