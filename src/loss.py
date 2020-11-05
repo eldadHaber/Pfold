@@ -46,9 +46,10 @@ class EMSELoss(torch.nn.Module):
     """
     Exponential MSE loss
     """
-    def __init__(self,sigma=0.5):
+    def __init__(self,sigma=0.5,debug=False):
         super(EMSELoss,self).__init__()
         self.sigma = sigma
+        self.debug = debug
 
     def forward(self, input, target):
         #We only want places where the target is larger than zero (remember this is for distances)
@@ -64,6 +65,22 @@ class EMSELoss(torch.nn.Module):
         target_e = torch.exp(-target/self.sigma)
 
         result = torch.sum(torch.norm(input_e * mask - target_e * mask,dim=(1,2)) ** 2 / torch.norm(target_e * mask,dim=(1,2)) ** 2)
+
+        if self.debug:
+            matplotlib.use('TkAgg')
+            import matplotlib.pyplot as plt
+            fig = plt.figure(num=3,figsize=[15, 10])
+            plt.subplot(1,2,1)
+            plt.imshow(target[0,:,:].cpu().detach())
+            plt.colorbar()
+            plt.title("normal")
+            plt.subplot(1,2,2)
+            plt.imshow(target_e[0,:,:].cpu().detach(),vmax=1,vmin=0)
+            plt.colorbar()
+            plt.title("sigma =  {:2.2f}".format(self.sigma))
+            plt.pause(1)
+            save = "{}_{:2.1f}.png".format("expo", self.sigma)
+            fig.savefig(save)
 
         return result/nb
 

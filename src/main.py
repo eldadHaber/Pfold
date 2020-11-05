@@ -50,7 +50,7 @@ def main(c):
     if c.sigma < 0:
         loss_inner_fnc = MSELoss()
     else:
-        loss_inner_fnc = EMSELoss()
+        loss_inner_fnc = EMSELoss(sigma=c.sigma)
     loss_fnc = LossMultiTargets(loss_inner_fnc)
 
     c.LOG.info('Date:{}'.format(datetime.now()))
