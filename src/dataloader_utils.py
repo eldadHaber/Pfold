@@ -141,6 +141,45 @@ class ConvertPnetFeaturesTo1D(object):
 
         return f1d
 
+class Random2DCrop(object):
+    """
+    This class will randomly crop a 2D image to the size given.
+    This assumes a square image, but could be trivially extended to non-square images if desired.
+    This will crop the last two dimensions of any image.
+    """
+
+    def __init__(self, crop_size=64):
+        self.crop_size = crop_size
+        self.row = None
+        self.col = None
+
+    def __call__(self, img):
+        if type(img) is tuple:
+            img_crop = ()
+            for img_i in img:
+                img_crop += (img_i[self.row:self.row+self.crop_size,self.col:self.col+self.crop_size],)
+        else:
+            img_crop = img[:,self.row:self.row+self.crop_size,self.col:self.col+self.crop_size]
+        return img_crop
+
+    def randomize(self,img_size):
+        assert img_size > self.crop_size
+        a=np.random.random_integers(low=0,high=img_size-self.crop_size,size=2)
+        self.row = a[0]
+        self.col = a[1]
+        return
+
+
+    # def crop(self,img,row,col,l):
+    #     if img.ndim == 2:
+    #         img_crop = img[row:row + l, col:col + l] # 2D case
+    #     elif img.ndim == 3:
+    #         img_crop = img[:, row:row + l, col:col + l] # 3D case
+    #     elif img.ndim == 4:
+    #         img_crop = img[:,:, row:row + l, col:col + l] # 4D case
+    #     ...
+    #     return img_crop
+
 
 
 class SeqFlip(object):

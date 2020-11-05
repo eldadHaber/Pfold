@@ -11,10 +11,10 @@ if __name__ == '__main__':
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
-    parser.add_argument('--dataset-train', default='f:/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='f:/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    # parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-train', default='f:/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--dataset-test', default='f:/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_2d_all/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # Input features
     parser.add_argument('--seq-flip-prop', default=0.5, type=float, metavar='N', help='Input feature types')
     parser.add_argument('--feature-dim', default=2, type=int, metavar='N', help='Input feature types')
@@ -32,6 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=50, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
 
     args = parser.parse_args()
     if args.network.lower() == 'transformer':

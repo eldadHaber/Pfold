@@ -4,7 +4,7 @@ import numpy as np
 import torch.utils.data as data
 
 from src.dataloader_utils import SeqFlip, DrawFromProbabilityMatrix, MaskRandomSubset, convert_seq_to_onehot, \
-    convert_1d_features_to_2d, ConvertCoordToDists
+    convert_1d_features_to_2d, ConvertCoordToDists, Random2DCrop
 
 
 class Dataset_npz(data.Dataset):
@@ -39,6 +39,7 @@ class Dataset_npz(data.Dataset):
         self.inpainting = inpainting
         self.chan_in = self.calculate_chan_in()
         self.coord_to_dist = ConvertCoordToDists()
+        self.crop = Random2DCrop()
 
     def calculate_chan_in(self):
         assert (self.i_cov is False or self.i_cov_all is False), "You can only have one of (i_cov, i_cov_all) = True"
@@ -108,6 +109,13 @@ class Dataset_npz(data.Dataset):
         coords = (coords,)
 
         distances = self.coord_to_dist(coords)
+
+        if self.feature_dim == 2:
+            # Random 64x64 crop of the data
+            self.crop.randomize(features.shape[-1])
+            features = self.crop(features)
+            distances = self.crop(distances)
+            coords = (coords[0][:,0:64],) # Note that the coordinates are useless in the 2D case!
 
         return features, distances, coords
 
