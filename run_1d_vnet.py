@@ -29,10 +29,11 @@ if __name__ == '__main__':
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=2, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=2, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--sigma', default=0.5, type=float, metavar='N', help='select the neural network to train (resnet)')
 
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
@@ -49,7 +50,7 @@ if __name__ == '__main__':
         args.network_args = {
         'nblocks': 4,
         'nlayers_pr_block': 5,
-        'channels': 512,
+        'channels': 64,
         'chan_out': 3,
         'stencil_size': 3,
         }

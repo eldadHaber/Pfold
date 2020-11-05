@@ -46,10 +46,11 @@ class EMSELoss(torch.nn.Module):
     """
     Exponential MSE loss
     """
-    def __init__(self):
+    def __init__(self,sigma=0.5):
         super(EMSELoss,self).__init__()
+        self.sigma = sigma
 
-    def forward(self, input, target, sigma=0.5):
+    def forward(self, input, target):
         #We only want places where the target is larger than zero (remember this is for distances)
         mask = target > 0
 
@@ -59,8 +60,8 @@ class EMSELoss(torch.nn.Module):
         mask = mask[batch_mask, :, :]
         nb = target.shape[0]
 
-        input_e = torch.exp(-input/sigma)
-        target_e = torch.exp(-target/sigma)
+        input_e = torch.exp(-input/self.sigma)
+        target_e = torch.exp(-target/self.sigma)
 
         result = torch.sum(torch.norm(input_e * mask - target_e * mask,dim=(1,2)) ** 2 / torch.norm(target_e * mask,dim=(1,2)) ** 2)
 
