@@ -24,8 +24,8 @@ if __name__ == '__main__':
     parser.add_argument('--i-pssm', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-entropy', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-cov_all', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-cov', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-contact', default=True, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-cov', default=False, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-contact', default=False, type=bool, metavar='N', help='Input feature types')
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
