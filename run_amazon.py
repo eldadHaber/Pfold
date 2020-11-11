@@ -18,22 +18,22 @@ if __name__ == '__main__':
 
     # Input features
     parser.add_argument('--seq-flip-prop', default=0.5, type=float, metavar='N', help='Input feature types')
-    parser.add_argument('--feature-dim', default=2, type=int, metavar='N', help='Input feature types')
+    parser.add_argument('--feature-dim', default=1, type=int, metavar='N', help='Input feature types')
     parser.add_argument('--inpainting', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-seq', default=True, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-seq', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-pssm', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-entropy', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-cov_all', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-cov', default=False, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-cov_all', default=False, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-cov', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-contact', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--random-crop', default=False, type=bool, metavar='N', help='Input feature types')
 
     # Learning
-    parser.add_argument('--network', default='dilated_resnet', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=1, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
+    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=50, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
 
     args = parser.parse_args()
