@@ -16,7 +16,7 @@ class Dataset_npz(data.Dataset):
         target = (r1, r2, r3)
 
     '''
-    def __init__(self, folder, seq_flip_prop=0.5, chan_out=3, feature_dim=1, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False, inpainting=False):
+    def __init__(self, folder, seq_flip_prop=0.5, chan_out=3, feature_dim=1, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False, inpainting=False, random_crop=False):
 
         search_command = folder + "*.npz"
         npzfiles = [f for f in glob.glob(search_command)]
@@ -40,6 +40,7 @@ class Dataset_npz(data.Dataset):
         self.chan_in = self.calculate_chan_in()
         self.coord_to_dist = ConvertCoordToDists()
         self.crop = Random2DCrop()
+        self.use_crop = random_crop
 
     def calculate_chan_in(self):
         assert (self.i_cov is False or self.i_cov_all is False), "You can only have one of (i_cov, i_cov_all) = True"
@@ -110,7 +111,7 @@ class Dataset_npz(data.Dataset):
 
         distances = self.coord_to_dist(coords)
 
-        if self.feature_dim == 2:
+        if self.feature_dim == 2 and self.use_crop:
             # Random 64x64 crop of the data
             self.crop.randomize(features.shape[-1])
             features = self.crop(features)

@@ -1,4 +1,5 @@
 from src.network_graph import gNNC
+from src.network_resnet import ResNet
 from src.network_transformer import TransformerModel
 from src.network_vnet import vnet1D, vnet2D
 
@@ -16,6 +17,8 @@ def select_network(network,network_args,feature_dim):
         net = TransformerModel(**network_args)  # .to(device)
     elif network.lower() == 'graph' and feature_dim == 1:
         net = gNNC(**network_args)  # .to(device)
+    elif network.lower() == 'dilated_resnet' and feature_dim == 2: #TrRosetta
+        net = ResNet(**network_args)  # .to(device)
     else:
         raise NotImplementedError("The network you have selected ({:}), has not been implemented in the feature dimension ({:}), you selected.".format(network,feature_dim))
     return net
