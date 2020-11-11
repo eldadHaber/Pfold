@@ -26,7 +26,6 @@ np.set_printoptions(linewidth=desired_width)
 def main(c):
     #Initialize things
     c.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    c.device = 'cpu'
     fix_seed(c.seed) #Set a seed, so we make reproducible results.
     c.result_dir = "{root}/{runner_name}/{date:%Y-%m-%d_%H_%M_%S}".format(
         root='results',
