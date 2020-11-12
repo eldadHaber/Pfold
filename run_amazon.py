@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     # Input features
     parser.add_argument('--seq-flip-prop', default=0.5, type=float, metavar='N', help='Input feature types')
-    parser.add_argument('--feature-dim', default=1, type=int, metavar='N', help='Input feature types')
+    parser.add_argument('--feature-dim', default=2, type=int, metavar='N', help='Input feature types')
     parser.add_argument('--inpainting', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-seq', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-pssm', default=True, type=bool, metavar='N', help='Input feature types')
