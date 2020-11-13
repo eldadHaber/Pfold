@@ -42,5 +42,6 @@ if __name__ == '__main__':
     # Check output folder is non-existent, and then create it
     os.makedirs(dataset_out,exist_ok=True)
 
-    net_prediction(net, dl_test, device=device, plot_results=False, save_results="{:}/".format(dataset_out))
+    net_prediction(net, dl_test, device=device, plot_results=False, save_results=False)
+    # net_prediction(net, dl_test, device=device, plot_results=False, save_results="{:}/".format(dataset_out))
 
