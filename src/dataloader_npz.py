@@ -16,7 +16,7 @@ class Dataset_npz(data.Dataset):
         target = (r1, r2, r3)
 
     '''
-    def __init__(self, folder, seq_flip_prop=0.5, chan_out=3, feature_dim=1, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False, inpainting=False, random_crop=False):
+    def __init__(self, folder, seq_flip_prop=0.5, chan_out=3, feature_dim=1, i_seq=False, i_pssm=False, i_entropy=False, i_cov=False, i_cov_all=False, i_contact=False, inpainting=False, random_crop=False, cross_dist=False):
 
         search_command = folder + "*.npz"
         npzfiles = [f for f in glob.glob(search_command)]
@@ -41,6 +41,7 @@ class Dataset_npz(data.Dataset):
         self.coord_to_dist = ConvertCoordToDists()
         self.crop = Random2DCrop()
         self.use_crop = random_crop
+        self.use_cross_dist = cross_dist
 
     def calculate_chan_in(self):
         assert (self.i_cov is False or self.i_cov_all is False), "You can only have one of (i_cov, i_cov_all) = True"
@@ -48,7 +49,7 @@ class Dataset_npz(data.Dataset):
         if self.i_seq:
             chan_in += 20
         if self.i_pssm:
-            chan_in += 21
+            chan_in += 20
         if self.i_entropy:
             chan_in += 1
         if self.inpainting:
@@ -75,7 +76,14 @@ class Dataset_npz(data.Dataset):
 
     def __getitem__(self, index):
         data = np.load(self.files[index])
-        coords = data['r1']
+        if self.chan_out == 3:
+            coords = (data['r1'],)
+        elif self.chan_out == 6:
+            coords = (data['r1'], data['r2'],)
+        elif self.chan_out == 9:
+            coords = (data['r1'], data['r2'], data['r3'],)
+        else:
+            raise NotImplementedError("The number of channels out is not supported.")
 
         features_1d = ()
         if self.i_seq:
@@ -107,9 +115,18 @@ class Dataset_npz(data.Dataset):
         self.Flip.reroll()
         features = self.Flip(features)
         coords = self.Flip(coords)
-        coords = (coords,)
 
-        distances = self.coord_to_dist(coords)
+        if self.use_cross_dist: # In this case, we put all the coordinates into one long coordinate array.
+            nc = len(coords)
+            nl = coords[0].shape[1]
+            coord_long = (np.concatenate(coords, axis=1),)
+            dist_long = self.coord_to_dist(coord_long)
+            distances = ()
+            for i in range(nc):
+                for j in range(nc):
+                    distances += (dist_long[0][i*nl:(i+1)*nl,j*nl:(j+1)*nl],)
+        else:
+            distances = self.coord_to_dist(coords)
 
         if self.feature_dim == 2 and self.use_crop:
             # Random 64x64 crop of the data

@@ -7,8 +7,8 @@ from src.dataloader_npz import Dataset_npz
 from src.optimization import net_prediction
 
 if __name__ == '__main__':
-    network = './trained_nets/vnet_1d.pt'
-    dataset = 'f:/final_dataset_1d_validate/'
+    network = './pretrained_networks/network.pt'
+    dataset = './data/test_FM/'
     dataset_out = './results/figures/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -18,9 +18,9 @@ if __name__ == '__main__':
     feature_dim = 1
     i_seq = True
     i_pssm = True
-    i_cov = True
+    i_cov = False
     i_cov_all = False
-    i_contact = True
+    i_contact = False
     inpainting = False
 
 

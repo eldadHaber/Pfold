@@ -11,8 +11,8 @@ if __name__ == '__main__':
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
-    parser.add_argument('--dataset-train', default='./../data/train/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./../data/test/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/train_npz/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
@@ -24,9 +24,11 @@ if __name__ == '__main__':
     parser.add_argument('--i-pssm', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-entropy', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--i-cov_all', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-cov', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-contact', default=True, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-cov', default=False, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--i-contact', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--random-crop', default=False, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--use-cross-dist', default=True, type=bool, metavar='N', help='Input feature types')
+
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
@@ -51,7 +53,7 @@ if __name__ == '__main__':
         'nblocks': 4,
         'nlayers_pr_block': 5,
         'channels': 64,
-        'chan_out': 3,
+        'chan_out': 9,
         'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':

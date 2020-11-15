@@ -42,7 +42,7 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_dim,batch_size=c.batch_size, network=c.network, i_seq=c.i_seq, i_pssm=c.i_pssm, i_entropy=c.i_entropy, i_cov=c.i_cov, i_cov_all=c.i_cov_all, i_contact=c.i_contact,inpainting=c.inpainting, seq_flip_prop=c.seq_flip_prop, random_crop=c.random_crop)
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_dim,batch_size=c.batch_size, network=c.network, i_seq=c.i_seq, i_pssm=c.i_pssm, i_entropy=c.i_entropy, i_cov=c.i_cov, i_cov_all=c.i_cov_all, i_contact=c.i_contact,inpainting=c.inpainting, seq_flip_prop=c.seq_flip_prop, random_crop=c.random_crop, cross_dist=c.use_cross_dist, chan_out=c.network_args['chan_out'])
     c.network_args['chan_in'] = dl_train.dataset.chan_in
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
@@ -55,7 +55,7 @@ def main(c):
 
     c.LOG.info('Date:{}'.format(datetime.now()))
 
-    net = select_network(c.network,c.network_args,c.feature_dim)
+    net = select_network(c.network,c.network_args,c.feature_dim,cross_dist=c.use_cross_dist)
 
     c.LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
     net.to(c.device)

@@ -4,13 +4,13 @@ from src.network_transformer import TransformerModel
 from src.network_vnet import vnet1D, vnet2D
 
 
-def select_network(network,network_args,feature_dim):
+def select_network(network,network_args,feature_dim,cross_dist=False):
     '''
     This is a wrapper routine for various networks.
     :return:
     '''
     if network.lower() == 'vnet' and feature_dim == 1:
-        net = vnet1D(**network_args)
+        net = vnet1D(**network_args,cross_dist=cross_dist)
     elif network.lower() == 'vnet' and feature_dim == 2:
         net = vnet2D(**network_args)
     elif network.lower() == 'transformer' and feature_dim == 1:

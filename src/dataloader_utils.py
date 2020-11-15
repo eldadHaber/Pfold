@@ -192,17 +192,26 @@ class SeqFlip(object):
 
     def __call__(self, args):
         if self.p < self.prob:
-            nd = args.ndim
-            if nd == 2:
-                args = np.flip(args,axis=(-1))
-            elif nd == 3:
-                args = np.flip(args,axis=(-1,-2))
+            if type(args) is tuple:
+                new_args = ()
+                for arg in args:
+                    new_args += (self.flip_array(arg),)
+                args = new_args
+            else:
+                args = self.flip_array(args)
         return args
 
     def reroll(self):
         self.p = random.random()
         return
 
+    def flip_array(self,arg):
+        nd = arg.ndim
+        if nd == 2:
+            arg = np.flip(arg, axis=(-1))
+        elif nd == 3:
+            arg = np.flip(arg, axis=(-1, -2))
+        return arg
 
     def __repr__(self):
         return self.__class__.__name__ + '()'

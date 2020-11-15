@@ -22,12 +22,13 @@ def conv2T(X, Kernel):
 
 class vnet1D(nn.Module):
     """ VNet """
-    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size):
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size,cross_dist=False):
         super(vnet1D, self).__init__()
         K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=stencil_size)
         self.K = K
         self.W = W
         self.h = 0.1
+        self.cross_dist = cross_dist
 
     def init_weights(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size = 3):
         K = nn.ParameterList([])
@@ -136,10 +137,25 @@ class vnet1D(nn.Module):
                 x = F.relu(z) + xS[n_scales]
 
         x = conv1(x, self.W) * mask
+        if self.cross_dist:
+            nl = x.shape[-1]
+            nc = x.shape[1]//3
+            x_long = torch.empty_like(x)
+            x_long = x_long.reshape((x.shape[0],3,-1))
+            for i in range(x.shape[1]//3):
+                x_long[:,:,i*nl:(i+1)*nl] = x[:,i*3:(i+1)*3,:]
+            dist_long = tr2DistSmall(x_long)
+            dists = ()
+            for i in range(nc):
+                for j in range(nc):
+                    dists += (dist_long[:,i*nl:(i+1)*nl,j*nl:(j+1)*nl],)
 
-        dists = ()
-        for i in range(x.shape[1]//3):
-            dists += (tr2DistSmall(x[:,i:i+3,:]),)
+
+
+        else:
+            dists = ()
+            for i in range(x.shape[1]//3):
+                dists += (tr2DistSmall(x[:,i*3:(i+1)*3,:]),)
 
         return dists, x
 

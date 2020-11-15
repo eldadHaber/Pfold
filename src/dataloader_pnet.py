@@ -138,7 +138,7 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, report_iter=1000, min_seq_len=-1, max_seq_len=999999):
+def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False):
     """
     Read all protein records from pnet file.
     Note that pnet files have coordinates saved in picometers, but we load it in in nanometers instead, since that works better with the neural networks.
@@ -221,7 +221,6 @@ def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_p
                 'seq': seq,
                 'seq_len': seq_len,
                 }
-
         if use_coord:
             r1 = convert(r1)
             r2 = convert(r2)
