@@ -7,20 +7,20 @@ from src.dataloader_npz import Dataset_npz
 from src.optimization import net_prediction
 
 if __name__ == '__main__':
-    network = './trained_nets/vnet_1d.pt'
+    network = 'F:/results/run_amazon/2020-11-09_19_31_14/network.pt'
     dataset = 'f:/final_dataset_1d_validate/'
     dataset_out = './results/figures/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     batch_size = 1
 
-    i_entropy = True
+    i_entropy = False
     feature_dim = 1
     i_seq = True
-    i_pssm = True
-    i_cov = True
+    i_pssm = False
+    i_cov = False
     i_cov_all = False
-    i_contact = True
+    i_contact = False
     inpainting = False
 
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     pad_modulo = 8
 
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=False)
 
 
