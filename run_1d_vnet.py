@@ -52,7 +52,7 @@ if __name__ == '__main__':
         args.network_args = {
         'nblocks': 4,
         'nlayers_pr_block': 5,
-        'channels': 64,
+        'channels': 256,
         'chan_out': 9,
         'stencil_size': 3,
         }
