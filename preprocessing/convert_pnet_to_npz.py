@@ -10,7 +10,7 @@ if __name__ == '__main__':
     # output_folder = './../data/test_npz/'
 
     os.makedirs(output_folder, exist_ok=True)
-    args = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=False, use_coord=True)
+    args = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=1000, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=False, use_coord=True)
 
     ids = args['id']
     r1 = args['r1']

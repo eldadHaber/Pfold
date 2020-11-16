@@ -32,10 +32,10 @@ if __name__ == '__main__':
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=2, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=15, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
-    parser.add_argument('--max-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=2, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--max-iter', default=400000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
 
     args = parser.parse_args()
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         args.network_args = {
         'nblocks': 4,
         'nlayers_pr_block': 5,
-        'channels': 64,
+        'channels': 256,
         'chan_out': 9,
         'stencil_size': 3,
         }
