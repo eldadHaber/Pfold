@@ -48,7 +48,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if coords_pred is not None and sigma<0:
                 loss_c = loss_tr_tuples(coords_pred, coords)
                 loss_train_c += loss_c.cpu().detach()
-                loss = (1-w) * loss_d + w * loss_c
+                loss = (1-w)/2 * loss_d + (w+1)/2 * loss_c
             else:
                 loss = loss_d
 
