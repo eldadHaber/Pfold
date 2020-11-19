@@ -7,7 +7,7 @@ from src.dataloader_npz import Dataset_npz
 from src.optimization import net_prediction
 
 if __name__ == '__main__':
-    network = './pretrained_networks/network.pt'
+    network = './trained_nets/network.pt'
     dataset = './data/test_FM/'
     dataset_out = './results/figures/'
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     pad_modulo = 8
 
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=True, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=False)
 
 
@@ -43,5 +43,5 @@ if __name__ == '__main__':
     os.makedirs(dataset_out,exist_ok=True)
 
     net_prediction(net, dl_test, device=device, plot_results=False, save_results=False)
-    # net_prediction(net, dl_test, device=device, plot_results=False, save_results="{:}/".format(dataset_out))
+    net_prediction(net, dl_test, device=device, plot_results=False, save_results="{:}/".format(dataset_out))
 

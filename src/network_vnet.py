@@ -55,7 +55,7 @@ class vnet1D(nn.Module):
                     Ki = nn.Parameter(Ki)
                     K.append(Ki)
 
-        W = nn.Parameter(1e-4*torch.randn(chan_out, channels, 1))
+        W = nn.Parameter(1e-2*torch.randn(chan_out, channels, 1))
         return K, W
 
     def forward(self, x, mask=None):

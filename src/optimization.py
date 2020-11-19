@@ -2,6 +2,7 @@ import time
 
 import matplotlib
 
+from src.IO import save_checkpoint
 from src.loss import loss_tr_tuples
 from src.utils import move_tuple_to
 from src.visualization import compare_distogram, plotfullprotein
@@ -12,7 +13,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, save=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -63,7 +64,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=False)
+                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=True)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
@@ -77,10 +78,9 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     loss_train_c = 0
                     loss_train = 0
             if (ite + 1) % checkpoint == 0:
-                pass
-                # filename = "{}{}_checkpoint.tar".format(save, ite + 1)
-                # save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
-                # LOG.info("Checkpoint saved: {}".format(filename))
+                filename = "{:}checkpoint.pt".format(save)
+                save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
+                LOG.info("Checkpoint saved: {}".format(filename))
             ite += 1
 
             if ite >= max_iter:

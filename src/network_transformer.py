@@ -95,7 +95,7 @@ class CNN(nn.Module):
         z1 = torch.relu(self.K1(src) * mask)
         z2 = z1 + self.K3(torch.relu(self.K2(z1)) * mask) * mask
         z3 = z2 + self.K5(torch.relu(self.K4(z1)) * mask) * mask
-        z3 = self.K6(z2) * mask
+        z3 = self.K6(z3) * mask
         return z3
 
 

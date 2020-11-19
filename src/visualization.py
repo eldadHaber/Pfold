@@ -1,3 +1,4 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -70,6 +71,7 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
                 plt.title(tit)
 
         if plot_results:
+            matplotlib.use('TkAgg')
             plt.pause(0.5)
         if save_results:
             save = "{}_{}.png".format(save_results, idx)
@@ -166,6 +168,7 @@ def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False
                 line3 = axes.plot3D(tx[i,:], ty[i,:], tz[i,:], 'blue', marker='o')
         plt.legend((target_h,pred_h), ('Target','Prediction'))
         if plot_results:
+            matplotlib.use('TkAgg')
             plt.pause(0.5)
         if save_results:
             save = "{}_{}.png".format(save_results, idx)
