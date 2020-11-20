@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=30, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=2e-4, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=2000000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
