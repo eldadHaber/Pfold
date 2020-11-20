@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, save=None, use_loss_coord=True):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, save=None, use_loss_coord=True, viz=False):
     '''
     Standard training routine.
     :param net: Network to train
@@ -64,7 +64,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=True, use_loss_coord=use_loss_coord, weight=w)
+                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord, weight=w)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']

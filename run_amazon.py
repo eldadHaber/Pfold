@@ -10,6 +10,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=123557, type=int, metavar='N', help='seed number')
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
+    parser.add_argument('--viz', default=False, type=bool, metavar='N', help='select the neural network to train (resnet)')
     # data
     parser.add_argument('--dataset-train', default='./../data/casp11_training_90/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-test', default='./../data/casp11_validation/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
