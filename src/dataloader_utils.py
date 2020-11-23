@@ -157,9 +157,9 @@ class Random2DCrop(object):
         if type(img) is tuple:
             img_crop = ()
             for img_i in img:
-                img_crop += (img_i[self.row:self.row+self.crop_size,self.col:self.col+self.crop_size],)
+                img_crop += (img_i[...,self.row:self.row+self.crop_size,self.col:self.col+self.crop_size],)
         else:
-            img_crop = img[:,self.row:self.row+self.crop_size,self.col:self.col+self.crop_size]
+            img_crop = img[...,self.row:self.row+self.crop_size,self.col:self.col+self.crop_size]
         return img_crop
 
     def randomize(self,img_size):
