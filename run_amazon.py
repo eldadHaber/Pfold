@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--i-contact', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--random-crop', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-cross-dist', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--use-loss-coord', default=True, type=bool, metavar='N', help='Input feature types')
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
@@ -39,6 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--load-from-previous', default='./../data/checkpoint.pt', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
