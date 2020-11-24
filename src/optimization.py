@@ -116,6 +116,10 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
             dists_pred, coords_pred = net(seq,mask)
+
+            dist_nn = torch.norm(coords_pred[:,:,1:]-coords_pred[:,:,:-1],2,dim=1)
+            dist_nn_truth = torch.norm(coords[0][:,:,1:]-coords[0][:,:,:-1],2,dim=1)
+
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
                 loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)

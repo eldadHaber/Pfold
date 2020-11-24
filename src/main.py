@@ -68,8 +68,8 @@ def main(c):
         c.LOG.info("Loading Checkpoint {:}, starting from iteration {:}".format(c.load_from_previous,ite_start))
     else:
         ite_start = 0
+    eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, checkpoint=c.checkpoint, save="{:}/".format(c.result_dir), use_loss_coord=c.use_loss_coord, viz=c.viz, ite=ite_start)
     torch.save(net, "{:}/network.pt".format(c.result_dir))
-    eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))
     print("Done")
