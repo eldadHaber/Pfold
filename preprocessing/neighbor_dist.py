@@ -6,15 +6,25 @@ import torch.utils.data as data
 
 from src.dataloader_utils import SeqFlip, DrawFromProbabilityMatrix, MaskRandomSubset, convert_seq_to_onehot, \
     convert_1d_features_to_2d, ConvertCoordToDists, Random2DCrop
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg') #TkAgg
+
+import pandas as pd
+desired_width = 600
+pd.set_option('display.width', desired_width)
+pd.set_option('display.max_columns', 10)
+np.set_printoptions(linewidth=desired_width)
 
 import torch
 
 if __name__ == '__main__':
-    dataset = './../data/casp11_training_90/'
+    dataset = './../data/train_npz/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
     batch_size = 1
+    n_acids = 20
 
     i_entropy = False
     feature_dim = 1
@@ -136,28 +146,95 @@ if __name__ == '__main__':
     # Check output folder is non-existent, and then create it
     # os.makedirs(dataset_out,exist_ok=True)
 
-    D = np.zeros((100000,21,21),dtype=np.float32)
-    counters = np.zeros((21,21),dtype=np.int32)
+    D = np.zeros((10000000,n_acids,n_acids),dtype=np.float32)
+    counters = np.zeros((n_acids,n_acids),dtype=np.int32)
+    plt.figure()
+    n_problems = 0
 
     for i, (seq, coords) in enumerate(dl_test):
         seq = torch.squeeze(seq)
 
         c = coords[0]
-        mask = torch.squeeze(c[:,0,:] != 0)
+        mask = np.squeeze(c[:,0,:] != 0)
 
         c_s = c[:,:,mask]
         seq_s = seq[mask]
 
-        d = torch.norm(c[:, :, 1:] - c[:, :, :-1], 2, dim=1)
-        for j,dist in enumerate(d):
+        d = torch.squeeze(torch.norm(c[:, :, 1:] - c[:, :, :-1], 2, dim=1))
+
+        for j in range(len(seq)-1):
+            if mask[j] == 0 or mask[j+1] == 0:
+                continue
+            dist = d[j]
+            if dist < 0.3 or dist > 0.5:
+                n_problems += 1
+                continue
             idx1 = seq[j]
             idx2 = seq[j+1] # i dont think this will work when there is a gap
             if idx1 < idx2:
-                counters[idx1, idx2] += 1
                 counts = counters[idx1, idx2]
                 D[counts,idx1,idx2] = dist
+                counters[idx1, idx2] += 1
             else:
-                counters[idx2, idx1] += 1
                 counts = counters[idx2, idx1]
                 D[counts,idx2,idx1] = dist
-        print("next")
+                counters[idx2, idx1] += 1
+            if (np.sum(counters)+1) % 1000000 == 0:
+                print("{:}".format(np.sum(counters)+1))
+                D_mean = np.sum(D,axis=0) / (counters+1e-10)
+                D_std = np.empty_like(D_mean)
+                for ii in range(D_std.shape[0]):
+                    for jj in range(ii,D_std.shape[0]):
+                        D_std[ii,jj] = np.std(D[:counters[ii,jj],ii,jj])
+                m = counters > 0
+                vmin = np.min(D_mean[m])
+                vmax = np.max(D_mean[m])
+                plt.clf()
+                plt.subplot(1,3,1)
+                plt.imshow(D_mean,vmin=vmin,vmax=vmax)
+                plt.colorbar()
+                plt.title("{:}".format(np.sum(counters)+1))
+                plt.subplot(1,3,2)
+                varmin = np.min(D_std[m])
+                varmax = np.max(D_std[m])
+                plt.imshow(D_std, vmin=varmin, vmax=varmax)
+                plt.colorbar()
+                plt.title("std {:}".format(np.sum(counters)+1))
+                plt.subplot(1,3,3)
+                cmin = np.min(counters[m])
+                cmax = np.max(counters[m])
+                plt.imshow(counters,vmin=cmin,vmax=cmax)
+                plt.colorbar()
+                plt.title("number of samples {:}, problems {:}".format(np.sum(counters)+1,n_problems))
+                plt.pause(1)
+
+    print("{:}".format(np.sum(counters)+1))
+    D_mean = np.sum(D,axis=0) / (counters+1e-10)
+    D_std = np.empty_like(D_mean)
+    for ii in range(D_std.shape[0]):
+        for jj in range(ii,D_std.shape[0]):
+            D_std[ii,jj] = np.std(D[:counters[ii,jj],ii,jj])
+    m = counters > 0
+
+    np.savez('distances',distances=D,distances_mean=D_mean,distances_std=D_std,counters=counters)
+
+    vmin = np.min(D_mean[m])
+    vmax = np.max(D_mean[m])
+    plt.clf()
+    plt.subplot(1,3,1)
+    plt.imshow(D_mean,vmin=vmin,vmax=vmax)
+    plt.colorbar()
+    plt.title("{:}".format(np.sum(counters)+1))
+    plt.subplot(1,3,2)
+    varmin = np.min(D_std[m])
+    varmax = np.max(D_std[m])
+    plt.imshow(D_std, vmin=varmin, vmax=varmax)
+    plt.colorbar()
+    plt.title("std {:}".format(np.sum(counters)+1))
+    plt.subplot(1,3,3)
+    cmin = np.min(counters[m])
+    cmax = np.max(counters[m])
+    plt.imshow(counters,vmin=cmin,vmax=cmax)
+    plt.colorbar()
+    plt.title("number of samples {:}, problems {:}".format(np.sum(counters)+1,n_problems))
+    plt.pause(1)
