@@ -37,6 +37,7 @@ class Dataset_npz(data.Dataset):
         self.i_cov_all = i_cov_all
         self.i_contact = i_contact
         self.inpainting = inpainting
+        self.k = 40
         self.chan_in = self.calculate_chan_in()
         self.coord_to_dist = ConvertCoordToDists()
         self.crop = Random2DCrop()
@@ -55,11 +56,11 @@ class Dataset_npz(data.Dataset):
             chan_in += 4 # 3 coordinates + 1 mask
         if self.feature_dim == 1:
             if self.i_cov_all:
-                chan_in += 10*441
+                chan_in += self.k*441*2
             elif self.i_cov:
-                chan_in += 10*21
+                chan_in += self.k*21*2
             if self.i_contact:
-                chan_in += 20
+                chan_in += self.k*2
         elif self.feature_dim == 2:
             chan_in *= 2
             if self.i_cov_all:
@@ -89,17 +90,34 @@ class Dataset_npz(data.Dataset):
             features_1d += (r,m[None,:],)
 
         if self.feature_dim == 1:
-            if self.i_cov:
-                cov = data['cov1d']
+            if self.i_cov or self.i_cov_all:
+                cov = data['cov1d_vectors']
+                cov = cov.swapaxes(1, 2)
+                cov = cov[:,:self.k,:]
                 cov = cov.reshape(-1,cov.shape[-1])
                 features_1d += (cov,)
+                cov_values = data['cov1d_values']
+                cov_values = (cov_values[:,:self.k]).flatten()
+                cov_values = np.repeat(cov_values[:,None],cov.shape[-1],axis=1)
+                features_1d += (cov_values,)
             if self.i_contact:
-                contact = data['contact1d']
-                features_1d += (contact.reshape(-1,contact.shape[-1]),)
+                contact = data['contact1d_vectors']
+                contact = contact.swapaxes(1, 2)
+                contact = contact[:,:self.k,:]
+                contact = contact.reshape(-1,contact.shape[-1])
+                features_1d += (contact,)
+
+                contact_values = data['contact1d_values']
+                contact_values = (contact_values[:,:self.k]).flatten()
+                contact_values = np.repeat(contact_values[:,None],contact.shape[-1],axis=1)
+                features_1d += (contact_values,)
             features = features_1d
         elif self.feature_dim == 2:
             features_2d = (convert_1d_features_to_2d(features_1d),)
-            features_2d += (data['cov2d'],data['contact2d'][None,:,:],)
+            if self.i_cov or self.i_cov_all:
+                features_2d += (data['cov2d'],)
+            if self.i_contact:
+                features_2d += (data['contact2d'][None,:,:],)
             features = features_2d
 
         features = np.concatenate(features, axis=0)

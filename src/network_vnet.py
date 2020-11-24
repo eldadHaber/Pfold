@@ -296,8 +296,11 @@ class vnet2D(nn.Module):
 
         x = conv2(x, self.W) * mm
 
+        x = torch.squeeze(x)
+
         # dists = ()
         # for i in range(x.shape[1]//3):
         #     dists += (tr2DistSmall(x[:,i:i+3,:]),)
 
-        return x, None
+
+        return (x,), None
