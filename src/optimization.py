@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, use_loss_coord=True):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, use_loss_coord=True,net1d=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -27,6 +27,8 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     '''
     stop_run = False
     net.to(device)
+    if net1d is not None:
+        net1d.to(device)
     t0 = time.time()
     t1 = time.time()
     loss_train_d = 0
@@ -42,7 +44,10 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
 
             w = ite / max_iter
             optimizer.zero_grad()
-            dists_pred, coords_pred = net(seq,mask)
+            if net1d is not None:
+                dists_pred, coords_pred = net1d(seq,mask)
+            features_2d = dists_pred[0][:,None,:,:]
+            dists_pred, coords_pred = net(features_2d,mask)
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and sigma < 0 and use_loss_coord:

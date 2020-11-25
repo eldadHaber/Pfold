@@ -42,8 +42,9 @@ def main(c):
         c.LOG.info("{:30s} : {}".format(key, value))
 
     # Load Dataset
-    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,c.feature_dim,batch_size=c.batch_size, network=c.network, i_seq=c.i_seq, i_pssm=c.i_pssm, i_entropy=c.i_entropy, i_cov=c.i_cov, i_cov_all=c.i_cov_all, i_contact=c.i_contact,inpainting=c.inpainting, seq_flip_prop=c.seq_flip_prop, random_crop=c.random_crop)
-    c.network_args['chan_in'] = dl_train.dataset.chan_in
+    dl_train, dl_test = select_dataset(c.dataset_train,c.dataset_test,1,batch_size=c.batch_size, network=c.network, i_seq=c.i_seq, i_pssm=c.i_pssm, i_entropy=c.i_entropy, i_cov=c.i_cov, i_cov_all=c.i_cov_all, i_contact=c.i_contact,inpainting=c.inpainting, seq_flip_prop=c.seq_flip_prop, random_crop=c.random_crop)
+    c.network_args['chan_in'] = 1
+    c.network1d_args['chan_in'] = dl_train.dataset.chan_in
     c.LOG.info('Datasets loaded, train  has {} samples. Test has {} samples'.format(len(dl_train.dataset),len(dl_test.dataset)))
 
     # Select loss function for training
@@ -56,14 +57,17 @@ def main(c):
     c.LOG.info('Date:{}'.format(datetime.now()))
 
     net = select_network(c.network,c.network_args,c.feature_dim)
+    net1d = select_network(c.network1d,c.network1d_args,1)
 
     c.LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
+    c.LOG.info('Initializing Net1d, which has {} trainable parameters.'.format(determine_network_param(net1d)))
     net.to(c.device)
-    optimizer = optim.Adam(list(net.parameters()), lr=c.SL_lr)
+    net1d.to(c.device)
+    optimizer = optim.Adam(list(net.parameters())+list(net1d.parameters()), lr=c.SL_lr)
     scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, use_loss_coord=c.use_loss_coord)
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, use_loss_coord=c.use_loss_coord,net1d=net1d)
     torch.save(net, "{:}/network.pt".format(c.result_dir))
     eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))
