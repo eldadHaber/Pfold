@@ -68,7 +68,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=False, use_loss_coord=use_loss_coord, weight=w)
+                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=False, use_loss_coord=use_loss_coord, weight=w, net1d=net1d)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
@@ -98,7 +98,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     return net
 
 
-def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=False, use_loss_coord=True, weight=0):
+def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=False, use_loss_coord=True, weight=0, net1d=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -120,7 +120,11 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
-            dists_pred, coords_pred = net(seq,mask)
+            if net1d is not None:
+                dists_pred, coords_pred = net1d(seq,mask)
+            features_2d = dists_pred[0][:,None,:,:]
+            dists_pred, coords_pred = net(features_2d,mask)
+            # dists_pred, coords_pred = net(seq,mask)
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
                 loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
