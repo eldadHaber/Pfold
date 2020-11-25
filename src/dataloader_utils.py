@@ -233,7 +233,7 @@ class ConvertCoordToDists(object):
     def __call__(self, args):
         distances = ()
         for r in args:
-            mask = r[0,:] != 0
+            mask = (r[0,:] != 0)
             M = mask[:,None] @  mask[None,:]
             d = np.sum(r ** 2, axis=0)[:,None] + np.sum(r ** 2, axis=0)[None,:] - 2 * (r.T @ r)
             d = np.sqrt(np.maximum(M*d,0))

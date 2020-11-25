@@ -8,6 +8,9 @@ from src.dataloader_utils import SeqFlip, DrawFromProbabilityMatrix, MaskRandomS
     convert_1d_features_to_2d, ConvertCoordToDists, Random2DCrop
 import matplotlib.pyplot as plt
 import matplotlib
+
+from src.network_transformer import tr2DistSmall
+
 matplotlib.use('TkAgg') #TkAgg
 
 import pandas as pd
@@ -137,6 +140,7 @@ if __name__ == '__main__':
             return self.__class__.__name__ + ' (' + self.folder + ')'
 
 
+
     dataset_test = Dataset_npz(dataset, feature_dim=feature_dim, seq_flip_prop=0, i_seq=i_seq, i_pssm=i_pssm,
                                i_entropy=i_entropy, i_cov=i_cov, i_cov_all=i_cov_all, i_contact=i_contact,
                                inpainting=inpainting)
@@ -146,10 +150,11 @@ if __name__ == '__main__':
     # Check output folder is non-existent, and then create it
     # os.makedirs(dataset_out,exist_ok=True)
 
-    D = np.zeros((10000000,n_acids,n_acids),dtype=np.float32)
-    counters = np.zeros((n_acids,n_acids),dtype=np.int32)
+    Dmins = torch.zeros((10000000))
+    counter = 0
     fig = plt.figure(num=1, figsize=[15, 10])
     n_problems = 0
+
 
     for i, (seq, coords) in enumerate(dl_test):
         seq = torch.squeeze(seq)
@@ -160,86 +165,24 @@ if __name__ == '__main__':
         c_s = c[:,:,mask]
         seq_s = seq[mask]
 
-        d = torch.squeeze(torch.norm(c[:, :, 1:] - c[:, :, :-1], 2, dim=1))
+        dist_fnc = ConvertCoordToDists()
+        D = tr2DistSmall(c_s)
+        idx = D > 0
+        Dmin = torch.min(D[idx])
+        Dmins[i] = Dmin
 
-        for j in range(len(seq)-1):
-            if mask[j] == 0 or mask[j+1] == 0:
-                continue
-            dist = d[j]
-            if dist < 0.3 or dist > 0.5:
-                n_problems += 1
-                continue
-            idx1 = seq[j]
-            idx2 = seq[j+1] # i dont think this will work when there is a gap
-            if idx1 < idx2:
-                counts = counters[idx1, idx2]
-                D[counts,idx1,idx2] = dist
-                counters[idx1, idx2] += 1
-            else:
-                counts = counters[idx2, idx1]
-                D[counts,idx2,idx1] = dist
-                counters[idx2, idx1] += 1
-            if (np.sum(counters)+1) % 1000000 == 0:
-                print("{:}".format(np.sum(counters)+1))
-                D_mean = np.sum(D,axis=0) / (counters+1e-10)
-                D_std = np.empty_like(D_mean)
-                for ii in range(D_std.shape[0]):
-                    for jj in range(ii,D_std.shape[0]):
-                        D_std[ii,jj] = np.std(D[:counters[ii,jj],ii,jj])
-                m = counters > 0
-                vmin = np.min(D_mean[m])
-                vmax = np.max(D_mean[m])
-                plt.clf()
-                plt.subplot(1,3,1)
-                plt.imshow(D_mean,vmin=vmin,vmax=vmax)
-                plt.colorbar()
-                plt.title("# problems {:}".format(n_problems))
-                plt.subplot(1,3,2)
-                varmin = np.min(D_std[m])
-                varmax = np.max(D_std[m])
-                plt.imshow(D_std, vmin=varmin, vmax=varmax)
-                plt.colorbar()
-                plt.title("std")
-                plt.subplot(1,3,3)
-                cmin = np.min(counters[m])
-                cmax = np.max(counters[m])
-                plt.imshow(counters,vmin=cmin,vmax=cmax)
-                plt.colorbar()
-                plt.title("{:}".format(np.sum(counters)+1))
-                plt.pause(1)
-                save = "{:}.png".format("dist")
-                fig.savefig(save)
+        if (i+1) % 100 == 0:
+            print("{:} samples. Average minimum distance = {:2.4f}+-{:2.4f}, smallest one = {:2.4f}".format(i+1,torch.mean(Dmins[0:i]),torch.std(Dmins[0:i]),torch.min(Dmins[0:i])))
 
-    print("{:}".format(np.sum(counters)+1))
-    D_mean = np.sum(D,axis=0) / (counters+1e-10)
-    D_std = np.empty_like(D_mean)
-    for ii in range(D_std.shape[0]):
-        for jj in range(ii,D_std.shape[0]):
-            D_std[ii,jj] = np.std(D[:counters[ii,jj],ii,jj])
-    m = counters > 0
 
-    np.savez('distances',distances=D,distances_mean=D_mean,distances_std=D_std,counters=counters)
 
-    vmin = np.min(D_mean[m])
-    vmax = np.max(D_mean[m])
-    plt.clf()
-    plt.subplot(1,3,1)
-    plt.imshow(D_mean,vmin=vmin,vmax=vmax)
-    plt.colorbar()
-    plt.title("# problems {:}".format(n_problems))
-    plt.subplot(1,3,2)
-    varmin = np.min(D_std[m])
-    varmax = np.max(D_std[m])
-    plt.imshow(D_std, vmin=varmin, vmax=varmax)
-    plt.colorbar()
-    plt.title("std")
-    plt.subplot(1,3,3)
-    cmin = np.min(counters[m])
-    cmax = np.max(counters[m])
-    plt.imshow(counters,vmin=cmin,vmax=cmax)
-    plt.colorbar()
-    plt.title("{:}".format(np.sum(counters) + 1))
-    plt.pause(1)
-    save = "{:}.png".format("dist_done")
-    fig.savefig(save)
+
+        # ii = torch.argmin(D[idx])
+        # idx_flat = torch.flatten(idx)
+        # cumidx = torch.cumsum(idx_flat,dim=0)
+        # lin_idx = torch.where(cumidx == ii)[0].numpy()
+        # np.unravel_index(lin_idx,idx.shape)
+
+
+
 

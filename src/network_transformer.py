@@ -105,5 +105,6 @@ def tr2DistSmall(Y):
     Z = Y - torch.mean(Y, dim=2, keepdim=True)
     D = torch.sum(Z**2, dim=1).unsqueeze(1) + torch.sum(Z**2, dim=1).unsqueeze(2) - 2*Z.transpose(1,2) @ Z
     D = 3*D/k
+    D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
     return torch.sqrt(torch.relu(D))
 

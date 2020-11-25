@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from src import log
 from src.IO import load_checkpoint
 from src.dataloader import select_dataset
-from src.loss import MSELoss, LossMultiTargets, EMSELoss
+from src.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg
 from src.network import select_network
 from src.optimization import eval_net, train
 from src.utils import determine_network_param
@@ -68,8 +68,15 @@ def main(c):
         c.LOG.info("Loading Checkpoint {:}, starting from iteration {:}".format(c.load_from_previous,ite_start))
     else:
         ite_start = 0
-    eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, checkpoint=c.checkpoint, save="{:}/".format(c.result_dir), use_loss_coord=c.use_loss_coord, viz=c.viz, ite=ite_start)
+    if c.use_loss_reg:
+        data = np.load(c.load_binding_dists)
+        d_mean = data['d_mean']
+        d_std = data['d_std']
+        loss_reg = Loss_reg(d_mean,d_std,device=c.device)
+    else:
+        loss_reg = None
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, checkpoint=c.checkpoint, save="{:}/".format(c.result_dir), use_loss_coord=c.use_loss_coord, viz=c.viz, ite=ite_start, loss_reg_fnc=loss_reg)
     torch.save(net, "{:}/network.pt".format(c.result_dir))
+    eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))
     print("Done")

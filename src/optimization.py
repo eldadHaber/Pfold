@@ -3,7 +3,7 @@ import time
 import matplotlib
 
 from src.IO import save_checkpoint
-from src.loss import loss_tr_tuples
+from src.loss import loss_tr_tuples, Loss_reg_min_separation, LossMultiTargets
 from src.utils import move_tuple_to
 from src.visualization import compare_distogram, plotfullprotein
 
@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, save=None, use_loss_coord=True, viz=False):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, save=None, use_loss_coord=True, viz=False, loss_reg_fnc=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -32,18 +32,20 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     t1 = time.time()
     loss_train_d = 0
     loss_train_c = 0
+    loss_train_reg = 0
     loss_train = 0
-
+    loss_reg_min_sep_fnc = Loss_reg_min_separation()
+    # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
     while True:
-        for i,(seq, dists,mask, coords) in enumerate(dataloader_train):
-            seq = seq.to(device, non_blocking=True)
+        for i,(features, dists,mask, coords) in enumerate(dataloader_train):
+            features = features.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
 
             w = ite / max_iter
             optimizer.zero_grad()
-            dists_pred, coords_pred = net(seq,mask)
+            dists_pred, coords_pred = net(features,mask)
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and sigma<0 and use_loss_coord:
@@ -52,6 +54,15 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 loss = (1-w)/2 * loss_d + (w+1)/2 * loss_c
             else:
                 loss = loss_d
+            if coords_pred is not None and loss_reg_fnc:
+                seq = torch.argmax(features[:,0:20,:],dim=1)
+                loss_reg = loss_reg_fnc(seq, coords_pred, mask)
+                loss_train_reg += loss_reg.cpu().detach()
+                loss += loss_reg
+            if coords_pred is not None and loss_reg_min_sep_fnc:
+                loss_reg_min_sep = loss_reg_min_sep_fnc(dists_pred,mask)
+                loss += loss_reg_min_sep
+                loss_train_reg += loss_reg_min_sep.cpu().detach()
 
             loss.backward()
             optimizer.step()
@@ -71,11 +82,12 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     else:
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Dist_err(ang): {:2.2f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, dist_err_ang, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err(ang): {:2.2f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
+                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, dist_err_ang, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train_d = 0
                     loss_train_c = 0
+                    loss_train_reg = 0
                     loss_train = 0
             if (ite + 1) % checkpoint == 0:
                 filename = "{:}checkpoint.pt".format(save)
