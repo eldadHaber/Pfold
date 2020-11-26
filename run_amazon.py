@@ -41,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-binding-dists', default='./binding_distances.npz', type=str, metavar='N', help='Input feature types')
-    parser.add_argument('--load-from-previous', default='./../data/pretrained_networks/checkpoint.pt', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--load-from-previous', default='', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
