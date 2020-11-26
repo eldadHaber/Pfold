@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--i-contact', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--random-crop', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-cross-dist', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--use-loss-coord', default=True, type=bool, metavar='N', help='Input feature types')
+    parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-loss-reg', default=True, type=bool, metavar='N', help='Input feature types')
 
     # Learning
