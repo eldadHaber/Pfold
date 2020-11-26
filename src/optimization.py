@@ -56,11 +56,11 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 loss = loss_d
             if coords_pred is not None and loss_reg_fnc:
                 seq = torch.argmax(features[:,0:20,:],dim=1)
-                loss_reg = loss_reg_fnc(seq, coords_pred, mask)
+                loss_reg = 10 * loss_reg_fnc(seq, coords_pred, mask)
                 loss_train_reg += loss_reg.cpu().detach()
                 loss += loss_reg
             if coords_pred is not None and loss_reg_min_sep_fnc:
-                loss_reg_min_sep = loss_reg_min_sep_fnc(dists_pred,mask)
+                loss_reg_min_sep = 100 * loss_reg_min_sep_fnc(dists_pred,mask)
                 loss += loss_reg_min_sep
                 loss_train_reg += loss_reg_min_sep.cpu().detach()
 
