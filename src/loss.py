@@ -2,7 +2,7 @@ import time
 
 import matplotlib
 
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 
 import torch
 import torch.nn as nn
