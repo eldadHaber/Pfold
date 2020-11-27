@@ -2,7 +2,7 @@ import time
 
 import matplotlib
 
-from src.loss import loss_tr_tuples
+from src.loss import loss_tr_tuples, Loss_reg_min_separation
 from src.utils import move_tuple_to
 from src.visualization import compare_distogram, plotfullprotein
 
@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, use_loss_coord=True,net1d=None):
+def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, use_loss_coord=True,loss_reg_fnc=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -27,27 +27,24 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     '''
     stop_run = False
     net.to(device)
-    if net1d is not None:
-        net1d.to(device)
     t0 = time.time()
     t1 = time.time()
     loss_train_d = 0
     loss_train_c = 0
     loss_train = 0
+    loss_train_reg = 0
+    loss_reg_min_sep_fnc = Loss_reg_min_separation()
 
     while True:
-        for i,(seq, dists,mask, coords) in enumerate(dataloader_train):
-            seq = seq.to(device, non_blocking=True)
+        for i,(features, dists,mask, coords) in enumerate(dataloader_train):
+            features = seq.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
 
             w = ite / max_iter
             optimizer.zero_grad()
-            if net1d is not None:
-                dists_pred, coords_pred = net1d(seq,mask)
-            features_2d = dists_pred[0][:,None,:,:]
-            dists_pred, coords_pred = net(features_2d,mask)
+            dists_pred, coords_pred = net(features,mask)
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and sigma < 0 and use_loss_coord:
@@ -56,6 +53,16 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                 loss = (1-w)/2 * loss_d + (w+1)/2 * loss_c
             else:
                 loss = loss_d
+            if coords_pred is not None and loss_reg_fnc:
+                seq = torch.argmax(features[:,0:20,:],dim=1)
+                loss_reg = 10 * loss_reg_fnc(seq, coords_pred, mask)
+                loss_train_reg += loss_reg.cpu().detach()
+                loss += loss_reg
+            if coords_pred is not None and loss_reg_min_sep_fnc:
+                loss_reg_min_sep = 100 * loss_reg_min_sep_fnc(dists_pred,mask)
+                loss += loss_reg_min_sep
+                loss_train_reg += loss_reg_min_sep.cpu().detach()
+
 
             loss.backward()
             optimizer.step()
@@ -68,7 +75,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=False, use_loss_coord=use_loss_coord, weight=w, net1d=net1d)
+                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=False, use_loss_coord=use_loss_coord, weight=w)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
@@ -81,6 +88,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     loss_train_d = 0
                     loss_train_c = 0
                     loss_train = 0
+                    loss_train_reg = 0
             if (ite + 1) % checkpoint == 0:
                 pass
                 # filename = "{}{}_checkpoint.tar".format(save, ite + 1)
@@ -98,7 +106,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     return net
 
 
-def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=False, use_loss_coord=True, weight=0, net1d=None):
+def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=False, use_loss_coord=True, weight=0):
     '''
     Standard training routine.
     :param net: Network to train
@@ -120,11 +128,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
-            if net1d is not None:
-                dists_pred, coords_pred = net1d(seq,mask)
-            features_2d = dists_pred[0][:,None,:,:]
-            dists_pred, coords_pred = net(features_2d,mask)
-            # dists_pred, coords_pred = net(seq,mask)
+            dists_pred, coords_pred = net(seq,mask)
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
                 loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)

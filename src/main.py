@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 
 from src import log
 from src.dataloader import select_dataset
-from src.loss import MSELoss, LossMultiTargets, EMSELoss
+from src.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg
 from src.network import select_network
 from src.optimization import eval_net, train
 from src.utils import determine_network_param
@@ -67,7 +67,15 @@ def main(c):
     scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
 
-    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, use_loss_coord=c.use_loss_coord,net1d=net1d)
+    if c.use_loss_reg:
+        data = np.load(c.load_binding_dists)
+        d_mean = data['d_mean']
+        d_std = data['d_std']
+        loss_reg = Loss_reg(d_mean, d_std, device=c.device)
+    else:
+        loss_reg = None
+
+    net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, use_loss_coord=c.use_loss_coord,loss_reg_fnc=loss_reg)
     torch.save(net, "{:}/network.pt".format(c.result_dir))
     eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))

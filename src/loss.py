@@ -85,6 +85,71 @@ class EMSELoss(torch.nn.Module):
         return result/nb
 
 
+class Loss_reg(torch.nn.Module):
+    def __init__(self,d_mean,d_std,device='cpu'):
+        super(Loss_reg,self).__init__()
+        A = torch.from_numpy(d_mean)
+        AA = A + A.T
+        AA[torch.arange(AA.shape[0]),torch.arange(AA.shape[0])] /= 2
+        self.d_mean = AA.to(device=device, dtype=torch.float32)
+
+        A = torch.from_numpy(d_std)
+        AA = A + A.T
+        AA[torch.arange(AA.shape[0]),torch.arange(AA.shape[0])] /= 2
+        self.d_std = AA.to(device=device, dtype=torch.float32)
+        return
+
+    def forward(self, seq, coord_pred, mask_padding):
+        #We only want places where the target is larger than zero (remember this is for distances)
+
+        d = torch.squeeze(torch.norm(coord_pred[:, :, 1:] - coord_pred[:, :, :-1], 2, dim=1))
+        d_upper = self.d_mean[seq[:,1:],seq[:,:-1]] + 3 * self.d_std[seq[:,1:],seq[:,:-1]]
+        d_lower = self.d_mean[seq[:,1:],seq[:,:-1]] - 3 * self.d_std[seq[:,1:],seq[:,:-1]]
+
+        m1 = d < d_lower
+        m2 = d > d_upper
+
+        M = (m1 + m2) * mask_padding[:,1:]
+
+        df_u = torch.abs(d - d_upper)
+        df_l = torch.abs(d - d_lower)
+        df_all = torch.stack((df_u,df_l))
+        df = torch.min(df_all,dim=0)[0]
+
+        # loss = torch.mean(torch.norm(df*M,1,dim=1))
+        loss = torch.mean(torch.norm(df*M,1,dim=1)/torch.sum(mask_padding[:,1:],dim=1))
+
+
+        # loss = torch.mean((torch.norm((d-d_reg)*mask_padding[:,1:],1,dim=1)))
+
+        return loss
+
+
+class Loss_reg_min_separation(torch.nn.Module):
+    def __init__(self,d_mean=0.3432,d_std=0.0391):
+        super(Loss_reg_min_separation,self).__init__()
+        self.d = d_mean - 3 * d_std
+        return
+
+    def forward(self, dists, mask_padding):
+        #We only want places where the target is larger than zero (remember this is for distances)
+        M = mask_padding[:,:, None].float() @ mask_padding[:,None,:].float()
+        dists = dists[0]
+        mask_diag = dists > 0
+        mask_relevant = dists < self.d
+        M2 = M * mask_diag * mask_relevant
+        # loss = torch.mean(torch.norm((dists-self.d)*M2,1,dim=(1,2)))
+        loss = torch.mean(torch.norm((dists-self.d)*M2,1,dim=(1,2))/torch.sum(M,dim=(1,2)))
+
+        # d = torch.squeeze(torch.norm(coord_pred[:, :, 1:] - coord_pred[:, :, :-1], 2, dim=1))
+        # d_reg = self.d_mean[seq[:,1:],seq[:,:-1]]
+        # loss = torch.mean((torch.norm((d-d_reg)*mask_padding[:,1:],1,dim=1)))
+
+        return loss
+
+
+
+
 
 def loss_tr(r1,r2, return_coords=False):
     '''

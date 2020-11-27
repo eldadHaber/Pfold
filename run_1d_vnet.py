@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--i-contact', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--random-crop', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
-
+    parser.add_argument('--use-loss-reg', default=True, type=bool, metavar='N', help='Input feature types')
 
     # Learning
     parser.add_argument('--network', default='graph', type=str, metavar='N', help='network to use')
@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=50, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--load-binding-dists', default='./binding_distances.npz', type=str, metavar='N', help='Input feature types')
 
     args = parser.parse_args()
     if args.network.lower() == 'transformer':
