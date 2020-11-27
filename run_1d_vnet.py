@@ -38,7 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=80000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=100, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-binding-dists', default='./binding_distances.npz', type=str, metavar='N', help='Input feature types')

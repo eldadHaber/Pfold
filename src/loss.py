@@ -125,6 +125,39 @@ class Loss_reg(torch.nn.Module):
         return loss
 
 
+
+class Loss_reg_sph(torch.nn.Module):
+    def __init__(self,d_mean,d_std,device='cpu'):
+        super(Loss_reg_sph,self).__init__()
+        A = torch.from_numpy(d_mean)
+        AA = A + A.T
+        AA[torch.arange(AA.shape[0]),torch.arange(AA.shape[0])] /= 2
+        self.d_mean = AA.to(device=device, dtype=torch.float32)
+
+        A = torch.from_numpy(d_std)
+        AA = A + A.T
+        AA[torch.arange(AA.shape[0]),torch.arange(AA.shape[0])] /= 2
+        self.d_std = AA.to(device=device, dtype=torch.float32)
+        return
+
+    def forward(self, seq, dr, mask_padding):
+        #We only want places where the target is larger than zero (remember this is for distances)
+
+        d_limit = 3 * self.d_std[seq[:,1:],seq[:,:-1]]
+        m1 = torch.abs(dr) > d_limit
+        M = m1 * mask_padding[:,1:]
+
+        df = torch.abs(dr) - d_limit
+
+        # loss = torch.mean(torch.norm(df*M,1,dim=1))
+        loss = torch.mean(torch.norm(df*M,1,dim=1)/torch.sum(mask_padding[:,1:],dim=1))
+
+
+        # loss = torch.mean((torch.norm((d-d_reg)*mask_padding[:,1:],1,dim=1)))
+
+        return loss
+
+
 class Loss_reg_min_separation(torch.nn.Module):
     def __init__(self,d_mean=0.3432,d_std=0.0391):
         super(Loss_reg_min_separation,self).__init__()

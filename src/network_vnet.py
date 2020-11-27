@@ -22,13 +22,25 @@ def conv2T(X, Kernel):
 
 class vnet1D(nn.Module):
     """ VNet """
-    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size,cross_dist=False):
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size,cross_dist=False, use_spherical_coords=True):
         super(vnet1D, self).__init__()
         K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=stencil_size)
         self.K = K
         self.W = W
         self.h = 0.1
         self.cross_dist = cross_dist
+        self.use_spherical_coords = use_spherical_coords
+        data = np.load('./binding_distances.npz')
+        A = torch.from_numpy(data['d_mean'])
+        AA = A + A.T
+        AA[torch.arange(AA.shape[0]),torch.arange(AA.shape[0])] /= 2
+        self.d = AA.to(dtype=torch.float32, device='cuda:0')
+
+        A = torch.from_numpy(data['d_std'])
+        AA = A + A.T
+        AA[torch.arange(AA.shape[0]),torch.arange(AA.shape[0])] /= 2
+        self.dd = AA.to(dtype=torch.float32, device='cuda:0')
+
 
     def init_weights(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size = 3):
         K = nn.ParameterList([])
@@ -58,7 +70,7 @@ class vnet1D(nn.Module):
         W = nn.Parameter(1e-2*torch.randn(chan_out, channels, 1))
         return K, W
 
-    def forward(self, x, mask=None):
+    def forward(self, x, mask=None, seq=None):
         if mask is None:
             mask = torch.ones_like(x[:,0,:])
 
@@ -137,6 +149,21 @@ class vnet1D(nn.Module):
                 x = F.relu(z) + xS[n_scales]
 
         x = conv1(x, self.W) * mask
+
+        if self.use_spherical_coords:
+            #Channels are ordered as (dr,theta,phi) (standard spherical coordinates, except we allow theta = [0,4pi], phi = [0,4pi], just to let it be easier (or maybe we allow all angles
+            # We define the first point to be at (0,0,0)
+            dr = x[:,0,:-1]
+            theta = x[:,1,:-1]
+            phi = x[:,2,:-1]
+            xyz = torch.zeros_like(x)
+            xyz[:,0,1:] = (self.d[seq[:,1:],seq[:,:-1]] + self.dd[seq[:,1:],seq[:,:-1]] * dr) * torch.sin(theta) * torch.cos(phi)
+            xyz[:,1,1:] = (self.d[seq[:,1:],seq[:,:-1]] + self.dd[seq[:,1:],seq[:,:-1]] * dr) * torch.sin(theta) * torch.sin(phi)
+            xyz[:,2,1:] = (self.d[seq[:,1:],seq[:,:-1]] + self.dd[seq[:,1:],seq[:,:-1]] * dr) * torch.cos(theta)
+
+            x = torch.cumsum(xyz,dim=2)
+
+
         if self.cross_dist:
             nl = x.shape[-1]
             nc = x.shape[1]//3
@@ -157,7 +184,7 @@ class vnet1D(nn.Module):
             for i in range(x.shape[1]//3):
                 dists += (tr2DistSmall(x[:,i*3:(i+1)*3,:]),)
 
-        return dists, x
+        return dists, x, dr
 
 def masked_instance_norm(x, mask, eps = 1e-5):
     # ins_norm = F.instance_norm(x)
@@ -311,6 +338,8 @@ class vnet2D(nn.Module):
                 x = F.relu(z) + xS[n_scales]
 
         x = conv2(x, self.W) * mm
+
+
 
         # dists = ()
         # for i in range(x.shape[1]//3):

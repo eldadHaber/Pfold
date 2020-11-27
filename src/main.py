@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from src import log
 from src.IO import load_checkpoint
 from src.dataloader import select_dataset
-from src.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg
+from src.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg, Loss_reg_sph
 from src.network import select_network
 from src.optimization import eval_net, train
 from src.utils import determine_network_param
@@ -72,7 +72,7 @@ def main(c):
         data = np.load(c.load_binding_dists)
         d_mean = data['d_mean']
         d_std = data['d_std']
-        loss_reg = Loss_reg(d_mean,d_std,device=c.device)
+        loss_reg = Loss_reg_sph(d_mean,d_std,device=c.device)
     else:
         loss_reg = None
     net = train(net, optimizer, dl_train, loss_fnc, c.LOG, device=c.device, dl_test=dl_test, max_iter=c.max_iter, report_iter=c.report_iter, scheduler=scheduler, sigma=c.sigma, checkpoint=c.checkpoint, save="{:}/".format(c.result_dir), use_loss_coord=c.use_loss_coord, viz=c.viz, ite=ite_start, loss_reg_fnc=loss_reg)

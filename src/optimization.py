@@ -42,10 +42,11 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
+            seq = torch.argmax(features[:, 0:20, :], dim=1)
 
             w = ite / max_iter
             optimizer.zero_grad()
-            dists_pred, coords_pred = net(features,mask)
+            dists_pred, coords_pred, dr = net(features,mask, seq)
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and sigma<0 and use_loss_coord:
@@ -55,8 +56,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             else:
                 loss = loss_d
             if coords_pred is not None and loss_reg_fnc:
-                seq = torch.argmax(features[:,0:20,:],dim=1)
-                loss_reg = 10 * loss_reg_fnc(seq, coords_pred, mask)
+                loss_reg = 10 * loss_reg_fnc(seq, dr, mask)
                 loss_train_reg += loss_reg.cpu().detach()
                 loss += loss_reg
             if coords_pred is not None and loss_reg_min_sep_fnc:
@@ -122,12 +122,13 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
     with torch.no_grad():
         loss_v = 0
         dist_err_angstrom = 0
-        for i,(seq, dists,mask, coords) in enumerate(dl):
-            seq = seq.to(device, non_blocking=True)
+        for i,(features, dists,mask, coords) in enumerate(dl):
+            features = features.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
-            dists_pred, coords_pred = net(seq,mask)
+            seq = torch.argmax(features[:, 0:20, :], dim=1)
+            dists_pred, coords_pred, dr = net(features,mask,seq)
 
             dist_nn = torch.norm(coords_pred[:,:,1:]-coords_pred[:,:,:-1],2,dim=1)
             dist_nn_truth = torch.norm(coords[0][:,:,1:]-coords[0][:,:,:-1],2,dim=1)
