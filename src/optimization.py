@@ -170,7 +170,7 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
     net.eval()
     with torch.no_grad():
         loss_v = 0
-        dist_err_angstrom = 0
+        dist_err_mean = 0
         for i,(seq, dists,mask, coords) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
@@ -178,15 +178,17 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
             dists_pred, coords_pred = net(seq,mask)
             _, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
-            dist_err_angstrom += torch.sum(torch.sqrt(torch.mean((dists_pred[0] - dists[0]) ** 2, dim=(1, 2))) * 10)
+            M = dists[0] != 0
+            dist_err = torch.sum(torch.sqrt(torch.mean(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))) * 10)
+            dist_err_mean += dist_err
             if save_results:
-                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i))
-                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i))
+                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i), error=dist_err)
+                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i), error=dist_err)
         if plot_results :
             compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
             plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
-        dist_err_angstrom /= len(dl.dataset)
-        print("Average distogram error in angstrom = {:2.2f}".format(dist_err_angstrom))
+        dist_err_mean /= len(dl.dataset)
+        print("Average distogram error in angstrom = {:2.2f}".format(dist_err_mean))
     net.train()
     return
 

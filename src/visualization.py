@@ -7,7 +7,7 @@ import torch
 # from scipy.special import softmax
 # from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_results=False, save_results=False):
+def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_results=False, save_results=False, error=''):
 
     plt.figure(num=1, figsize=[15, 10])
     plt.clf()
@@ -43,7 +43,7 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
 
             plt.imshow(output, vmin=0, vmax=vmax)
             plt.colorbar()
-            tit = name + "(prediction)"
+            tit = name + "(prediction) {:2.2f} Å".format(error)
             plt.title(tit)
 
             if highlight is not None:
@@ -80,7 +80,7 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
     return
 
 
-def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False):
+def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False, error=None):
     nb = ps[0].shape[0]
     if save_results:
         indices = range(nb)
@@ -103,6 +103,8 @@ def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False
         if highlight is not None:
             idxs = torch.where(highlight)[0]
             target_h, = axes.plot3D(t1[idx, 0, idxs], t1[idx, 1, idxs], t1[idx, 2, idxs], 'black', marker='x')
+        if error is not None:
+            plt.title("Error {:2.2f} Å".format(error))
 
         if len(ts) > 1: # If we have more than the backbone, we add those atoms to the protein as well
             t2 = ts[1]
