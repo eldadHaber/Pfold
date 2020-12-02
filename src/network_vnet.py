@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.network_transformer import tr2DistSmall
+from src.network_transformer import tr2DistSmall, tr2DistSmall_with_std
 
 
 def conv2(X, Kernel):
@@ -154,8 +154,8 @@ class vnet1D(nn.Module):
 
         else:
             dists = ()
-            for i in range(x.shape[1]//3):
-                dists += (tr2DistSmall(x[:,i*3:(i+1)*3,:]),)
+            for i in range(x.shape[1]//6):
+                dists += (tr2DistSmall_with_std(x[:,i*6:(i+1)*6,:]),)
 
         return dists, x
 

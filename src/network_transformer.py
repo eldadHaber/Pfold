@@ -61,7 +61,7 @@ class TransformerModel(nn.Module):
 
         dists = ()
         for i in range(output.shape[1]//3):
-            dists += (tr2DistSmall(output[:,i:i+3,:]),)
+            dists += (tr2DistSmall(x[:, i * 3:(i + 1) * 3, :]),)
 
         return dists, output
 
@@ -108,3 +108,10 @@ def tr2DistSmall(Y):
     D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
     return torch.sqrt(torch.relu(D))
 
+def tr2DistSmall_with_std(Y):
+    k = Y.shape[1]
+    Z = Y - torch.mean(Y, dim=2, keepdim=True)
+    D = torch.sum(Z**2, dim=1).unsqueeze(1) + torch.sum(Z**2, dim=1).unsqueeze(2) - 2*Z.transpose(1,2) @ Z
+    D = 3*D/k
+    D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
+    return torch.sqrt(torch.relu(D))

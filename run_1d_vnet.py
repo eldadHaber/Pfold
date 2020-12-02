@@ -60,7 +60,7 @@ if __name__ == '__main__':
         'nblocks': 4,
         'nlayers_pr_block': 5,
         'channels': 280,
-        'chan_out': 3,
+        'chan_out': 6,
         'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':

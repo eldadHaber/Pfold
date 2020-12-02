@@ -101,7 +101,7 @@ class gNNC(nn.Module):
 
         dists = ()
         for i in range(Z.shape[1]//3):
-            dists += (tr2DistSmall(Z[:,i:i+3,:]),)
+            dists += (tr2DistSmall(x[:, i * 3:(i + 1) * 3, :]),)
 
         return dists, Z
 
