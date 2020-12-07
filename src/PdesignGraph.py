@@ -21,23 +21,29 @@ S     = torch.load('../../../data/casp12Testing/Seqtest.pt')
 def getIterData(S,Yobs,MSK,i):
     Seq = S[i].t()
     n = Seq.shape[1]
-    Xtrue = Yobs[i][0, 0, :n, :n]
-    M = MSK[i]
-    M = torch.ger(M[:n], M[:n])
-    X0 = torch.zeros(3, n)
-    X0[0, :] = torch.linspace(0, 1, n)
+    M = MSK[i][:n]
 
-    # initialization
-    Z = torch.zeros(23, n)
-    Z[:20, :] = 0.5*Seq
-    Z[20:, :] = X0
-    return Z, Xtrue, M
+    X = Yobs[i][0, 0, :n, :n]
+    X = utils.linearInterp1D(X,M)
+    X = torch.tensor(X)
+    #D = torch.sum(torch.pow(X,2), dim=0, keepdim=True) + torch.sum(torch.pow(X,2), dim=0, keepdim=True).t() - 2*X.t()@X
+    #D = 0.5*(D+D.t())
+    #mm = torch.diag(M)
+    #D  = mm @ D @ mm
+    U, Lam, V = torch.svd(X)
+
+    #C = torch.zeros(10,n)
+    #C[:5,:] = torch.diag(torch.sqrt(Lam[:5]))@U[:,:5].t()
+    #C[5:,:] = torch.diag(torch.sqrt(Lam[:5]))@V[:, :5].t()
+    Coords = torch.diag(Lam)@V.t()
+    Coords = Coords.type('torch.FloatTensor')
+    return Seq, Coords, M
 
 
-nstart = 20
+nstart = 3
 nopen = 32*2
 nhid  = 64*2
-nclose = 3
+nclose = 20
 nlayers = 72
 h       = 1/nlayers
 Arch = [nstart, nopen, nhid, nclose, nlayers]
@@ -59,9 +65,8 @@ optimizer = optim.Adam([{'params': model.Kopen, 'lr': lrO},
 alossBest = 1e6
 ndata = len(S)-1
 epochs = 500
-sig = 0.2
 
-ndata = 2
+ndata = 40
 bestModel = model
 hist = torch.zeros(epochs)
 for j in range(epochs):
@@ -69,44 +74,37 @@ for j in range(epochs):
     aloss = 0
     for i in range(1,ndata):
 
-        Z, Xtrue, M = getIterData(S, Yobs, MSK, i)
-
+        Z, Coords, M = getIterData(S, Yobs, MSK, i)
         optimizer.zero_grad()
-        Zout = model(Z, recompute_graph=True)
-
-        D = torch.exp(-utils.getDistMat(Zout)/sig)
-        Dt = torch.exp(-utils.getDistMat(Xtrue)/sig)
-        loss = torch.norm(M*Dt-M*D)**2/torch.norm(M*Dt)**2
+        Zout = model(Coords)
+        #print('network output norm ',Zout.norm().detach().item())
+        onehotZ = torch.argmax(Z, dim=0)
+        wloss = torch.zeros(20)
+        for kk in range(20):
+            wloss[kk] = torch.sum(onehotZ==kk)
+        wloss = 1.0/(wloss+1.0)
+        misfit = F.cross_entropy(Zout.t(), onehotZ,wloss)
+        R    = model.graphNNreg()
+        loss = misfit + 0.5*R
         loss.backward(retain_graph=True)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
-        aloss += torch.sqrt(loss).detach()
+        aloss += loss.detach()
         optimizer.step()
-        print(i, '   ', j, '     ', torch.sqrt(loss).item())
+        print(j,'.',i,'   ', misfit.item(),'   ',R.item(),'   ',
+                model.W.grad.norm().item(),'   ',
+                model.Kopen.grad.norm().item(),'   ',
+                model.Kclose.grad.norm().item(),'   ',
+                model.Bias.grad.norm().item())
     if aloss < alossBest:
         alossBest = aloss
         bestModel = model
 
     # Validation on 0-th data
     with torch.no_grad():
-        Z, Xtrue, M = getIterData(S, Yobs, MSK, 0)
-        Zout = model(Z)
-        D = torch.exp(-utils.getDistMat(Zout) / sig)
-        Dt = torch.exp(-utils.getDistMat(Xtrue) / sig)
-        lossV = torch.norm(M*Dt - M*D)**2 / torch.norm(M * Dt)**2
-
-    print('==== Epoch =======',j, '        ', (aloss).item()/(ndata),'   ',lossV.item())
+        Z, Coords, M = getIterData(S, Yobs, MSK, 0)
+        onehotZ = torch.argmax(Z, dim=0)
+        Zout = model(Coords)
+        lossV = F.cross_entropy(Zout.t(), onehotZ)
+    print('==== Epoch =======',j, '        ', (aloss).item()/(ndata-1),'   ',lossV.item())
     hist[j] = (aloss).item()/(ndata)
 
-Z, Xtrue, M = getIterData(S, Yobs, MSK, 1)
-Zout = model(Z,sig)
-D    = torch.exp(-utils.getDistMat(Zout)/sig)
-Dt   = torch.exp(-utils.getDistMat(Xtrue)/sig)
-
-print('loss = ', alossBest.item()/(ndata))
-plt.figure(1)
-plt.subplot(1,2,1)
-plt.imshow(D.detach())
-plt.subplot(1,2,2)
-plt.imshow(M*Dt)
-plt.figure(2)
-plt.plot(hist)

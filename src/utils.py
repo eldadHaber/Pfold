@@ -1,12 +1,14 @@
 import numpy as np
 import scipy
 # import scipy.spatial
+from scipy import interpolate
 import string
 import random
 import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 class list2np(object):
     def __init__(self):
@@ -207,6 +209,33 @@ def orgProtData(x,normals,s, msk, sigma=1.0):
     # NN = NN[:, mm > 0]
     return XX, NN
 
+def getAdjMatrix(X,st=13):
+    # normalize the data
+    X = X - torch.mean(X, dim=1, keepdim=True)
+    X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True)/X.shape[1] + 1e-4)
+    W = getDistMat(X)
+    for jj in range(W.shape[0]):
+        wj = W[jj, :]
+        ws, id = torch.sort(wj,descending=False)
+        idb = id[:st]
+        wjs = wj*0
+        wjs[idb] = wj[idb]*0+1
+        W[jj,:] = wjs
+    W = (W+W.t())/2.0
+    W[W!=0] = 1.0
+    return W
+
+def getGraphLapBin(X,st=13):
+    W = getAdjMatrix(X, st=st)
+    D = torch.diag(torch.sum(W, dim=0))
+    L = D - W
+    #Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
+    #L = Dh @ L @ Dh
+
+    L = 0.5 * (L + L.t())
+
+    return L, W
+
 def getGraphLap(X,sig=0.2):
 
     # normalize the data
@@ -220,11 +249,34 @@ def getGraphLap(X,sig=0.2):
     D = torch.diag(torch.sum(W, dim=0))
     L = D - W
     Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
-    L = Dh * L * Dh
+    L = Dh @ L @ Dh
 
     L = 0.5 * (L + L.t())
 
     return L, W
+
+def getGraphLapFromSVD(X,sig=0.2,st=9):
+
+    W = torch.abs(X[:5,:].t()@X[5:,:])
+    W = torch.exp(-W/sig/W.max())
+    for jj in range(W.shape[0]):
+        wj = W[jj, :]
+        ws, id = torch.sort(wj,descending=True)
+        idb = id[:st]
+        wjs = wj*0
+        wjs[idb] = wj[idb]*0+1
+        W[jj,:] = wjs
+    W = (W+W.t())/2.0
+    W[W!=0] = 1.0
+    D = torch.diag(torch.sum(W, dim=0))
+    L = D - W
+    #Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
+    #L = Dh @ L @ Dh
+
+    L = 0.5 * (L + L.t())
+
+    return L, W
+
 
 def randsvd(A,k):
 
@@ -251,3 +303,13 @@ def cheby(K,L,Z):
         T0 = T1.clone()
         T1 = T2.clone()
     return A
+
+def linearInterp1D(X,M):
+    n  = X.shape[1]
+    ti = np.arange(0,n)
+    t  = ti[M!=0]
+    f = interpolate.interp1d(t, X[:,M!=0], kind='slinear', axis=-1, copy=True, bounds_error=None,
+                             fill_value='extrapolate')
+    Xnew = f(ti)
+
+    return Xnew

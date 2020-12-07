@@ -53,7 +53,7 @@ iters = 50
 hist = []
 model.train() # Turn on the train mode
 for itr in range(iters):
-    idx = torch.randint(4,5,(1,))
+    idx = 0 #torch.randint(4,5,(1,))
     # Arrange the data for a convolution
     Z  = S[idx].transpose(1,2)
     no = Z.shape[2]
