@@ -76,11 +76,11 @@ class Dataset_npz(data.Dataset):
 
     def __getitem__(self, index):
         data = np.load(self.files[index])
-        if self.chan_out == 6:
+        if self.chan_out == 3:
             coords = (data['r1'],)
-        elif self.chan_out == 12:
+        elif self.chan_out == 6:
             coords = (data['r1'], data['r2'],)
-        elif self.chan_out == 18:
+        elif self.chan_out == 9:
             coords = (data['r1'], data['r2'], data['r3'],)
         else:
             raise NotImplementedError("The number of channels out is not supported.")

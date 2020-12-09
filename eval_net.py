@@ -18,8 +18,8 @@ np.set_printoptions(linewidth=desired_width)
 
 
 if __name__ == '__main__':
-    network_path = 'D:/Pytorch/2020-11-26_17_32_57/checkpoint.pt'
-    dataset = './data/casp11_test_FM/'
+    network_path = 'D:/Pytorch/Pfold/pretrained_networks/network_11_26_17_32_57.pt'
+    dataset = './data/casp11_test_TBM/'
     dataset_out = './results/figures/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -56,12 +56,12 @@ if __name__ == '__main__':
 
 
     # Load network and set it in evaluate mode
-    # net = torch.load(network_path)
-    net = select_network(network,network_args,feature_dim,cross_dist=False)
+    net = torch.load(network_path)
+    # net = select_network(network,network_args,feature_dim,cross_dist=False)
     optimizer = optim.Adam(list(net.parameters()), lr=1e-2)
     scheduler = OneCycleLR(optimizer, 1e-2, total_steps=2000000, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
-    net, optimizer, scheduler, ite_start = load_checkpoint(net, optimizer, scheduler, network_path)
+    # net, optimizer, scheduler, ite_start = load_checkpoint(net, optimizer, scheduler, network_path)
 
 
     net.eval()
