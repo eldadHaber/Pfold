@@ -12,8 +12,8 @@ if __name__ == '__main__':
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     parser.add_argument('--viz', default=False, type=bool, metavar='N', help='Mode to run in (debug,fast,paper)')
     # data
-    parser.add_argument('--dataset-train', default='./../data/casp11_training_90/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./../data/casp11_validation/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/casp11_validation/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/casp11_test_TBM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
@@ -60,8 +60,8 @@ if __name__ == '__main__':
     elif args.network.lower() == 'vnet':
 
         args.network_args = {
-        'nblocks': 4,
-        'nlayers_pr_block': 5,
+        'nblocks': 2,
+        'nlayers_pr_block': 3,
         'channels': 280,
         'chan_out': 21,
         'stencil_size': 3,

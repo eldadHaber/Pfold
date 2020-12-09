@@ -34,7 +34,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     loss_train_entropy = 0
     loss_train = 0
     logsoft = torch.nn.LogSoftmax(dim=1)
-    KLloss = torch.nn.KLDivLoss(reduction='batchmean')
+    KLloss = torch.nn.KLDivLoss(reduction='none')
     while True:
         for i,(features, pssm, mask, entropy) in enumerate(dataloader_train):
             features = features.to(device, non_blocking=True)
@@ -44,7 +44,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
 
             optimizer.zero_grad()
             pssm_pred, entropy_pred = net(features,mask)
-            loss_pssm = KLloss(logsoft(pssm_pred),pssm) / torch.sum(mask,dim=1)
+            loss_pssm = torch.mean(torch.sum(KLloss(logsoft(pssm_pred),pssm),dim=(1,2)) / torch.sum(mask,dim=1))
 
             loss_entropy = torch.mean(torch.norm(entropy - entropy_pred,dim=1))
 
