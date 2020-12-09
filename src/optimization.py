@@ -36,6 +36,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     loss_train = 0
     loss_reg_min_sep_fnc = Loss_reg_min_separation()
     # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
+    best_v_loss = 9e9
     while True:
         for i,(features, dists,mask, coords) in enumerate(dataloader_train):
             features = features.to(device, non_blocking=True)
@@ -89,6 +90,11 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     loss_train_c = 0
                     loss_train_reg = 0
                     loss_train = 0
+                    if loss_v < best_v_loss:
+                        filename = "{:}best_model_state.pt".format(save)
+                        save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
+                        torch.save(net, "{:}best_model.pt".format(save))
+                        best_v_loss = loss_v
             if (ite + 1) % checkpoint == 0:
                 filename = "{:}checkpoint.pt".format(save)
                 save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
@@ -171,6 +177,7 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
     with torch.no_grad():
         loss_v = 0
         dist_err_mean = 0
+        dist_err_mean_alq = 0
         for i,(seq, dists,mask, coords) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
@@ -179,8 +186,15 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
             dists_pred, coords_pred = net(seq,mask)
             _, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
             M = dists[0] != 0
-            dist_err = torch.sum(torch.sqrt(torch.mean(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))) * 10)
+            # dist_err = torch.sum(torch.sqrt(torch.mean(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))) * 10)
+            # dist_err_mean += dist_err
+            L = torch.sum(mask)
+            dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
             dist_err_mean += dist_err
+
+            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*(L-1))) * 10)
+            dist_err_mean_alq += dist_err_alq
+
             if save_results:
                 compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i), error=dist_err)
                 plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i), error=dist_err)
@@ -188,7 +202,9 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
             compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
             plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
         dist_err_mean /= len(dl.dataset)
+        dist_err_mean_alq /= len(dl.dataset)
         print("Average distogram error in angstrom = {:2.2f}".format(dist_err_mean))
+        print("Average distogram error in angstrom according to Alq = {:2.2f}".format(dist_err_mean_alq))
     net.train()
     return
 
