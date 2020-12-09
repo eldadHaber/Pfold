@@ -30,43 +30,31 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     net.to(device)
     t0 = time.time()
     t1 = time.time()
-    loss_train_d = 0
-    loss_train_c = 0
-    loss_train_reg = 0
+    loss_train_pssm = 0
+    loss_train_entropy = 0
     loss_train = 0
-    loss_reg_min_sep_fnc = Loss_reg_min_separation()
-    # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
+    logsoft = torch.nn.LogSoftmax(dim=1)
+    KLloss = torch.nn.KLDivLoss(reduction='batchmean')
     while True:
-        for i,(features, dists,mask, coords) in enumerate(dataloader_train):
+        for i,(features, pssm, mask, entropy) in enumerate(dataloader_train):
             features = features.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
-            dists = move_tuple_to(dists, device, non_blocking=True)
-            coords = move_tuple_to(coords, device, non_blocking=True)
+            pssm = pssm.to(device, non_blocking=True)
+            entropy = entropy.to(device, non_blocking=True)
 
-            w = ite / max_iter
             optimizer.zero_grad()
-            dists_pred, coords_pred = net(features,mask)
+            pssm_pred, entropy_pred = net(features,mask)
+            loss_pssm = KLloss(logsoft(pssm_pred),pssm) / torch.sum(mask,dim=1)
 
-            loss_d = loss_fnc(dists_pred, dists)
-            if coords_pred is not None and sigma<0 and use_loss_coord:
-                loss_c = loss_tr_tuples(coords_pred, coords)
-                loss_train_c += loss_c.cpu().detach()
-                loss = (1-w)/2 * loss_d + (w+1)/2 * loss_c
-            else:
-                loss = loss_d
-            if coords_pred is not None and loss_reg_fnc:
-                seq = torch.argmax(features[:,0:20,:],dim=1)
-                loss_reg = 10 * loss_reg_fnc(seq, coords_pred, mask)
-                loss_train_reg += loss_reg.cpu().detach()
-                loss += loss_reg
-            if coords_pred is not None and loss_reg_min_sep_fnc:
-                loss_reg_min_sep = 100 * loss_reg_min_sep_fnc(dists_pred,mask)
-                loss += loss_reg_min_sep
-                loss_train_reg += loss_reg_min_sep.cpu().detach()
+            loss_entropy = torch.mean(torch.norm(entropy - entropy_pred,dim=1))
+
+            loss = loss_pssm + loss_entropy
 
             loss.backward()
             optimizer.step()
-            loss_train_d += loss_d.cpu().detach()
+            loss_train_pssm += loss_pssm.cpu().detach()
+            loss_train_entropy += loss_entropy.cpu().detach()
+
             loss_train += loss.cpu().detach()
 
             if scheduler is not None:
@@ -75,19 +63,18 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord, weight=w)
+                    loss_v = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
                     else:
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err(ang): {:2.2f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, dist_err_ang, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{:6d}/{:6d}  Loss(training): {:6.4f}  Loss(test): {:6.4f}  Loss(pssm): {:6.4f}  Loss(entropy): {:6.4f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
+                            ite + 1,int(max_iter), loss_train/report_iter, loss_v, loss_train_pssm/report_iter, loss_train_entropy/report_iter, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
-                    loss_train_d = 0
-                    loss_train_c = 0
-                    loss_train_reg = 0
+                    loss_train_pssm = 0
+                    loss_train_entropy = 0
                     loss_train = 0
             if (ite + 1) % checkpoint == 0:
                 filename = "{:}checkpoint.pt".format(save)
@@ -121,35 +108,24 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
     net.eval()
     with torch.no_grad():
         loss_v = 0
-        dist_err_angstrom = 0
-        for i,(seq, dists,mask, coords) in enumerate(dl):
-            seq = seq.to(device, non_blocking=True)
-            dists = move_tuple_to(dists, device, non_blocking=True)
-            coords = move_tuple_to(coords, device, non_blocking=True)
-            mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
-            dists_pred, coords_pred = net(seq,mask)
+        for i,(features, pssm, mask, entropy) in enumerate(dl):
+            features = features.to(device, non_blocking=True)
+            mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
+            pssm = pssm.to(device, non_blocking=True)
+            entropy = entropy.to(device, non_blocking=True)
 
-            dist_nn = torch.norm(coords_pred[:,:,1:]-coords_pred[:,:,:-1],2,dim=1)
-            dist_nn_truth = torch.norm(coords[0][:,:,1:]-coords[0][:,:,:-1],2,dim=1)
+            pssm_pred, entropy_pred = net(features,mask)
 
-            loss_d = loss_fnc(dists_pred, dists)
-            if coords_pred is not None and use_loss_coord:
-                loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
-                loss = (1 - weight) / 2 * loss_d + (weight + 1) / 2 * loss_c
-            else:
-                loss = loss_d
+            loss_pssm = torch.mean(torch.sum(torch.norm(pssm - pssm_pred,dim=1),dim=-1))
+
+            loss_entropy = torch.mean(torch.sum(torch.norm(entropy - entropy_pred,dim=1),dim=-1))
+
+            loss = loss_pssm + loss_entropy
+
             loss_v += loss
 
-            dist_err_angstrom += torch.sum(torch.sqrt(torch.mean((dists_pred[0] - dists[0])**2,dim=(1,2)))*10)
-
-            if save_results:
-                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i))
-                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i))
-        if plot_results :
-            compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
-            plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
     net.train()
-    return loss_v/len(dl), dist_err_angstrom/len(dl.dataset)
+    return loss_v/len(dl)
 
 
 

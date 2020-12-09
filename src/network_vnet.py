@@ -137,27 +137,13 @@ class vnet1D(nn.Module):
                 x = F.relu(z) + xS[n_scales]
 
         x = conv1(x, self.W) * mask
-        if self.cross_dist:
-            nl = x.shape[-1]
-            nc = x.shape[1]//3
-            x_long = torch.empty_like(x)
-            x_long = x_long.reshape((x.shape[0],3,-1))
-            for i in range(x.shape[1]//3):
-                x_long[:,:,i*nl:(i+1)*nl] = x[:,i*3:(i+1)*3,:]
-            dist_long = tr2DistSmall(x_long)
-            dists = ()
-            for i in range(nc):
-                for j in range(nc):
-                    dists += (dist_long[:,i*nl:(i+1)*nl,j*nl:(j+1)*nl],)
 
+        pssm = x[:,:20,:]
+        # pssm = torch.softmax(pssm,dim=1) * mask
+        entropy = x[:,20:,:]
+        entropy = torch.tanh(torch.abs(entropy)) * mask
 
-
-        else:
-            dists = ()
-            for i in range(x.shape[1]//6):
-                dists += (tr2DistSmall_with_std(x[:,i*6:(i+1)*6,:]),)
-
-        return dists, x
+        return pssm, entropy
 
 def masked_instance_norm(x, mask, eps = 1e-5):
     # ins_norm = F.instance_norm(x)

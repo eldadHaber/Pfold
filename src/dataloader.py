@@ -81,13 +81,11 @@ class PadCollate:
         max_len = max(map(lambda x: x[0].shape[self.dim], batch))
         max_len = int(self.pad_mod * np.ceil(max_len / self.pad_mod))
 
-        distances = ()
-        nt = len(batch[0][1]) # Number of distograms
-        tt = torch.empty((nt,nb,max_len,max_len),dtype=torch.float32)
+        pssms = ()
+        tt = torch.zeros((1,nb,20,max_len),dtype=torch.float32) #pssms
 
-        coords = ()
-        nc = len(batch[0][2]) # Number of coordinates
-        cc = torch.empty((nc,nb,3,max_len),dtype=torch.float32)
+        entropies = ()
+        cc = torch.zeros((1,nb,1,max_len),dtype=torch.float32)
 
         features = torch.empty((nb,nf,max_len),dtype=torch.float32)
         masks = torch.ones((nb, max_len), dtype=torch.int64)
@@ -98,24 +96,20 @@ class PadCollate:
             pad_size[self.dim] = max_len - pad_size[self.dim]
             features[i,:,:] = torch.cat([torch.from_numpy(feature.copy()), torch.zeros(*pad_size)],dim=self.dim)
 
-            for j in range(nt):
-                distance = batchi[1][j]
-                pad_size = list(distance.shape)
-                pad_size[0] = max_len - pad_size[0]
-                tt[j,i,:,:] = torch.cat([torch.cat([torch.from_numpy(distance), torch.zeros(*pad_size)],dim=0),torch.zeros((max_len,pad_size[0]))],dim=1)
+            pssm = torch.from_numpy(batchi[1].copy())
+            pssm_len = pssm.shape[-1]
+            tt[0,i,:,:pssm_len] = pssm
 
-            for j in range(nc):
-                coord = torch.from_numpy(batchi[2][j].copy())
-                pad_size = list(coord.shape)
-                pad_size[1] = max_len - pad_size[1]
-                cc[j,i,:,:] = torch.cat([coord, torch.zeros(*pad_size)], dim=1)
+            entropy = torch.from_numpy(batchi[2].copy())
+            entropy_len = entropy.shape[-1]
+            cc[0,i,:,:entropy_len] = entropy
 
             masks[i,feature.shape[self.dim]:] = 0
-        for i in range(nt):
-            distances += (tt[i,:,:,:],)
-        for i in range(nc):
-            coords += (cc[i,:,:,:],)
-        return features, distances, masks, coords
+        for i in range(1):
+            pssms = tt[i,:,:,:]
+        for i in range(1):
+            entropies = cc[i,:,:,:]
+        return features, pssms, masks, entropies
 
 
 

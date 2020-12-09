@@ -82,6 +82,9 @@ class Dataset_npz(data.Dataset):
             coords = (data['r1'], data['r2'],)
         elif self.chan_out == 18:
             coords = (data['r1'], data['r2'], data['r3'],)
+        elif self.chan_out == 21:
+            pssm = data['pssm']
+            entropy = data['entropy']
         else:
             raise NotImplementedError("The number of channels out is not supported.")
 
@@ -114,28 +117,10 @@ class Dataset_npz(data.Dataset):
 
         self.Flip.reroll()
         features = self.Flip(features)
-        coords = self.Flip(coords)
+        pssm = self.Flip(pssm)
+        entropy = self.Flip(entropy)
 
-        if self.use_cross_dist: # In this case, we put all the coordinates into one long coordinate array.
-            nc = len(coords)
-            nl = coords[0].shape[1]
-            coord_long = (np.concatenate(coords, axis=1),)
-            dist_long = self.coord_to_dist(coord_long)
-            distances = ()
-            for i in range(nc):
-                for j in range(nc):
-                    distances += (dist_long[0][i*nl:(i+1)*nl,j*nl:(j+1)*nl],)
-        else:
-            distances = self.coord_to_dist(coords)
-
-        if self.feature_dim == 2 and self.use_crop:
-            # Random 64x64 crop of the data
-            self.crop.randomize(features.shape[-1])
-            features = self.crop(features)
-            distances = self.crop(distances)
-            coords = (coords[0][:,0:64],) # Note that the coordinates are useless in the 2D case!
-
-        return features, distances, coords
+        return features, pssm, entropy
 
     def __len__(self):
         return len(self.files)

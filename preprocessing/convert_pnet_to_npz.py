@@ -4,12 +4,12 @@ import numpy as np
 from src.dataloader_pnet import parse_pnet
 
 if __name__ == '__main__':
-    # pnetfile = './../data/casp11/training_90.pnet'
-    # output_folder = './../data/casp11_training_90/'
+    pnetfile = './../data/casp11/training_90.pnet'
+    output_folder = './../data/casp11_training_90/'
     # pnetfile = './../data/casp11/testing.pnet'
     # output_folder = './../data/casp11_testing/'
-    pnetfile = './../data/casp11/validation.pnet'
-    output_folder = './../data/casp11_validation/'
+    # pnetfile = './../data/casp11/validation.pnet'
+    # output_folder = './../data/casp11_validation/'
 
     os.makedirs(output_folder, exist_ok=True)
     args = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=1000, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=False, use_coord=True)
