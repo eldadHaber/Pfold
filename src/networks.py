@@ -460,12 +460,12 @@ class graphNN(nn.Module):
         nlayers = A[4]
 
         Kopen = torch.zeros(nopen, nstart)
-        stdv = 1e-4 * Kopen.shape[0]/Kopen.shape[1]
+        stdv = 1e-2 * Kopen.shape[0]/Kopen.shape[1]
         Kopen.data.uniform_(-stdv, stdv)
         Kopen = nn.Parameter(Kopen)
 
         Kclose = torch.zeros(nclose, nopen)
-        stdv = 1e-4 * Kclose.shape[0] / Kclose.shape[1]
+        stdv = 1e-2 * Kclose.shape[0] / Kclose.shape[1]
         Kclose.data.uniform_(-stdv, stdv)
         Kclose = nn.Parameter(Kclose)
 
@@ -473,7 +473,7 @@ class graphNN(nn.Module):
         W = torch.rand(nlayers, 3, nhid, nopen, 1)*stdv
         W = nn.Parameter(W)
 
-        Bias = torch.rand(nlayers,3,nopen)*1e-3
+        Bias = torch.rand(nlayers,3,nopen)*1e-4
         Bias = nn.Parameter(Bias)
 
         return Kopen, Kclose, W, Bias
@@ -524,23 +524,24 @@ class graphNN(nn.Module):
         l = self.W.shape[0]
 
         # Compute the graph
-        L, D = utils.getGraphLapBin(Z,st=19)
+        L, D = utils.getGraphLap(Z)
         # opening layer
         Z = torch.tanh(self.Kclose.t()@Z)
+        #Z = self.Kclose.t()@Z
         Zold = Z
 
         for i in reversed(range(l)):
             if recompute_graph:
-                L, D = utils.getGraphLapBin(Z, st=19)
+                L, D = utils.getGraphLap(Z)
             Wi = self.W[i]
             Bi = self.Bias[i].unsqueeze(2)
+            #print(Z.norm())
             # Layer
             Ai0 = conv1((Z +   Bi[0]).unsqueeze(0),   Wi[0]).squeeze(0)
             Ai1 = (conv1((Z +  Bi[1]).unsqueeze(0),  Wi[1]).squeeze(0) )@L
             Ai2 = ((conv1((Z + Bi[2]).unsqueeze(0), Wi[2]).squeeze(0) )@L)@L.t()
             Ai = Ai0 + Ai1 + Ai2
-            #Ai = Ai - Ai.mean(dim=0, keepdim=True)
-            #Ai = Ai/torch.sqrt(torch.sum(Ai ** 2, dim=0, keepdim=True) + 1e-3)
+
             Ai = F.instance_norm(Ai.unsqueeze(0)).squeeze(0)
             Ai = torch.relu(Ai)
 
@@ -579,10 +580,11 @@ class hyperNet(nn.Module):
 
     def __init__(self, Arch):
         super(hyperNet, self).__init__()
-        Kopen, Kclose, W = self.init_weights(Arch)
+        Kopen, Kclose, W, Bias = self.init_weights(Arch)
         self.Kopen  = Kopen
         self.Kclose = Kclose
         self.W = W
+        self.Bias = Bias
         self.h = 0.1
 
     def init_weights(self,A):
@@ -595,46 +597,103 @@ class hyperNet(nn.Module):
         nlayers = A[4]
 
         Kopen = torch.zeros(nopen, nstart)
-        stdv = 1e-2 * Kopen.shape[0]/Kopen.shape[1]
+        stdv = 1e-3 * Kopen.shape[0]/Kopen.shape[1]
         Kopen.data.uniform_(-stdv, stdv)
         Kopen = nn.Parameter(Kopen)
 
         Kclose = torch.zeros(nclose, nopen)
-        stdv = 1e-2 * Kclose.shape[0] / Kclose.shape[1]
+        stdv = 1e-3 * Kclose.shape[0] / Kclose.shape[1]
         Kclose.data.uniform_(-stdv, stdv)
         Kclose = nn.Parameter(Kclose)
 
-        W = torch.zeros(nlayers, nhid, nopen, 9)
+        W = torch.zeros(nlayers, 2, nhid, nopen, 9)
         stdv = 1e-4
         W.data.uniform_(-stdv, stdv)
         W = nn.Parameter(W)
 
-        return Kopen, Kclose, W
+        Bias = torch.rand(nlayers,2,nopen,1)*1e-4
+        Bias = nn.Parameter(Bias)
+
+        return Kopen, Kclose, W, Bias
+
+    def doubleSymLayer(self, Z, Wi, Bi, L):
+        Ai0 = conv1((Z + Bi[0]).unsqueeze(0), Wi[0])
+        Ai0 = F.instance_norm(Ai0)
+        Ai1 = (conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0) @ L).unsqueeze(0)
+        Ai1 = F.instance_norm(Ai1)
+        Ai0 = torch.relu(Ai0)
+        Ai1 = torch.relu(Ai1)
+
+        # Layer T
+        Ai0 = conv1T(Ai0, Wi[0])
+        Ai1 = (conv1T(Ai1, Wi[1]).squeeze(0) @ L.t()).unsqueeze(0)
+        Ai = Ai0 + Ai1
+
+        return Ai
 
     def forward(self, Z, m=1.0):
 
         h = self.h
         l = self.W.shape[0]
+        Kopen = self.Kopen
+        Kclose = self.Kclose
 
-        Z = torch.tanh(self.Kopen@Z)
+        Z = torch.relu(Kopen@Z)
         Zold = Z
-
+        L, D = utils.getGraphLap(Z)
         for i in range(l):
+            if i%10==0:
+                L, D = utils.getGraphLap(Z)
 
             Wi = self.W[i]
+            Bi = self.Bias[i]
             # Layer
-            Ai = m*conv1(Z, Wi)
-            Ai = F.instance_norm(Ai)
-            Ai = torch.relu(Ai)
-
-            # Layer T
-            Ai = m*conv1T(Ai, Wi)
+            Ai = self.doubleSymLayer(Z, Wi, Bi, L)
             Ztemp = Z
-            Z = 2*Z - Zold - (h**2)*Ai
+            Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
             Zold = Ztemp
         # closing layer back to desired shape
-        Z = torch.relu(self.Kclose@Z)
-        return Z
+        Z = torch.relu(Kclose@Z)
+        Zold = torch.relu(Kclose@Zold)
+        return Z, Zold
+
+    def backwardProp(self, Z):
+
+        h = self.h
+        l = self.W.shape[0]
+
+        Kopen = self.Kopen
+        Kclose = self.Kclose
+
+        # opening layer
+        Z = torch.relu(Kclose.t()@Z)
+        Zold = Z
+        L, D = utils.getGraphLap(Z)
+        for i in reversed(range(l)):
+            if i%10==0:
+                L, D = utils.getGraphLap(Z)
+            Wi = self.W[i]
+            Bi = self.Bias[i]
+            Ai = self.doubleSymLayer(Z, Wi, Bi, L)
+
+            Ztemp = Z
+            Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
+            Zold = Ztemp
+
+        # closing layer back to desired shape
+        Z    = torch.relu(Kopen.t()@Z)
+        Zold = torch.relu(Kopen.t()@Zold)
+        return Z, Zold
+
+
+    def NNreg(self):
+
+        dWdt = self.W[1:] - self.W[:-1]
+        RW   = torch.sum(torch.abs(dWdt))/dWdt.numel()
+        RKo  = torch.norm(self.Kopen)**2/2/self.Kopen.numel()
+        RKc = torch.norm(self.Kclose)**2/2/self.Kclose.numel()
+        return RW + RKo + RKc
+
 
 ##### END hyper Convolution Neural Networks ######
 

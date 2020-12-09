@@ -178,6 +178,10 @@ def determine_network_param(net):
 
 def getDistMat(X,msk=torch.tensor([1.0])):
     D = torch.sum(torch.pow(X,2), dim=0, keepdim=True) + torch.sum(torch.pow(X,2), dim=0, keepdim=True).t() - 2*X.t()@X
+    
+    dev = X.device
+    msk = msk.to(dev)
+
     mm = torch.ger(msk,msk)
     return mm*torch.sqrt(torch.relu(D))
 
@@ -214,14 +218,25 @@ def getAdjMatrix(X,st=13):
     X = X - torch.mean(X, dim=1, keepdim=True)
     X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True)/X.shape[1] + 1e-4)
     W = getDistMat(X)
-    for jj in range(W.shape[0]):
+    n = W.shape[0]
+    # Position matrix
+    P = torch.diag(torch.ones(n)) + \
+        torch.diag(torch.ones(n-1),-1) + \
+        torch.diag(torch.ones(n-2),-2) + \
+        torch.diag(torch.ones(n-3),-3)
+    P = P + P.t()
+    for jj in range(n):
+        if jj<W.shape[0]-1:
+            W[jj,jj+1] = 0
+        if jj > 0-1:
+            W[jj,jj-1] = 0
         wj = W[jj, :]
         ws, id = torch.sort(wj,descending=False)
         idb = id[:st]
         wjs = wj*0
         wjs[idb] = wj[idb]*0+1
         W[jj,:] = wjs
-    W = (W+W.t())/2.0
+    W = (W+W.t())/2.0 + P
     W[W!=0] = 1.0
     return W
 
@@ -236,14 +251,17 @@ def getGraphLapBin(X,st=13):
 
     return L, W
 
-def getGraphLap(X,sig=0.2):
+def getGraphLap(X,sig=10):
 
     # normalize the data
     X = X - torch.mean(X, dim=1, keepdim=True)
-    X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True)/X.shape[1] + 1e-4)
+    X = X / (torch.std(X, dim=1, keepdim=True) + 1e-3)
+    #X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True)/X.shape[1] + 1e-4)
     # add  position vector
-    pos = 0.5*torch.linspace(0, 1, X.shape[1]).unsqueeze(0)
-    Xa = torch.cat((X, pos), dim=0)
+    pos = torch.linspace(-0.5, 0.5, X.shape[1]).unsqueeze(0)
+    dev = X.device
+    pos = pos.to(dev)
+    Xa = torch.cat((X, 5e1*pos), dim=0)
     W = getDistMat(Xa)
     W = torch.exp(-W/sig)
     D = torch.diag(torch.sum(W, dim=0))
