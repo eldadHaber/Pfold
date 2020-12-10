@@ -45,6 +45,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             coords = move_tuple_to(coords, device, non_blocking=True)
 
             w = ite / max_iter
+
             optimizer.zero_grad()
             dists_pred, coords_pred = net(features,mask)
 
@@ -135,6 +136,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
             dists_pred, coords_pred = net(seq,mask)
+            nb = seq.shape[0]
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
@@ -142,7 +144,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
                 loss = (1 - weight) / 2 * loss_d + (weight + 1) / 2 * loss_c
             else:
                 loss = loss_d
-            loss_v += loss
+            loss_v += loss * nb
             M = dists[0] != 0
             L = torch.sum(mask,dim=1)
             dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
@@ -158,7 +160,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
             plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
     net.train()
-    return loss_v/len(dl), dist_err_mean/len(dl.dataset), dist_err_mean_alq/len(dl.dataset)
+    return loss_v/len(dl.dataset), dist_err_mean/len(dl.dataset), dist_err_mean_alq/len(dl.dataset)
 
 
 
