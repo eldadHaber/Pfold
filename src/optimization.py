@@ -76,15 +76,15 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord, weight=w)
+                    loss_v, dist_err_ang, dist_err_ang_alq = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord, weight=w)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
                     else:
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err(ang): {:2.2f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, dist_err_ang, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err(ang): {:2.2f}  Dist_err(alq): {:2.2f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
+                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, dist_err_ang, dist_err_ang_alq, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train_d = 0
                     loss_train_c = 0
@@ -127,16 +127,14 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
     net.eval()
     with torch.no_grad():
         loss_v = 0
-        dist_err_angstrom = 0
+        dist_err_mean = 0
+        dist_err_mean_alq = 0
         for i,(seq, dists,mask, coords) in enumerate(dl):
             seq = seq.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
             dists_pred, coords_pred = net(seq,mask)
-
-            dist_nn = torch.norm(coords_pred[:,:,1:]-coords_pred[:,:,:-1],2,dim=1)
-            dist_nn_truth = torch.norm(coords[0][:,:,1:]-coords[0][:,:,:-1],2,dim=1)
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
@@ -146,7 +144,12 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
                 loss = loss_d
             loss_v += loss
 
-            dist_err_angstrom += torch.sum(torch.sqrt(torch.mean((dists_pred[0] - dists[0])**2,dim=(1,2)))*10)
+            L = torch.sum(mask)
+            dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
+            dist_err_mean += dist_err
+
+            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*(L-1))) * 10)
+            dist_err_mean_alq += dist_err_alq
 
             if save_results:
                 compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i))
@@ -155,7 +158,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
             plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
     net.train()
-    return loss_v/len(dl), dist_err_angstrom/len(dl.dataset)
+    return loss_v/len(dl), dist_err_mean/len(dl.dataset), dist_err_mean_alq/len(dl.dataset)
 
 
 

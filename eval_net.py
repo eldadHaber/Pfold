@@ -18,8 +18,9 @@ np.set_printoptions(linewidth=desired_width)
 
 
 if __name__ == '__main__':
-    network_path = 'D:/Pytorch/Pfold/pretrained_networks/2020-11-26_17_30_02/network.pt'
-    dataset = './data/casp11_test_FM/'
+    # network_path = 'D:/Pytorch/Pfold/pretrained_networks/2020-11-26_17_30_02/network.pt'
+    network_path = 'D:/Pytorch/run_amazon/2020-12-09_22_45_12/network.pt'
+    dataset = './data/casp11_test_TBM/'
     dataset_out = './results/figures/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
