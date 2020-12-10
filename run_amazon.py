@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--viz', default=False, type=bool, metavar='N', help='select the neural network to train (resnet)')
     # data
     parser.add_argument('--dataset-train', default='./../data/casp11_training_90/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./../data/casp11_test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./../data/casp11_validation/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-train', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='D:/Dropbox/ComputationalGenetics/data/final_dataset_1d/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
