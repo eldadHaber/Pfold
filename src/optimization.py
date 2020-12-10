@@ -144,7 +144,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
                 loss = loss_d
             loss_v += loss
             M = dists[0] != 0
-            L = torch.sum(mask)
+            L = torch.sum(mask,dim=1)
             dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
             dist_err_mean += dist_err
 
@@ -191,7 +191,7 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
             M = dists[0] != 0
             # dist_err = torch.sum(torch.sqrt(torch.mean(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))) * 10)
             # dist_err_mean += dist_err
-            L = torch.sum(mask)
+            L = torch.sum(mask,dim=1)
             dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
             dist_err_mean += dist_err
 
