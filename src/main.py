@@ -64,7 +64,7 @@ def main(c):
     scheduler = OneCycleLR(optimizer, c.SL_lr, total_steps=c.max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
     if c.load_from_previous != "":
-        net, optimizer, scheduler, ite_start = load_checkpoint(net, optimizer, scheduler, c.load_from_previous)
+        net, optimizer, scheduler, ite_start = load_checkpoint(net, optimizer, scheduler, c.load_from_previous, lr=c.SL_lr)
         c.LOG.info("Loading Checkpoint {:}, starting from iteration {:}".format(c.load_from_previous,ite_start))
     else:
         ite_start = 0
