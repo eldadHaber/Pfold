@@ -619,7 +619,7 @@ class hyperNet(nn.Module):
     def doubleSymLayer(self, Z, Wi, Bi, L):
         Ai0 = conv1((Z + Bi[0]).unsqueeze(0), Wi[0])
         Ai0 = F.instance_norm(Ai0)
-        Ai1 = (conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0) @ L).unsqueeze(0)
+        Ai1 = (conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0)@L).unsqueeze(0)
         Ai1 = F.instance_norm(Ai1)
         Ai0 = torch.relu(Ai0)
         Ai1 = torch.relu(Ai1)
@@ -638,7 +638,7 @@ class hyperNet(nn.Module):
         Kopen = self.Kopen
         Kclose = self.Kclose
 
-        Z = torch.relu(Kopen@Z)
+        Z = Kopen@Z
         Zold = Z
         L, D = utils.getGraphLap(Z)
         for i in range(l):
@@ -652,9 +652,11 @@ class hyperNet(nn.Module):
             Ztemp = Z
             Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
             Zold = Ztemp
+            # for non hyperbolic use
+            # Z = Z - h*Ai.squeeze(0)
         # closing layer back to desired shape
-        Z = torch.relu(Kclose@Z)
-        Zold = torch.relu(Kclose@Zold)
+        Z    = Kclose@Z
+        Zold = Kclose@Zold
         return Z, Zold
 
     def backwardProp(self, Z):
@@ -666,7 +668,7 @@ class hyperNet(nn.Module):
         Kclose = self.Kclose
 
         # opening layer
-        Z = torch.relu(Kclose.t()@Z)
+        Z = Kclose.t()@Z
         Zold = Z
         L, D = utils.getGraphLap(Z)
         for i in reversed(range(l)):
@@ -681,8 +683,8 @@ class hyperNet(nn.Module):
             Zold = Ztemp
 
         # closing layer back to desired shape
-        Z    = torch.relu(Kopen.t()@Z)
-        Zold = torch.relu(Kopen.t()@Zold)
+        Z    = Kopen.t()@Z
+        Zold = Kopen.t()@Zold
         return Z, Zold
 
 
@@ -697,4 +699,37 @@ class hyperNet(nn.Module):
 
 ##### END hyper Convolution Neural Networks ######
 
+class Attention(nn.Module):
+    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
+    def __init__(self, Arch,W=torch.ones(1)):
+        super(Attention, self).__init__()
+        WQ, WK, WV, BQ, BK, BV = self.init_weights(Arch)
+        self.WQ = WQ
+        self.WK = WK
+        self.WV = WV
+        self.BQ = BQ
+        self.BK = BK
+        self.BV = BV
+
+    def init_weights(self,A):
+        print('Initializing network  ')
+        #Arch = [nin, nhidKQ, nhidV]
+
+        WQ = torch.zeros(A[1], A[0])
+        stdv = 1e-3 * WQ.shape[0]/WQ.shape[1]
+        WQ.data.uniform_(-stdv, stdv)
+        WQ = nn.Parameter(WQ)
+
+        WK = torch.zeros(A[1], A[0])
+        stdv = 1e-3 * WK.shape[0]/WK.shape[1]
+        WK.data.uniform_(-stdv, stdv)
+        WK = nn.Parameter(WK)
+
+        WV = torch.zeros(A[1], A[0])
+        stdv = 1e-3 * WK.shape[0]/WK.shape[1]
+        WK.data.uniform_(-stdv, stdv)
+        WK = nn.Parameter(WK)
+
+
+        return WK, WV, WK

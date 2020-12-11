@@ -434,3 +434,38 @@ def convertCoordToAnglesVec(rN, rCa, rCb, mask=1.0):
     THETA[indnan] = 0.0
 
     return OMEGA, PHI, THETA
+
+
+#id, seq, pssm2, entropy, dssp, rN,rCa,rCb, mask = parse_pnet('../../../data/casp11/validation')
+#
+#numprot = len(id)
+#Aind = []
+#PSSM = []
+#E    = []
+#ra  = []
+#M    = []
+#L2np = list2np()
+#
+#for idx in range(numprot):
+#
+#
+#    Ai, PSSMi, Ei, rNi, rCai, rCbi, mski = L2np(seq[idx], pssm2[idx], entropy[idx],
+#                                           rN[idx], rCa[idx], rCb[idx], mask[idx])
+#    if idx%100==0:
+#        print(idx)
+#    if len(Ei) <= 1000:
+#        Aind.append(torch.tensor(Ai))
+#        PSSM.append(torch.tensor(PSSMi))
+#        E.append(torch.tensor(Ei))
+#        ra.append(torch.tensor(rCai))
+#        M.append(torch.tensor(mski))
+#
+#torch.save(Aind,'AminoAcidIdxVal.pt')
+#torch.save(PSSM,'PSSMVal.pt')
+#torch.save(E,'entropyVal.pt')
+#torch.save(ra,'RCalphaVal.pt')
+#torch.save(M,'MasksVal.pt')
+
+
+
+

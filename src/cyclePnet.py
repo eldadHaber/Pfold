@@ -66,10 +66,9 @@ optimizer = optim.Adam([{'params': model.Kopen, 'lr': lrO},
                         {'params': model.Bias, 'lr': lrB}])
 
 alossBest = 1e6
-ndata = len(S)-1
-epochs = 100
+epochs = 3
 sig   = 0.2
-ndata = 40
+ndata = 3
 bestModel = model
 hist = torch.zeros(epochs)
 print('         Design       Coords      Reg           gradW       gradKo        gradKc       gradB')
