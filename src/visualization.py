@@ -7,7 +7,7 @@ import torch
 # from scipy.special import softmax
 # from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_results=False, save_results=False, error=''):
+def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_results=False, save_results=False, error=0):
 
     plt.figure(num=1, figsize=[15, 10])
     plt.clf()
