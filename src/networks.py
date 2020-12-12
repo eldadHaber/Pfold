@@ -578,14 +578,14 @@ class graphNN(nn.Module):
 class hyperNet(nn.Module):
     """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
-    def __init__(self, Arch):
+    def __init__(self, Arch, h=0.1):
         super(hyperNet, self).__init__()
-        Kopen, Kclose, W, Bias = self.init_weights(Arch)
+        Kopen, Kclose, W, Bias= self.init_weights(Arch)
         self.Kopen  = Kopen
         self.Kclose = Kclose
         self.W = W
         self.Bias = Bias
-        self.h = 0.1
+        self.h = h
 
     def init_weights(self,A):
         print('Initializing network  ')
@@ -704,32 +704,42 @@ class Attention(nn.Module):
 
     def __init__(self, Arch,W=torch.ones(1)):
         super(Attention, self).__init__()
-        WQ, WK, WV, BQ, BK, BV = self.init_weights(Arch)
-        self.WQ = WQ
-        self.WK = WK
-        self.WV = WV
-        self.BQ = BQ
-        self.BK = BK
-        self.BV = BV
+        W = self.init_weights(Arch)
+        self.W = W
 
     def init_weights(self,A):
         print('Initializing network  ')
         #Arch = [nin, nhidKQ, nhidV]
+        nhid = A[0]
+        nopen = A[1]
+        W = torch.zeros(3, 2, nhid, nopen, 9)
+        stdv = 1e-4
+        W.data.uniform_(-stdv, stdv)
+        W = nn.Parameter(W)
 
-        WQ = torch.zeros(A[1], A[0])
-        stdv = 1e-3 * WQ.shape[0]/WQ.shape[1]
-        WQ.data.uniform_(-stdv, stdv)
-        WQ = nn.Parameter(WQ)
+        return W
+    def attnLayer(self,Z, W, L):
 
-        WK = torch.zeros(A[1], A[0])
-        stdv = 1e-3 * WK.shape[0]/WK.shape[1]
-        WK.data.uniform_(-stdv, stdv)
-        WK = nn.Parameter(WK)
+        Q0 = conv1(Z.unsqueeze(0), W[0])
+        Q0 = F.instance_norm(Q0).squeeze(0)
+        Q1 = (conv1(Z.unsqueeze(0), W[1]).squeeze(0) @ L).unsqueeze(0)
+        Q1 = F.instance_norm(Q1).squeeze(0)
+        Q0 = torch.relu(Q0)
+        Q1 = torch.relu(Q1)
+        Q = Q0 + Q1
+        return Q
 
-        WV = torch.zeros(A[1], A[0])
-        stdv = 1e-3 * WK.shape[0]/WK.shape[1]
-        WK.data.uniform_(-stdv, stdv)
-        WK = nn.Parameter(WK)
+    def forward(self, Z, L=[]):
+        if len(L)==0:
+            L = torch.eye(Z.shape[1])
+        Q = self.attnLayer(Z, self.W[0], L)
+        K = self.attnLayer(Z, self.W[1], L)
+        V = self.attnLayer(Z, self.W[2], L)
+
+        A = torch.exp(Q@K.t())
+        a = torch.sum(A,dim=1,keepdim=True)
+        Aa = A/a
+        Aa = (Aa + Aa.t())/2.0
+        return Aa@V
 
 
-        return WK, WV, WK

@@ -33,37 +33,21 @@ print('Number of data: ', len(S))
 n_data_total = len(S)
 
 
-def getIterData(S, Aind, Yobs, MSK, i, device='cpu'):
+def getIterData(S, Aind, i, device='cpu'):
     scale = 1e-3
     PSSM = S[i].t()
     n = PSSM.shape[1]
-    M = MSK[i][:n]
     a = Aind[i]
-
-    # X = Yobs[i][0, 0, :n, :n]
-    X = Yobs[i].t()
-    X = utils.linearInterp1D(X, M)
-    X = torch.tensor(X)
-
-    X = X - torch.mean(X, dim=1, keepdim=True)
-    U, Lam, V = torch.svd(X)
-
-    Coords = scale * torch.diag(Lam) @ V.t()
-    Coords = Coords.type('torch.FloatTensor')
 
     PSSM = PSSM.type(torch.float32)
     PSSM = augmentPSSM(PSSM, 0.3)
+    PSSM = PSSM.to(device=device, non_blocking=True)
 
-    A = torch.zeros(20, n)
-    A[a, torch.arange(0, n)] = 1.0
-    Seq = torch.cat((PSSM, A))
+    Seq = torch.zeros(20, n)
+    Seq[a, torch.arange(0, n)] = 1.0
     Seq = Seq.to(device=device, non_blocking=True)
 
-    Coords = Coords.to(device=device, non_blocking=True)
-    M = M.type('torch.FloatTensor')
-    M = M.to(device=device, non_blocking=True)
-
-    return Seq, Coords, M
+    return Seq, PSSM
 
 
 def augmentPSSM(Z, sig=1):
@@ -75,10 +59,10 @@ def augmentPSSM(Z, sig=1):
     Zout = Zout / (torch.sum(Zout, dim=0, keepdim=True) + 0.001)
     return Zout
 
-nstart  = 3
-nopen   = 128
-nhid    = 256
-nclose  = 40
+nstart  = 20
+nopen   = 64
+nhid    = 128
+nclose  = 20
 nlayers = 50
 h       = 1/nlayers
 Arch = [nstart, nopen, nhid, nclose, nlayers]
@@ -117,39 +101,29 @@ for j in range(epochs):
     amisb = 0.0
     for i in range(ndata):
 
-        Z, Coords, M = getIterData(S, Aind, Yobs, MSK, i, device=device)
-        M = torch.ger(M, M)
+        Seq, PSSM = getIterData(S, Aind, i, device=device)
 
         optimizer.zero_grad()
         # From Coords to Seq
-        Zout, Zold = model(Coords)
-        # onehotZ = torch.argmax(Z[20:,:], dim=0)
+        PSSMout, PSSMold = model(Seq)
+        Seqout,  SeqOld = model.backwardProp(PSSM)
+
         onehotZ = Aind[i].to(device)
         wloss = torch.zeros(20).to(device)
         for kk in range(20):
             wloss[kk] = torch.sum(onehotZ == kk)
         wloss = 1.0 / (wloss + 1.0)
 
-        misfit = F.cross_entropy(Zout[20:, :].t(), onehotZ, wloss)
+        misfitFor  = F.kl_div(PSSMout.t().unsqueeze(0), PSSM.t().unsqueeze(0))
+        misfitBack = F.cross_entropy(Seqout.t(), onehotZ, wloss)
         # From Seq to Coord
-        Cout, CoutOld = model.backwardProp(Z)
-        DM = utils.getDistMat(Cout)
-        DMt = utils.getDistMat(Coords)
-        dm = DMt.max()
-        D = torch.exp(-DM / (dm * sig))
-        Dt = torch.exp(-DMt / (dm * sig))
-        misfitBackward = torch.norm(M * Dt - M * D) ** 2 / torch.norm(M * Dt) ** 2
 
         R = model.NNreg()
-        C0 = torch.norm(Cout - CoutOld) ** 2 / torch.numel(Z)
-        Z0 = torch.norm(Zout - Zold) ** 2 / torch.numel(Z)
-        loss = misfit + misfitBackward + R + C0 + Z0
+        C0 = torch.norm(PSSMout - PSSMold) ** 2 / torch.numel(PSSM)
+        Z0 = torch.norm(Seqout - SeqOld) ** 2 / torch.numel(PSSM)
+        loss = misfitFor + misfitBackward + R + C0 + Z0
 
         loss.backward(retain_graph=True)
-        # torch.nn.utils.clip_grad_norm_(model.W, 0.1)
-        # torch.nn.utils.clip_grad_norm_(model.Kclose, 0.1)
-        # torch.nn.utils.clip_grad_norm_(model.Kopen, 0.1)
-        # torch.nn.utils.clip_grad_norm_(model.Bias, 0.1)
 
         aloss += loss.detach()
         amis += misfit.detach().item()
