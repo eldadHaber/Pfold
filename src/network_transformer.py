@@ -7,6 +7,58 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn import LayerNorm
+
+nn.Transformer()
+nn.Embedding()
+class RoBERTa(nn.Module):
+    # args.encoder_layers = getattr(args, "encoder_layers", 12)
+    # args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 768)
+    # args.encoder_ffn_embed_dim = getattr(args, "encoder_ffn_embed_dim", 3072)
+    # args.encoder_attention_heads = getattr(args, "encoder_attention_heads", 12)
+    #
+    # args.activation_fn = getattr(args, "activation_fn", "gelu")
+    # args.pooler_activation_fn = getattr(args, "pooler_activation_fn", "tanh")
+    #
+    # args.dropout = getattr(args, "dropout", 0.1)
+    # args.attention_dropout = getattr(args, "attention_dropout", 0.1)
+    # args.activation_dropout = getattr(args, "activation_dropout", 0.0)
+    # args.pooler_dropout = getattr(args, "pooler_dropout", 0.0)
+    # args.encoder_layers_to_keep = getattr(args, "encoder_layers_to_keep", None)
+    # args.encoder_layerdrop = getattr(args, "encoder_layerdrop", 0.0)
+    # args.untie_weights_roberta = getattr(args, "untie_weights_roberta", False)
+
+    def __init__(self, d_model=1024, nhead=12, dim_feedforward=3072, num_encoder_layers=12, dropout=0.1, chan_out=-1, activation='gelu'):
+        super(RoBERTa, self).__init__()
+        from torch.nn import TransformerEncoder, TransformerEncoderLayer
+        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
+        encoder_norm = LayerNorm(d_model)
+        self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+
+        self._reset_parameters()
+
+        self.d_model = d_model
+        self.nhead = nhead
+        return
+
+    def forward(self, src, mask=None):
+        if mask is None:
+            mask = torch.ones_like(src[:,0,:])
+
+        # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
+        src = src.permute(2,0,1)
+        mask_e = mask.unsqueeze(1)
+        src = self.pos_encoder(src) #Check dimensions
+        output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
+
+        dists = ()
+        for i in range(output.shape[1]//3):
+            dists += (tr2DistSmall(x[:, i * 3:(i + 1) * 3, :]),)
+
+        return dists, output
+
+
 
 
 class PositionalEncoding(nn.Module):

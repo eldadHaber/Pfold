@@ -116,7 +116,6 @@ class hyperNet(nn.Module):
         return dists, Z
 
     def NNreg(self):
-
         dWdt = self.W[1:] - self.W[:-1]
         RW   = torch.sum(torch.abs(dWdt))/dWdt.numel()
         RKo  = torch.norm(self.Kopen)**2/2/self.Kopen.numel()
