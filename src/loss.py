@@ -12,14 +12,18 @@ class LossMultiTargets(nn.Module):
         super(LossMultiTargets, self).__init__()
         self.loss = loss_fnc
 
-    def forward(self, inputs,targets):
+    def forward(self, inputs,targets,inputs_std=None):
         # loss = []
         # for (input,target) in zip(inputs,targets):
         #     loss.append(self.loss(input,target))
         loss = 0
         nb = len(targets)
-        for (input,target) in zip(inputs,targets):
-            loss += self.loss(input,target)
+        if inputs_std is not None:
+            for (input,target,input_std) in zip(inputs,targets,inputs_std):
+                loss += self.loss(input,target,input_std=input_std)
+        else:
+            for (input,target) in zip(inputs,targets):
+                loss += self.loss(input,target)
         loss /= nb
         return loss
 
@@ -27,7 +31,7 @@ class MSELoss(torch.nn.Module):
     def __init__(self):
         super(MSELoss,self).__init__()
 
-    def forward(self, input, target):
+    def forward(self, input, target,input_std=None):
         #We only want places where the target is larger than zero (remember this is for distances)
         mask = target > 0
 
@@ -36,9 +40,14 @@ class MSELoss(torch.nn.Module):
         target = target[batch_mask, :, :]
         mask = mask[batch_mask, :, :]
         nb = target.shape[0]
-
-        result = torch.sum(torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
-
+        if input_std is None:
+            result = torch.sum(torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
+        else:
+            d = torch.abs(input - target)
+            m = d > input_std
+            M = m * mask
+            result = torch.sum(torch.norm(((d - input_std)/(input_std+1e-10))*M,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
+            # result = torch.sum(torch.norm(input * mask - target * mask, dim=(1, 2)) ** 2 / torch.norm(target * mask, dim=(1, 2)) ** 2)
         return result/nb
 
 
@@ -211,7 +220,7 @@ def loss_tr(r1,r2, return_coords=False):
         return loss_tr
 
 
-def loss_tr_tuples(r1s,r2s, return_coords=False):
+def loss_tr_tuples(r1s,r2s, return_coords=False, coords_pred_std=None):
     '''
     Given two sets of 3D points of equal size. It computes the distance between these two sets of points, when allowing translation and rotation of the point clouds.
     r1 -> Tensors of shape (b,3d,n)
@@ -232,6 +241,8 @@ def loss_tr_tuples(r1s,r2s, return_coords=False):
         r2 = r2[batch_mask,:,:]
         mask = mask[batch_mask,:,:]
 
+
+
         #First we translate the two sets, by setting both their centroids to origin
         r1c = r1 - torch.sum(r1 * mask, dim=2, keepdim=True) / torch.sum(mask, dim=2, keepdim=True)
         r2c = r2 - torch.sum(r2 * mask, dim=2, keepdim=True) / torch.sum(mask, dim=2, keepdim=True)
@@ -250,8 +261,18 @@ def loss_tr_tuples(r1s,r2s, return_coords=False):
         R = torch.bmm(V, torch.bmm(tmp, U.transpose(1,2)))
 
         r1cr = torch.bmm(R, r1c)
+        if coords_pred_std is None:
+            loss_tr += torch.mean(torch.norm(r1cr - r2c, dim=(1, 2)) ** 2 / torch.norm(r2c, dim=(1, 2)) ** 2) # TODO THIS IS WRONG?!
+        else:
+            r1_std = coords_pred_std[:, 3 * i:3 * i + 3, :]
+            r1_std = r1_std[batch_mask, :, :]
+            r1cr_std = torch.sqrt(torch.bmm(R**2, r1_std**2))
 
-        loss_tr += torch.mean(torch.norm(r1cr - r2c, dim=(1, 2)) ** 2 / torch.norm(r2c, dim=(1, 2)) ** 2)
+            dif = torch.abs(r1cr - r2c)
+            m = dif > r1cr_std
+            M = m * mask
+
+            loss_tr += torch.mean(torch.norm((dif-r1cr_std)/(r1cr_std+1e-10)*M, dim=(1, 2)) ** 2 / torch.norm(r2c, dim=(1, 2)) ** 2)
         if return_coords:
             coords_pred += (r1cr.cpu().detach().numpy(),)
             coords_target += (r2c.cpu().detach().numpy(),)

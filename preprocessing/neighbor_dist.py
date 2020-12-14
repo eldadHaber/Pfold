@@ -21,6 +21,9 @@ import torch
 if __name__ == '__main__':
     dataset = './../data/casp11_training_90/'
 
+    a = np.load("C:/Users/Tue/PycharmProjects/Pfold/preprocessing/distances.npz")
+
+
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
     batch_size = 1

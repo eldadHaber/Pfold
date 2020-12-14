@@ -8,9 +8,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import LayerNorm
+from torch.nn.init import xavier_uniform_
 
-nn.Transformer()
-nn.Embedding()
+
 class RoBERTa(nn.Module):
     # args.encoder_layers = getattr(args, "encoder_layers", 12)
     # args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 768)
@@ -28,13 +28,21 @@ class RoBERTa(nn.Module):
     # args.encoder_layerdrop = getattr(args, "encoder_layerdrop", 0.0)
     # args.untie_weights_roberta = getattr(args, "untie_weights_roberta", False)
 
-    def __init__(self, d_model=1024, nhead=12, dim_feedforward=3072, num_encoder_layers=12, dropout=0.1, chan_out=-1, activation='gelu'):
+    def __init__(self, chan_in=41, nhead=20, dim_feedforward=3072, num_encoder_layers=12, dropout=0.1, chan_out=-1, activation='gelu'):
         super(RoBERTa, self).__init__()
-        from torch.nn import TransformerEncoder, TransformerEncoderLayer
+        from torch.nn import TransformerEncoder, TransformerEncoderLayer, TransformerDecoderLayer, TransformerDecoder
+
+        tmp = chan_in % nhead
+        d_model = nhead - tmp + chan_in
+
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
         encoder_norm = LayerNorm(d_model)
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+
+        # decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
+        # decoder_norm = LayerNorm(d_model)
+        # self.decoder = TransformerDecoder(decoder_layer, 1, decoder_norm)
 
         self._reset_parameters()
 
@@ -42,21 +50,29 @@ class RoBERTa(nn.Module):
         self.nhead = nhead
         return
 
-    def forward(self, src, mask=None):
+
+
+    def _reset_parameters(self):
+        r"""Initiate parameters in the transformer model."""
+
+        for p in self.parameters():
+            if p.dim() > 1:
+                xavier_uniform_(p)
+
+    def forward(self, x, mask=None):
         if mask is None:
-            mask = torch.ones_like(src[:,0,:])
+            mask = torch.ones_like(x[:,0,:])
+        chan_in = x.shape[1]
+        z = torch.zeros((x.shape[0],self.d_model,x.shape[2]),device=x.device,dtype=x.dtype)
+        z[:,:chan_in,:] = x
 
         # We start by changing the shape of src from the conventional shape of (N,C,L) to (L,N,C), where N=Nbatch, C=#Channels, L= sequence length
-        src = src.permute(2,0,1)
+        z = z.permute(2,0,1)
         mask_e = mask.unsqueeze(1)
-        src = self.pos_encoder(src) #Check dimensions
-        output = self.transformer_encoder(src, src_key_padding_mask=(mask==0))
-
-        dists = ()
-        for i in range(output.shape[1]//3):
-            dists += (tr2DistSmall(x[:, i * 3:(i + 1) * 3, :]),)
-
-        return dists, output
+        z = self.pos_encoder(z) #Check dimensions
+        output = self.encoder(z, src_key_padding_mask=(mask==0))
+        output = output.permute(1, 2, 0)
+        return output
 
 
 
@@ -76,7 +92,8 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
+        pe = self.pe[:x.size(0), :]
+        x = x + pe
         return self.dropout(x)
 
 class TransformerModel(nn.Module):
@@ -160,10 +177,46 @@ def tr2DistSmall(Y):
     D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
     return torch.sqrt(torch.relu(D))
 
-def tr2DistSmall_with_std(Y):
-    k = Y.shape[1]
-    Z = Y - torch.mean(Y, dim=2, keepdim=True)
-    D = torch.sum(Z**2, dim=1).unsqueeze(1) + torch.sum(Z**2, dim=1).unsqueeze(2) - 2*Z.transpose(1,2) @ Z
-    D = 3*D/k
-    D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
-    return torch.sqrt(torch.relu(D))
+def tr2DistSmall_with_std(y,ystd):
+    k = y.shape[1]
+    z = y - torch.mean(y, dim=2, keepdim=True)
+    d = torch.sum(z**2, dim=1).unsqueeze(1) + torch.sum(z**2, dim=1).unsqueeze(2) - 2*z.transpose(1,2) @ z
+    d = 3*d/k
+    d[...,torch.arange(d.shape[-1]),torch.arange(d.shape[-1])] = 0
+    d = torch.sqrt(torch.relu(d))
+
+    r = y*ystd - torch.mean(y*ystd, dim=2, keepdim=True)
+    dstd = torch.sum(r**2, dim=1).unsqueeze(1) + torch.sum(r**2, dim=1).unsqueeze(2) - 2*r.transpose(1,2) @ r
+    dstd = 3*dstd/k
+    dstd[...,torch.arange(d.shape[-1]),torch.arange(d.shape[-1])] = 0
+    dstd = torch.sqrt(torch.relu(dstd))
+    dstd = dstd / (d+1e-10)
+    return d, dstd
+
+#
+# def tr2DistSmall_with_std_v2(y,ystd):
+#     k = y.shape[1]
+#     z = y - torch.mean(y, dim=2, keepdim=True)
+#     d = torch.sum(z**2, dim=1).unsqueeze(1) + torch.sum(z**2, dim=1).unsqueeze(2) - 2*z.transpose(1,2) @ z
+#     d = 3*d/k
+#     d[...,torch.arange(d.shape[-1]),torch.arange(d.shape[-1])] = 0
+#     d = torch.sqrt(torch.relu(d))
+#
+#     r = y*ystd - torch.mean(y*ystd, dim=2, keepdim=True)
+#     dstd = torch.sum(r**2, dim=1).unsqueeze(1) + torch.sum(r**2, dim=1).unsqueeze(2) - 2*r.transpose(1,2) @ r
+#     dstd = 3*dstd/k
+#     dstd[...,torch.arange(d.shape[-1]),torch.arange(d.shape[-1])] = 0
+#     dstd = torch.sqrt(torch.relu(dstd))
+#     dstd = dstd / (d+1e-10)
+#     # dstd = torch.ones_like(d)
+#     return d, dstd
+#
+#
+#
+# def tr2DistSmall_with_std(y,ystd):
+#     k = y.shape[1]
+#     z = y - torch.mean(y, dim=2, keepdim=True)
+#     d = torch.sum(z**2, dim=1).unsqueeze(1) + torch.sum(z**2, dim=1).unsqueeze(2) - 2*z.transpose(1,2) @ z
+#     d2 = 3*d.clone()/k
+#     d2[...,torch.arange(d.shape[-1]),torch.arange(d.shape[-1])] = 0
+#     d3 = torch.sqrt(torch.relu(d2.clone()))

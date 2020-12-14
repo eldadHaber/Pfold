@@ -9,8 +9,6 @@ import torch
 
 def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_results=False, save_results=False, error=0):
 
-    plt.figure(num=1, figsize=[15, 10])
-    plt.clf()
     # names = ['Distance','Omega','Phi','Theta']
     names = ['dCaCa','dCbCb','dNN','dNCa','dNCb','dCaCb']
     n = len(targets)
@@ -20,7 +18,7 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
     else:
         idxs = [nb-1]
     for idx in idxs:
-        fig = plt.figure(3, figsize=[20, 10])
+        fig = plt.figure(num=1, figsize=[20, 10])
         plt.clf()
         for i,(output,target,name) in enumerate(zip(outputs,targets,names)):
             tmp = np.where(padding_mask[idx, :].cpu().numpy() == np.int64(0))[0]

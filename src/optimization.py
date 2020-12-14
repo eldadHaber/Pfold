@@ -109,6 +109,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             break
     # plotfullprotein(cnn_pred, caa_pred, cbb_pred, cnn_target, caa_target, cbb_target)
     # plotcoordinates(pred, target_coord)
+    optimizer.zero_grad()
     return net
 
 

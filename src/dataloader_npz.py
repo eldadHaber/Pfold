@@ -43,74 +43,40 @@ class Dataset_npz(data.Dataset):
         self.use_crop = random_crop
         self.use_cross_dist = cross_dist
 
-    def calculate_chan_in(self):
-        assert (self.i_cov is False or self.i_cov_all is False), "You can only have one of (i_cov, i_cov_all) = True"
-        chan_in = 0
-        if self.i_seq:
-            chan_in += 20
-        if self.i_pssm:
-            chan_in += 20
-        if self.i_entropy:
-            chan_in += 1
-        if self.inpainting:
-            chan_in += 4 # 3 coordinates + 1 mask
-        if self.feature_dim == 1:
-            if self.i_cov_all:
-                chan_in += 10*441
-            elif self.i_cov:
-                chan_in += 10*21
-            if self.i_contact:
-                chan_in += 20
-        elif self.feature_dim == 2:
-            chan_in *= 2
-            if self.i_cov_all:
-                chan_in += 441
-            elif self.i_cov:
-                chan_in += 21
-            if self.i_contact:
-                chan_in += 1
-        print("Number of features used this run {:}".format(chan_in))
-        return chan_in
-
+    # def mask_and_label(self, token_ids: List[int]):
+    #     """
+    #     Masks a sequence string according to the rules set out by BERT
+    #     :return:
+    #     """
+    #     labels = []
+    #
+    #     for i, token in enumerate(token_ids):
+    #         prob = random.random()
+    #         if prob < 0.15 and token != 0:
+    #             prob *= 6.666666666
+    #             # prob /= 0.15
+    #
+    #             # 80% randomly change token to mask token
+    #             if prob < 0.8:
+    #                 token_ids[i] = self.mask_token
+    #
+    #             # 10% randomly change token to random token
+    #             elif prob < 0.9:
+    #                 token_ids[i] = self.get_random_base_token()
+    #
+    #             # 10% randomly stay with current token
+    #
+    #             labels.append(token)
+    #
+    #         else:
+    #             labels.append(0)  # Padding
+    #     return token_ids, labels
 
 
     def __getitem__(self, index):
         data = np.load(self.files[index])
-        if self.chan_out == 3:
-            coords = (data['r1'],)
-        elif self.chan_out == 6:
-            coords = (data['r1'], data['r2'],)
-        elif self.chan_out == 9:
-            coords = (data['r1'], data['r2'], data['r3'],)
-        else:
-            raise NotImplementedError("The number of channels out is not supported.")
+        features_1d += (convert_seq_to_onehot(data['seq']),)
 
-        features_1d = ()
-        if self.i_seq:
-            features_1d += (convert_seq_to_onehot(data['seq']),)
-        if self.i_pssm:
-            features_1d += (data['pssm'],)
-        if self.i_entropy:
-            features_1d += (data['entropy'],)
-        if self.inpainting:
-            r, m = self.seq_mask(coords)
-            features_1d += (r,m[None,:],)
-
-        if self.feature_dim == 1:
-            if self.i_cov:
-                cov = data['cov1d']
-                cov = cov.reshape(-1,cov.shape[-1])
-                features_1d += (cov,)
-            if self.i_contact:
-                contact = data['contact1d']
-                features_1d += (contact.reshape(-1,contact.shape[-1]),)
-            features = features_1d
-        elif self.feature_dim == 2:
-            features_2d = (convert_1d_features_to_2d(features_1d),)
-            features_2d += (data['cov2d'],data['contact2d'][None,:,:],)
-            features = features_2d
-
-        features = np.concatenate(features, axis=0)
 
         self.Flip.reroll()
         features = self.Flip(features)

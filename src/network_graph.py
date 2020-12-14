@@ -245,18 +245,18 @@ def getGraphLap(X, mask, sigma=None):
     L = D - W
     L = 0.5 * (L + L.transpose(1,2))
     #
-    # Dd = torch.zeros_like(Wsum)
-    # Dd = Dd.flatten()
-    # m1 = (mask == 1).flatten()
-    # nominator = (torch.sqrt(torch.diagonal(D, dim1=1, dim2=2)) + 1e-4).flatten()
-    # Dd[m1] = 1 / nominator[m1]
-    # Dd=Dd.reshape(Wsum.shape)
-    # # Dd2 = (1 / (torch.sqrt(torch.diagonal(D, dim1=1, dim2=2)) + 1e-4)) * mask.squeeze()
-    # tmp = Dd.unsqueeze(2).expand(*Dd.size(), Wsum.size(1))
-    # Dh = tmp * E
-    # # Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
-    # Lnorm = Dh @ L @ Dh
-    # Lnorm = 0.5 * (Lnorm + Lnorm.transpose(1,2))
+    Dd = torch.zeros_like(Wsum)
+    Dd = Dd.flatten()
+    m1 = (mask == 1).flatten()
+    nominator = (torch.sqrt(torch.diagonal(D, dim1=1, dim2=2)) + 1e-9).flatten()
+    Dd[m1] = 1 / nominator[m1]
+    Dd=Dd.reshape(Wsum.shape)
+    # Dd2 = (1 / (torch.sqrt(torch.diagonal(D, dim1=1, dim2=2)) + 1e-4)) * mask.squeeze()
+    tmp = Dd.unsqueeze(2).expand(*Dd.size(), Wsum.size(1))
+    Dh = tmp * E
+    # Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
+    Lnorm = Dh @ L @ Dh
+    Lnorm = 0.5 * (Lnorm + Lnorm.transpose(1,2))
     # #
     # b = 1
     # import matplotlib.pyplot as plt
