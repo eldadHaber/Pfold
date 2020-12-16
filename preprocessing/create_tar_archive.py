@@ -1,8 +1,8 @@
 import webdataset as wds
 
-fastafile = './../Data/Dummy_file.fasta'
+fastafile = 'F:/uniref/uniref50.fasta/uniref50.fasta'
 # sink = wds.TarWriter("dest.tar")
-sink = wds.ShardWriter("dest-%09d.tar", maxcount=100000000)
+sink = wds.ShardWriter("F:/uniref/uniref50-%09d.tar", maxcount=100000000)
 
 idx = 0
 with open(fastafile, 'r') as f:
