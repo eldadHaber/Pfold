@@ -40,7 +40,7 @@ def getIterData(S, Aind, i, device='cpu'):
     a = Aind[i]
 
     PSSM = PSSM.type(torch.float32)
-    PSSM = augmentPSSM(PSSM, 0.3)
+    #PSSM = augmentPSSM(PSSM, 0.05)
     PSSM = PSSM.to(device=device, non_blocking=True)
 
     Seq = torch.zeros(20, n)
@@ -59,6 +59,12 @@ def augmentPSSM(Z, sig=1):
     Zout = Zout / (torch.sum(Zout, dim=0, keepdim=True) + 0.001)
     return Zout
 
+def kl_div(p, q):
+    n = p.shape[1]
+    p   = torch.softmax(p, dim=0)
+    ind = ((q!=0).int() & (p!=0).int()) > 0
+    return torch.sum(p[ind] * torch.log(p[ind] / q[ind]))/n
+
 nstart  = 20
 nopen   = 64
 nhid    = 128
@@ -76,7 +82,7 @@ print('Number of parameters ',total_params)
 
 
 lrO = 1e-4
-lrC = 1e-3
+lrC = 1e-4
 lrN = 1e-4
 lrB = 1e-4
 
@@ -87,13 +93,13 @@ optimizer = optim.Adam([{'params': model.Kopen, 'lr': lrO},
 
 alossBest = 1e6
 ndata = len(S)
-epochs = 1000
+epochs = 50
 sig   = 0.3
-ndata = 1000 #n_data_total
+ndata = 100 #n_data_total
 bestModel = model
 hist = torch.zeros(epochs)
 
-print('         Design       Coords      Reg           gradW       gradKo        gradKc       gradB')
+print('         For           Back       Reg            gradW       gradKo        gradKc       gradB')
 for j in range(epochs):
     # Prepare the data
     aloss = 0.0
@@ -106,7 +112,7 @@ for j in range(epochs):
         optimizer.zero_grad()
         # From Coords to Seq
         PSSMout, PSSMold = model(Seq)
-        Seqout,  SeqOld = model.backwardProp(PSSM)
+        SeqOut,  SeqOld  = model.backwardProp(PSSM)
 
         onehotZ = Aind[i].to(device)
         wloss = torch.zeros(20).to(device)
@@ -114,20 +120,20 @@ for j in range(epochs):
             wloss[kk] = torch.sum(onehotZ == kk)
         wloss = 1.0 / (wloss + 1.0)
 
-        misfitFor  = F.kl_div(PSSMout.t().unsqueeze(0), PSSM.t().unsqueeze(0))
-        misfitBack = F.cross_entropy(Seqout.t(), onehotZ, wloss)
-        # From Seq to Coord
+        misfitFor  = kl_div(PSSMout, PSSM)
+        misfitBack = F.cross_entropy(SeqOut.t(), onehotZ, wloss)
 
-        R = model.NNreg()
-        C0 = torch.norm(PSSMout - PSSMold) ** 2 / torch.numel(PSSM)
-        Z0 = torch.norm(Seqout - SeqOld) ** 2 / torch.numel(PSSM)
-        loss = misfitFor + misfitBackward + R + C0 + Z0
+        # From Seq to Coord
+        R  = model.NNreg()
+        C0 = torch.norm(PSSMout - PSSMold)**2/torch.numel(PSSM)
+        Z0 = torch.norm(SeqOut - SeqOld)**2/torch.numel(PSSM)
+        loss = misfitFor + misfitBack + R + C0 + Z0
 
         loss.backward(retain_graph=True)
 
         aloss += loss.detach()
-        amis += misfit.detach().item()
-        amisb += misfitBackward.detach().item()
+        amis  += misfitFor.detach().item()
+        amisb += misfitBack.detach().item()
 
         optimizer.step()
         nprnt = 10
@@ -148,29 +154,24 @@ for j in range(epochs):
     with torch.no_grad():
         misVal = 0
         misbVal = 0
-        nVal = 4 #len(SVal)
+        nVal = 50 #len(SVal)
         for jj in range(nVal):
-            Z, Coords, M = getIterData(SVal, AindVal, YobsVal, MSKVal, jj, device=device)
-            M = torch.ger(M, M)
-            Zout, Zold = model(Coords)
-            #onehotZ = torch.argmax(Z[20:, :], dim=0)
+            Seq, PSSM = getIterData(SVal, AindVal, jj, device=device)
+
+            # From Coords to Seq
+            PSSMout, PSSMold = model(Seq)
+            SeqOut, SeqOld = model.backwardProp(PSSM)
+
             onehotZ = AindVal[jj].to(device)
             wloss = torch.zeros(20).to(device)
             for kk in range(20):
                 wloss[kk] = torch.sum(onehotZ == kk)
             wloss = 1.0 / (wloss + 1.0)
-            misfit = F.cross_entropy(Zout[20:, :].t(), onehotZ, wloss)
-            misVal += misfit
-            # From Seq to Coord
-            Cout, CoutOld = model.backwardProp(Z)
-            DM = utils.getDistMat(Cout)
-            DMt = utils.getDistMat(Coords)
-            dm = DMt.max()
-            D = torch.exp(-DM / (dm * sig))
-            Dt = torch.exp(-DMt / (dm * sig))
-            misfitBackward = torch.norm(M * Dt - M * D) ** 2 / torch.norm(M * Dt) ** 2
-            misbVal += misfitBackward
 
+            misfitFor = kl_div(PSSMout, PSSM)
+            misfitBack = F.cross_entropy(SeqOut.t(), onehotZ, wloss)
+            misVal  += misfitFor
+            misbVal += misfitBack
         print("%2d       %10.3E   %10.3E" % (j, misVal / nVal, misbVal / nVal))
         print('===============================================')
 

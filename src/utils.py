@@ -331,3 +331,28 @@ def linearInterp1D(X,M):
     Xnew = f(ti)
 
     return Xnew
+
+def distConstraint(X,dc=0.375):
+    n = X.shape[1]
+    dX = X[:,1:] - X[:,:-1]
+    d  = torch.sqrt(torch.sum(dX**2,dim=0,keepdim=True))
+    dX = (dX/d)*dc
+
+    Xh = torch.zeros(3,n, device=X.device)
+    Xh[:, 0]  = X[:, 0]
+    Xh[:, 1:] = X[:, 0].unsqueeze(1) + torch.cumsum(dX, dim=1)
+
+    return Xh
+
+def kl_div(p, q, weight=False):
+    n = p.shape[1]
+    p   = torch.log_softmax(p, dim=0)
+    KLD = F.kl_div(p.unsqueeze(0), q.unsqueeze(0), reduction='none').squeeze(0)
+    if weight:
+        r = torch.sum(q,dim=1)
+    else:
+        r = torch.ones(q.shape[0])
+
+    r = r/r.sum()
+    KLD = torch.diag(1-r)@KLD
+    return KLD.sum()/KLD.shape[1]

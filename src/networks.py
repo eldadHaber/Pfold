@@ -637,10 +637,9 @@ class hyperNet(nn.Module):
         l = self.W.shape[0]
         Kopen = self.Kopen
         Kclose = self.Kclose
-
-        Z = Kopen@Z
-        Zold = Z
         L, D = utils.getGraphLap(Z)
+        Z = (Kopen@Z)@L
+        Zold = Z
         for i in range(l):
             if i%10==0:
                 L, D = utils.getGraphLap(Z)
@@ -655,8 +654,8 @@ class hyperNet(nn.Module):
             # for non hyperbolic use
             # Z = Z - h*Ai.squeeze(0)
         # closing layer back to desired shape
-        Z    = Kclose@Z
-        Zold = Kclose@Zold
+        Z    = (Kclose@Z)@L
+        Zold = (Kclose@Zold)@L
         return Z, Zold
 
     def backwardProp(self, Z):
@@ -667,10 +666,11 @@ class hyperNet(nn.Module):
         Kopen = self.Kopen
         Kclose = self.Kclose
 
-        # opening layer
-        Z = Kclose.t()@Z
-        Zold = Z
         L, D = utils.getGraphLap(Z)
+        # opening layer
+        Z = (Kclose.t()@Z)@L
+        Zold = Z
+
         for i in reversed(range(l)):
             if i%10==0:
                 L, D = utils.getGraphLap(Z)
@@ -683,8 +683,8 @@ class hyperNet(nn.Module):
             Zold = Ztemp
 
         # closing layer back to desired shape
-        Z    = Kopen.t()@Z
-        Zold = Kopen.t()@Zold
+        Z    = (Kopen.t()@Z)@L
+        Zold = (Kopen.t()@Zold)@L
         return Z, Zold
 
 
