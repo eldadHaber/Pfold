@@ -633,19 +633,21 @@ class hyperNet(nn.Module):
 
         return Ai
 
-    def doubleSymGradLayer(self, Z, Wi, Bi):
+    def doubleSymGradLayer(self, Z, Wi, Bi, D):
 
         Ai0 = conv1((Z + Bi[0]).unsqueeze(0), Wi[0])
         Ai0 = F.instance_norm(Ai0)
 
-        Ai1 = utils.graphGrad(Z,conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0)).unsqueeze(0)
+        C1  = conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0)
+        Ai1 = utils.graphGrad(C1,D).unsqueeze(0)
         Ai1 = F.instance_norm(Ai1)
         Ai0 = torch.relu(Ai0)
         Ai1 = torch.relu(Ai1)
 
         # Layer T
         Ai0 = conv1T(Ai0, Wi[0])
-        Ai1 = utils.graphDiv(Z,conv1T(Ai1, Wi[1]).squeeze(0)).unsqueeze(0)
+        C1  = conv1T(Ai1, Wi[1]).squeeze(0)
+        Ai1 = utils.graphDiv(C1,D).unsqueeze(0)
         Ai = Ai0 + Ai1
 
         return Ai
@@ -657,7 +659,7 @@ class hyperNet(nn.Module):
         Kopen = self.Kopen
         Kclose = self.Kclose
         L, D = utils.getGraphLap(Z)
-        Z = (Kopen@Z)@L
+        Z = Kopen@Z
         Zold = Z
         for i in range(l):
             if i%10==0:
@@ -666,16 +668,16 @@ class hyperNet(nn.Module):
             Wi = self.W[i]
             Bi = self.Bias[i]
             # Layer
-            Ai = self.doubleSymLayer(Z, Wi, Bi, L)
-            #Ai = self.doubleSymGradLayer(Z, Wi, Bi)
+            #Ai = self.doubleSymLayer(Z, Wi, Bi, L)
+            Ai = self.doubleSymGradLayer(Z, Wi, Bi, D)
             Ztemp = Z
             Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
             Zold = Ztemp
             # for non hyperbolic use
             # Z = Z - h*Ai.squeeze(0)
         # closing layer back to desired shape
-        Z    = (Kclose@Z)@L
-        Zold = (Kclose@Zold)@L
+        Z    = Kclose@Z
+        Zold = Kclose@Zold
         return Z, Zold
 
     def backwardProp(self, Z):
@@ -688,7 +690,7 @@ class hyperNet(nn.Module):
 
         L, D = utils.getGraphLap(Z)
         # opening layer
-        Z = (Kclose.t()@Z)@L
+        Z = Kclose.t()@Z
         Zold = Z
 
         for i in reversed(range(l)):
@@ -696,15 +698,15 @@ class hyperNet(nn.Module):
                 L, D = utils.getGraphLap(Z)
             Wi = self.W[i]
             Bi = self.Bias[i]
-            Ai = self.doubleSymLayer(Z, Wi, Bi, L)
-            #Ai = self.doubleSymGradLayer(Z, Wi, Bi)
+            #Ai = self.doubleSymLayer(Z, Wi, Bi, L)
+            Ai = self.doubleSymGradLayer(Z, Wi, Bi, D)
             Ztemp = Z
             Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
             Zold = Ztemp
 
         # closing layer back to desired shape
-        Z    = (Kopen.t()@Z)@L
-        Zold = (Kopen.t()@Zold)@L
+        Z    = (Kopen.t()@Z)
+        Zold = (Kopen.t()@Zold)
         return Z, Zold
 
 

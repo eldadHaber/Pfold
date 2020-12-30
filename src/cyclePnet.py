@@ -111,7 +111,6 @@ optimizer = optim.Adam([{'params': model.Kopen, 'lr': lrO},
                         {'params': model.Bias, 'lr': lrB}])
 
 alossBest = 1e6
-ndata = len(S)
 epochs = 1
 sig   = 0.3
 ndata = 3 #n_data_total

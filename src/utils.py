@@ -262,10 +262,10 @@ def getGraphLap(X,sig=10):
     dev = X.device
     pos = pos.to(dev)
     Xa = torch.cat((X, 5e1*pos), dim=0)
-    W = getDistMat(Xa)
-    W = torch.exp(-W/sig)
-    D = torch.diag(torch.sum(W, dim=0))
-    L = D - W
+    W  = getDistMat(Xa)
+    We = torch.exp(-W/sig)
+    D  = torch.diag(torch.sum(We, dim=0))
+    L = D - We
     Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
     L = Dh @ L @ Dh
 
@@ -357,28 +357,43 @@ def kl_div(p, q, weight=False):
     KLD = torch.diag(1-r)@KLD
     return KLD.sum()/KLD.shape[1]
 
-def graphGrad(X,b):
-    n = X.shape[1]
-    D = torch.relu(torch.sum(X**2,dim=0,keepdim=True) + torch.sum(X**2, dim=0, keepdim=True).t() - 2*X.t()@X)
+def graphGrad(b, D):
+    #D = torch.relu(torch.sum(X**2,dim=0,keepdim=True) + torch.sum(X**2, dim=0, keepdim=True).t() - 2*X.t()@X)
+    n = D.shape[1]
+    m = b.shape[0]
     idx = torch.triu(torch.ones(n, n), 1) > 0
     h = D[idx]
 
-    B = b.reshape(n,1) - b.reshape(n,1).t()
-    c = B[idx]/h
+    B = b.unsqueeze(2) - b.unsqueeze(2).transpose(1,2)
+    c = B[:,idx]/h
     return c
 
-def graphDiv(X,c):
+def graphDiv(c, D):
 
-    n = X.shape[1]
-    D = torch.relu(torch.sum(X **2,dim=0,keepdim=True) + torch.sum(X**2,dim=0,keepdim=True).t() - 2*X.t()@X)
+    #D = torch.relu(torch.sum(X **2,dim=0,keepdim=True) + torch.sum(X**2,dim=0,keepdim=True).t() - 2*X.t()@X)
+    n = D.shape[1]
+    m = c.shape[0]
     idx = torch.triu(torch.ones(n, n), 1) > 0
     h = D[idx]
 
-    C = torch.zeros(n,n)
-    C[idx] = c.view(-1)/h
+    C = torch.zeros(m,n,n)
+    C[:,idx] = c/h
 
-    e = torch.ones(n,1)
-    b = C@e - (e.t()@C).t()
+    b = torch.sum(C,2) - torch.sum(C,1)
 
     return b
 
+
+# dp = v'*g = v'*Grad b
+#D = torch.rand(40,40)
+#D = D@D.t()
+#b = torch.rand(16,40)
+#g = graphGrad(b, D)
+
+#v = torch.randn(g.shape[0],g.shape[1])
+#dp1 = torch.sum(v*g,dim=1)
+
+#t = graphDiv(v, D)
+#dp2 = torch.sum(b*t,dim=1)
+
+#print(dp1-dp2)
