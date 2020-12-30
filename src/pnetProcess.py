@@ -436,17 +436,19 @@ def convertCoordToAnglesVec(rN, rCa, rCb, mask=1.0):
     return OMEGA, PHI, THETA
 
 
-#id, seq, pssm2, entropy, dssp, rN,rCa,rCb, mask = parse_pnet('../../../data/casp11/validation')
+# id, seq, pssm2, entropy, dssp, rN,rCa,rCb, mask = parse_pnet('../../../data/casp11/validation')
 #
-#numprot = len(id)
-#Aind = []
-#PSSM = []
-#E    = []
-#ra  = []
-#M    = []
-#L2np = list2np()
+# numprot = len(id)
+# Aind = []
+# PSSM = []
+# E    = []
+# ra  = []
+# rb = []
+# rn = []
+# M    = []
+# L2np = list2np()
 #
-#for idx in range(numprot):
+# for idx in range(numprot):
 #
 #
 #    Ai, PSSMi, Ei, rNi, rCai, rCbi, mski = L2np(seq[idx], pssm2[idx], entropy[idx],
@@ -458,12 +460,16 @@ def convertCoordToAnglesVec(rN, rCa, rCb, mask=1.0):
 #        PSSM.append(torch.tensor(PSSMi))
 #        E.append(torch.tensor(Ei))
 #        ra.append(torch.tensor(rCai))
+#        rb.append(torch.tensor(rCbi))
+#        rn.append(torch.tensor(rNi))
 #        M.append(torch.tensor(mski))
 #
 #torch.save(Aind,'AminoAcidIdxVal.pt')
 #torch.save(PSSM,'PSSMVal.pt')
 #torch.save(E,'entropyVal.pt')
 #torch.save(ra,'RCalphaVal.pt')
+#torch.save(rb,'RBalphaVal.pt')
+#torch.save(rn,'RNVal.pt')
 #torch.save(M,'MasksVal.pt')
 
 

@@ -29,6 +29,12 @@ YobsVal = torch.load('../../../data/casp11/RCalphaVal.pt')
 MSKVal  = torch.load('../../../data/casp11/MasksVal.pt')
 SVal     = torch.load('../../../data/casp11/PSSMVal.pt')
 
+# load Testing data
+AindTesting = torch.load('../../../data/casp11/AminoAcidIdxTesting.pt')
+YobsTesting = torch.load('../../../data/casp11/RCalphaTesting.pt')
+MSKTesting  = torch.load('../../../data/casp11/MasksTesting.pt')
+STesting     = torch.load('../../../data/casp11/PSSMTesting.pt')
+
 
 
 print('Number of data: ', len(S))
@@ -108,7 +114,7 @@ alossBest = 1e6
 ndata = len(S)
 epochs = 1
 sig   = 0.3
-ndata = 1000 #n_data_total
+ndata = 3 #n_data_total
 bestModel = model
 hist = torch.zeros(epochs)
 
@@ -126,10 +132,12 @@ for j in range(epochs):
         optimizer.zero_grad()
         # From Coords to Seq
         Zout, Zold = model(Coords)
-        misfit = utils.kl_div(Zout[:20, :], Z[:20,:],weight=True)
+        PSSMpred = F.softshrink(Zout[:20, :].abs(), Zout.abs().mean().item() / 5)
+        misfit = utils.kl_div(PSSMpred, Z[:20, :], weight=True)
+
         # From Seq to Coord
         Cout, CoutOld = model.backwardProp(Z)
-        d = torch.sqrt(torch.sum((Coords[:, 1:] - Coords[:, :-1])**2, dim=0)).mean()
+        d = torch.sqrt(torch.sum((Coords[:, 1:] - Coords[:, :-1]) ** 2, dim=0)).mean()
         Cout = utils.distConstraint(Cout, d)
         CoutOld = utils.distConstraint(CoutOld, d)
 
@@ -139,6 +147,8 @@ for j in range(epochs):
         D = torch.exp(-DM / (dm * sig))
         Dt = torch.exp(-DMt / (dm * sig))
         misfitBackward = torch.norm(M * Dt - M * D) ** 2 / torch.norm(M * Dt) ** 2
+        # W = 1/(DMt+1e-4*torch.ones(DMt.shape[0], device=device))
+        misfitBackward = torch.norm((M * Dt - M * D)) ** 2 / torch.norm((M * Dt)) ** 2
 
         R = model.NNreg()
         C0 = torch.norm(Cout - CoutOld) ** 2 / torch.numel(Z)
@@ -152,7 +162,8 @@ for j in range(epochs):
         amisb += misfitBackward.detach().item()
 
         optimizer.step()
-        nprnt = 10
+        # scheduler.step()
+        nprnt = 1000
         if (i + 1) % nprnt == 0:
             amis = amis / nprnt
             amisb = amisb / nprnt
@@ -170,19 +181,22 @@ for j in range(epochs):
     with torch.no_grad():
         misVal = 0
         misbVal = 0
-        nVal = 4 #len(SVal)
+        AQdis = 0
+        # nVal    = len(SVal)
+        nVal = len(STesting)
         for jj in range(nVal):
-            Z, Coords, M = getIterData(SVal, AindVal, YobsVal, MSKVal, jj, device=device)
+            # Z, Coords, M = getIterData(SVal, AindVal, YobsVal, MSKVal, jj,device=device)
+            Z, Coords, M = getIterData(STesting, AindTesting, YobsTesting, MSKTesting, jj, device=device)
             M = torch.ger(M, M)
             Zout, Zold = model(Coords)
-
-            misfit = utils.kl_div(Zout[:20, :], Z[:20, :],weight=True)
+            PSSMpred = F.softshrink(Zout[:20, :].abs(), Zout.abs().mean().item() / 5)
+            misfit = utils.kl_div(PSSMpred, Z[:20, :], weight=True)
 
             misVal += misfit
             # From Seq to Coord
             Cout, CoutOld = model.backwardProp(Z)
-            d = torch.sqrt(torch.sum((Coords[:,1:] - Coords[:,:-1])**2,dim=0)).mean()
-            Cout    = utils.distConstraint(Cout,d)
+            d = torch.sqrt(torch.sum((Coords[:, 1:] - Coords[:, :-1]) ** 2, dim=0)).mean()
+            Cout = utils.distConstraint(Cout, d)
             CoutOld = utils.distConstraint(CoutOld, d)
 
             DM = utils.getDistMat(Cout)
@@ -191,9 +205,13 @@ for j in range(epochs):
             D = torch.exp(-DM / (dm * sig))
             Dt = torch.exp(-DMt / (dm * sig))
             misfitBackward = torch.norm(M * Dt - M * D) ** 2 / torch.norm(M * Dt) ** 2
-            misbVal += misfitBackward
+            # W = 1/(DMt+1e-4*torch.ones(DMt.shape[0], device=device))
+            # misfitBackward = torch.norm((M*DMt-M*DM))**2/torch.norm((M*DMt))**2
 
-        print("%2d       %10.3E   %10.3E" % (j, misVal / nVal, misbVal / nVal))
+            misbVal += misfitBackward
+            AQdis += torch.norm(M * (DM - DMt)) / M.nonzero().shape[0]
+
+        print("%2d       %10.3E   %10.3E   %10.3E" % (j, misVal / nVal, misbVal / nVal, AQdis / nVal))
         print('===============================================')
 
     hist[j] = (aloss).item() / (ndata)

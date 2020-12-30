@@ -619,14 +619,33 @@ class hyperNet(nn.Module):
     def doubleSymLayer(self, Z, Wi, Bi, L):
         Ai0 = conv1((Z + Bi[0]).unsqueeze(0), Wi[0])
         Ai0 = F.instance_norm(Ai0)
+
         Ai1 = (conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0)@L).unsqueeze(0)
         Ai1 = F.instance_norm(Ai1)
+
         Ai0 = torch.relu(Ai0)
         Ai1 = torch.relu(Ai1)
 
         # Layer T
         Ai0 = conv1T(Ai0, Wi[0])
         Ai1 = (conv1T(Ai1, Wi[1]).squeeze(0) @ L.t()).unsqueeze(0)
+        Ai = Ai0 + Ai1
+
+        return Ai
+
+    def doubleSymGradLayer(self, Z, Wi, Bi):
+
+        Ai0 = conv1((Z + Bi[0]).unsqueeze(0), Wi[0])
+        Ai0 = F.instance_norm(Ai0)
+
+        Ai1 = utils.graphGrad(Z,conv1((Z + Bi[1]).unsqueeze(0), Wi[1]).squeeze(0)).unsqueeze(0)
+        Ai1 = F.instance_norm(Ai1)
+        Ai0 = torch.relu(Ai0)
+        Ai1 = torch.relu(Ai1)
+
+        # Layer T
+        Ai0 = conv1T(Ai0, Wi[0])
+        Ai1 = utils.graphDiv(Z,conv1T(Ai1, Wi[1]).squeeze(0)).unsqueeze(0)
         Ai = Ai0 + Ai1
 
         return Ai
@@ -648,6 +667,7 @@ class hyperNet(nn.Module):
             Bi = self.Bias[i]
             # Layer
             Ai = self.doubleSymLayer(Z, Wi, Bi, L)
+            #Ai = self.doubleSymGradLayer(Z, Wi, Bi)
             Ztemp = Z
             Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
             Zold = Ztemp
@@ -677,7 +697,7 @@ class hyperNet(nn.Module):
             Wi = self.W[i]
             Bi = self.Bias[i]
             Ai = self.doubleSymLayer(Z, Wi, Bi, L)
-
+            #Ai = self.doubleSymGradLayer(Z, Wi, Bi)
             Ztemp = Z
             Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
             Zold = Ztemp
@@ -699,47 +719,122 @@ class hyperNet(nn.Module):
 
 ##### END hyper Convolution Neural Networks ######
 
-class Attention(nn.Module):
-    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
+def restrict1D(Xf):
+    n  = Xf.shape
+    Xc = torch.zeros(n[0],2*n[1],n[2]//2, device=Xf.device)
+    Xc[:,:n[1],:] = Xf[:,:,0:-1:2] + Xf[:,:,1::2]
+    Xc[:,n[1]:,:] = Xf[:,:,1::2] - Xf[:,:,0:-1:2]
 
-    def __init__(self, Arch,W=torch.ones(1)):
-        super(Attention, self).__init__()
-        W = self.init_weights(Arch)
+    return Xc
+
+def prolong1D(Xc):
+    n  = Xc.shape
+    m1 = n[1]//2
+    m2 = n[2]*2
+    Xf = torch.zeros(n[0],m1,m2, device=Xc.device)
+    Xf[:,:,0:-1:2] = (Xc[:,:m1,:] - Xc[:,m1:,:])/2
+    Xf[:,:,1::2] = (Xc[:,:m1,:] + Xc[:,m1:,:])/2
+
+    return Xf
+
+class vnet1DRev(nn.Module):
+    """ VNet """
+    def __init__(self, Arch,nout,h=0.1):
+        super(vnet1DRev, self).__init__()
+        K, W = self.init_weights(Arch,nout)
+        self.K = K
         self.W = W
+        self.h = h
 
-    def init_weights(self,A):
+    def init_weights(self,A,nout,device='cpu'):
         print('Initializing network  ')
-        #Arch = [nin, nhidKQ, nhidV]
-        nhid = A[0]
-        nopen = A[1]
-        W = torch.zeros(3, 2, nhid, nopen, 9)
-        stdv = 1e-4
-        W.data.uniform_(-stdv, stdv)
-        W = nn.Parameter(W)
+        nL = A.shape[0]
+        K = nn.ParameterList([])
+        npar = 0
+        cnt = 1
+        for i in range(nL):
+            for j in range(A[i, 2]):
+                if A[i, 1] == A[i, 0]:
+                    stdv = 1e-4
+                else:
+                    stdv = 1e-4 * A[i, 0] / A[i, 1]
 
-        return W
-    def attnLayer(self,Z, W, L):
+                Ki = torch.zeros(A[i, 1], A[i, 0], A[i, 3])
+                Ki.data.uniform_(-stdv, stdv)
+                Ki = nn.Parameter(Ki)
+                print('layer number', cnt, 'layer size', Ki.shape[0], Ki.shape[1], Ki.shape[2])
+                cnt += 1
+                npar += np.prod(Ki.shape)
+                Ki.to(device)
+                K.append(Ki)
 
-        Q0 = conv1(Z.unsqueeze(0), W[0])
-        Q0 = F.instance_norm(Q0).squeeze(0)
-        Q1 = (conv1(Z.unsqueeze(0), W[1]).squeeze(0) @ L).unsqueeze(0)
-        Q1 = F.instance_norm(Q1).squeeze(0)
-        Q0 = torch.relu(Q0)
-        Q1 = torch.relu(Q1)
-        Q = Q0 + Q1
-        return Q
+        W = nn.Parameter(1e-4*torch.randn(nout, A[0,1], 1))
+        npar += W.numel()
+        print('Number of parameters  ', npar)
+        return K, W
 
-    def forward(self, Z, L=[]):
-        if len(L)==0:
-            L = torch.eye(Z.shape[1])
-        Q = self.attnLayer(Z, self.W[0], L)
-        K = self.attnLayer(Z, self.W[1], L)
-        V = self.attnLayer(Z, self.W[2], L)
+    def forward(self, x, m=1.0):
+        """ Forward propagation through the network """
 
-        A = torch.exp(Q@K.t())
-        a = torch.sum(A,dim=1,keepdim=True)
-        Aa = A/a
-        Aa = (Aa + Aa.t())/2.0
-        return Aa@V
+        # Number of layers
+        nL = len(self.K)
 
+        # Opening layer
+        z = conv1(x, self.K[0])
+        z = F.instance_norm(z)
+        x = F.relu(z)
 
+        # Step through the layers (down cycle)
+        n_scale = 1
+        for i in range(1, nL):
+
+            sK = self.K[i].shape
+
+            if sK[0] == sK[1]:
+                z  = conv1(x, self.K[i])
+                z  = F.instance_norm(z)
+                #z = tv_norm(z)
+                z  = F.relu(z)
+                z  = conv1T(z, self.K[i])
+                x  = x - self.h*z
+
+            # Change number of channels/resolution
+            else:
+                z  = conv1(x, self.K[i])
+                z  = F.instance_norm(z)
+                x  = F.relu(z)
+
+                # Downsample by factor of 2
+                x = restrict1D(x)
+                n_scale += 1
+        # Step back through the layers (up cycle)
+        for i in reversed(range(1, nL)):
+
+            # First case - Residual blocks
+            # (same number of input and output kernels)
+            sK = self.K[i].shape
+            if sK[0] == sK[1]:
+                z  = conv1T(x, self.K[i])
+                z  = F.instance_norm(z)
+                z  = F.relu(z)
+                z  = conv1(z, self.K[i])
+
+                x  = x - self.h*z
+
+            # Change number of channels/resolution
+            else:
+                n_scale -= 1
+                # Upsample by factor of 2
+                x = prolong1D(x)
+
+                z  = conv1T(x, self.K[i])
+                z  = F.instance_norm(z)
+                x  = F.relu(z)
+
+        x = conv1(x, self.W)
+        return x
+
+#
+#
+#
+##### END 1D RevVNET ###########################

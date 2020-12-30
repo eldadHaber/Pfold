@@ -356,3 +356,29 @@ def kl_div(p, q, weight=False):
     r = r/r.sum()
     KLD = torch.diag(1-r)@KLD
     return KLD.sum()/KLD.shape[1]
+
+def graphGrad(X,b):
+    n = X.shape[1]
+    D = torch.relu(torch.sum(X**2,dim=0,keepdim=True) + torch.sum(X**2, dim=0, keepdim=True).t() - 2*X.t()@X)
+    idx = torch.triu(torch.ones(n, n), 1) > 0
+    h = D[idx]
+
+    B = b.reshape(n,1) - b.reshape(n,1).t()
+    c = B[idx]/h
+    return c
+
+def graphDiv(X,c):
+
+    n = X.shape[1]
+    D = torch.relu(torch.sum(X **2,dim=0,keepdim=True) + torch.sum(X**2,dim=0,keepdim=True).t() - 2*X.t()@X)
+    idx = torch.triu(torch.ones(n, n), 1) > 0
+    h = D[idx]
+
+    C = torch.zeros(n,n)
+    C[idx] = c.view(-1)/h
+
+    e = torch.ones(n,1)
+    b = C@e - (e.t()@C).t()
+
+    return b
+
