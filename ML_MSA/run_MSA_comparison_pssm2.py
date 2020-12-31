@@ -35,7 +35,7 @@ n_test_toks = len(test_toks)
 # batch_labels, batch_strs, batch_tokens = batch_converter(data)
 
 #Load sequence
-folder = './../data/casp11_training_90/'
+folder = './../data/casp11_validation/'
 search_command = folder + "*.npz"
 npzfiles = [f for f in glob.glob(search_command)]
 
@@ -94,7 +94,7 @@ for ii,npzfile in enumerate(npzfiles):
     #            'Y': '19', '-': '20'}
     pssm = pssm25.cpu().numpy().T
     id = dat['id']
-    save = "./../data/casp11_training_90_ml/{:}.npz".format(id)
+    save = "./../data/casp11_validation_ml/{:}.npz".format(id)
     np.savez(save, seq=dat['seq'], pssm=pssm, entropy=dat['entropy'],r1=dat['r1'],r2=dat['r2'],r3=dat['r3'],id=dat['id'])
 input("Press Enter to continue...")
 print("done")
