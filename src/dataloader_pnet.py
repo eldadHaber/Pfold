@@ -5,6 +5,7 @@ import time
 import numpy as np
 from torch.utils.data import Dataset
 
+from ML_MSA.MSA_utils import AA_converter
 from src.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
     DrawFromProbabilityMatrix
 
@@ -138,11 +139,13 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False):
+def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, AA_list, unk_idx, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False):
     """
     Read all protein records from pnet file.
     Note that pnet files have coordinates saved in picometers, but we load it in in nanometers instead, since that works better with the neural networks.
     """
+
+    AA = AA_converter(AA_list,unk_idx)
 
     id = []
     seq = []
@@ -163,8 +166,9 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
                 cnt += 1
                 id_i = file_.readline()[:-1]
             elif case('[PRIMARY]' + '\n'):
-                seq_i = letter_to_num(file_.readline()[:-1], AA_DICT)
-                seq_len_i = len(seq_i)
+                primary = file_.readline()[:-1]
+                seq_i = AA([primary])
+                seq_len_i = seq_i.shape[-1]
                 if seq_len_i <= max_seq_len and seq_len_i >= min_seq_len:
                     seq_ok = True
                     id.append(id_i)
@@ -200,10 +204,10 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
-def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
+def parse_pnet(file, AA_list, unk_idx, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
     with open(file, 'r') as f:
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len)
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, AA_list=AA_list, unk_idx=unk_idx, min_seq_len=min_seq_len, max_seq_len=max_seq_len)
         print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
         r1 = []
         r2 = []

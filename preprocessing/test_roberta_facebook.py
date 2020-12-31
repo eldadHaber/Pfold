@@ -2,7 +2,9 @@ import torch
 import esm
 import numpy as np
 # Load 34 layer model
-model, alphabet = esm.pretrained.esm1_t34_670M_UR50S()
+# model, alphabet = esm.pretrained.esm1_t34_670M_UR50S()
+model, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
+
 batch_converter = alphabet.get_batch_converter()
 
 # Prepare data (two protein sequences)
