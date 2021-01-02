@@ -357,27 +357,31 @@ def kl_div(p, q, weight=False):
     KLD = torch.diag(1-r)@KLD
     return KLD.sum()/KLD.shape[1]
 
-def graphGrad(b, D):
+def graphGrad(b, D, h0=1):
     #D = torch.relu(torch.sum(X**2,dim=0,keepdim=True) + torch.sum(X**2, dim=0, keepdim=True).t() - 2*X.t()@X)
     n = D.shape[1]
     m = b.shape[0]
-    idx = torch.triu(torch.ones(n, n), 1) > 0
+    idx = torch.triu(torch.ones(n, n,device=b.device), 1) > 0
     h = D[idx]
 
     B = b.unsqueeze(2) - b.unsqueeze(2).transpose(1,2)
-    c = B[:,idx]/h
-    return c
+    hh = torch.relu(1/h - 1/h0)
+    c = B[:,idx]*hh
+    idx = c>0
+    return c, idx
 
-def graphDiv(c, D):
+def graphDiv(c, D, h0=1):
 
     #D = torch.relu(torch.sum(X **2,dim=0,keepdim=True) + torch.sum(X**2,dim=0,keepdim=True).t() - 2*X.t()@X)
     n = D.shape[1]
     m = c.shape[0]
-    idx = torch.triu(torch.ones(n, n), 1) > 0
+    idx = torch.triu(torch.ones(n, n,device=D.device), 1) > 0
     h = D[idx]
+    hh = torch.relu(1/h - 1/h0)
 
-    C = torch.zeros(m,n,n)
-    C[:,idx] = c/h
+    C = torch.zeros(m,n,n,device=D.device)
+    print(c.shape, torch.sum(hh>0))
+    C[:,idx] = c*hh[hh>0]
 
     b = torch.sum(C,2) - torch.sum(C,1)
 
@@ -385,15 +389,15 @@ def graphDiv(c, D):
 
 
 # dp = v'*g = v'*Grad b
-#D = torch.rand(40,40)
-#D = D@D.t()
-#b = torch.rand(16,40)
-#g = graphGrad(b, D)
+D = 2*torch.rand(40,40)
+D = D@D.t()
+b = torch.randn(16,40)
+g, idx = graphGrad(b, D,50)
 
-#v = torch.randn(g.shape[0],g.shape[1])
-#dp1 = torch.sum(v*g,dim=1)
+v = torch.randn(g.shape[0],g.shape[1])
+dp1 = torch.sum(v*g,dim=1)
 
-#t = graphDiv(v, D)
-#dp2 = torch.sum(b*t,dim=1)
+t = graphDiv(v, D, 50)
+dp2 = torch.sum(b*t,dim=1)
 
 #print(dp1-dp2)

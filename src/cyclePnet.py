@@ -111,9 +111,9 @@ optimizer = optim.Adam([{'params': model.Kopen, 'lr': lrO},
                         {'params': model.Bias, 'lr': lrB}])
 
 alossBest = 1e6
-epochs = 1
+epochs = 3
 sig   = 0.3
-ndata = 3 #n_data_total
+ndata = 1000 #n_data_total
 bestModel = model
 hist = torch.zeros(epochs)
 
@@ -162,7 +162,7 @@ for j in range(epochs):
 
         optimizer.step()
         # scheduler.step()
-        nprnt = 1000
+        nprnt = 10
         if (i + 1) % nprnt == 0:
             amis = amis / nprnt
             amisb = amisb / nprnt
@@ -208,7 +208,7 @@ for j in range(epochs):
             # misfitBackward = torch.norm((M*DMt-M*DM))**2/torch.norm((M*DMt))**2
 
             misbVal += misfitBackward
-            AQdis += torch.norm(M * (DM - DMt)) / M.nonzero().shape[0]
+            AQdis += torch.norm(M * (DM - DMt)) / torch.sum(M>0)
 
         print("%2d       %10.3E   %10.3E   %10.3E" % (j, misVal / nVal, misbVal / nVal, AQdis / nVal))
         print('===============================================')
