@@ -262,9 +262,9 @@ def getGraphLap(X,sig=10):
     dev = X.device
     pos = pos.to(dev)
     Xa = torch.cat((X, 5e1*pos), dim=0)
-    W  = getDistMat(Xa)
+    W = getDistMat(Xa)
     We = torch.exp(-W/sig)
-    D  = torch.diag(torch.sum(We, dim=0))
+    D = torch.diag(torch.sum(We, dim=0))
     L = D - We
     Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
     L = Dh @ L @ Dh
@@ -341,7 +341,7 @@ def distConstraint(X,dc=0.375):
     Xh = torch.zeros(3,n, device=X.device)
     Xh[:, 0]  = X[:, 0]
     Xh[:, 1:] = X[:, 0].unsqueeze(1) + torch.cumsum(dX, dim=1)
-
+    
     return Xh
 
 def kl_div(p, q, weight=False):
@@ -351,13 +351,13 @@ def kl_div(p, q, weight=False):
     if weight:
         r = torch.sum(q,dim=1)
     else:
-        r = torch.ones(q.shape[0])
+        r = torch.ones(q.shape[0],device=p.device)
 
     r = r/r.sum()
     KLD = torch.diag(1-r)@KLD
     return KLD.sum()/KLD.shape[1]
 
-def graphGrad(b, D, h0=1):
+def graphGrad(b, D):
     #D = torch.relu(torch.sum(X**2,dim=0,keepdim=True) + torch.sum(X**2, dim=0, keepdim=True).t() - 2*X.t()@X)
     n = D.shape[1]
     m = b.shape[0]
@@ -365,39 +365,20 @@ def graphGrad(b, D, h0=1):
     h = D[idx]
 
     B = b.unsqueeze(2) - b.unsqueeze(2).transpose(1,2)
-    hh = torch.relu(1/h - 1/h0)
-    c = B[:,idx]*hh
-    idx = c>0
-    return c, idx
+    c = B[:,idx]/h
+    return c
 
-def graphDiv(c, D, h0=1):
+def graphDiv(c, D):
 
     #D = torch.relu(torch.sum(X **2,dim=0,keepdim=True) + torch.sum(X**2,dim=0,keepdim=True).t() - 2*X.t()@X)
     n = D.shape[1]
     m = c.shape[0]
     idx = torch.triu(torch.ones(n, n,device=D.device), 1) > 0
     h = D[idx]
-    hh = torch.relu(1/h - 1/h0)
 
     C = torch.zeros(m,n,n,device=D.device)
-    print(c.shape, torch.sum(hh>0))
-    C[:,idx] = c*hh[hh>0]
+    C[:,idx] = c/h
 
     b = torch.sum(C,2) - torch.sum(C,1)
 
     return b
-
-
-# dp = v'*g = v'*Grad b
-D = 2*torch.rand(40,40)
-D = D@D.t()
-b = torch.randn(16,40)
-g, idx = graphGrad(b, D,50)
-
-v = torch.randn(g.shape[0],g.shape[1])
-dp1 = torch.sum(v*g,dim=1)
-
-t = graphDiv(v, D, 50)
-dp2 = torch.sum(b*t,dim=1)
-
-#print(dp1-dp2)
