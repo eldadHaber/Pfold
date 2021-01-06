@@ -62,7 +62,7 @@ for ii,npzfile in enumerate(npzfiles):
     # if ii<10:
     #     continue
     file_index = int(npzfile.split("_")[-1].split(".")[0])
-    # file_index = 4068
+    file_index = 10078
     # filename = 'F:/Globus/raw_subset/3U9P_d3u9pm2.a2m.gz'
     filename = a2mfiles[file_index] #103 123 125 130 140
 
@@ -106,60 +106,34 @@ for ii,npzfile in enumerate(npzfiles):
     jj_ref = jj_ref.to(device)
     model.to(device)
     n = seqs_ref.shape[0]
-    cov_ref = torch.ones((l,l,n_test_toks),device=device)
+    cov_ref = torch.zeros((l,l,n_test_toks),device=device)
     tt0 = time.time()
     maxiter = np.int(np.ceil(n/nb))
-    # i =0
-    # tt1 = time.time()
-    # i0 = i * nb
-    # i1 = (i + 1) * nb
-    # seq_ref_batch = seqs_ref[i0:i1, :]
-    # iii = ii_ref[i0:i1]
-    # jjj = jj_ref[i0:i1]
-    # # seq_batch = seq_batch.to(device)
+
     # for i in range(maxiter):
+    #     tt1 = time.time()
+    #     i0 = i*nb
+    #     i1 = (i+1)*nb
+    #     seq_ref_batch = seqs_ref[i0:i1,:]
+    #     iii = ii_ref[i0:i1]
+    #     jjj = jj_ref[i0:i1]
+    #     # seq_batch = seq_batch.to(device)
+    #     tt2 = time.time()
     #     with torch.no_grad():
-    #         tt2 = time.time()
-    #         _ = model(seq_ref_batch)
+    #         results = model(seq_ref_batch)
     #         tt3 = time.time()
-    #         # pred = results['logits']
-    #         # a=torch.arange(iii.shape[0],device=device)
-    #         # pred = pred[a,iii,:]
-    #         # pred = pred[:,4:-4]
-    #         # prob = torch.softmax(pred, dim=1)
-    #         # peff = prob
-    #         # cov_ref[iii-1,jjj-1,:] = peff
-    #         # tt4 = time.time()
-    #     print("{:}/{:} times {:2.2f}s".format(i,maxiter,tt3-tt2))
+    #         pred = results['logits']
+    #         a=torch.arange(iii.shape[0],device=device)
+    #         pred = pred[a,iii,:]
+    #         pred = pred[:,4:-4]
+    #         prob = torch.softmax(pred, dim=1)
+    #         peff = prob
+    #         cov_ref[iii-1,jjj-1,:] = peff
+    #         tt4 = time.time()
+    #     print("{:}/{:} times {:2.2f},{:2.2f},{:2.2f},{:2.2f}s, ETA {:2.2f}h".format(i,maxiter,tt2-tt1,tt3-tt2,tt4-tt3,tt4-tt0,(tt4-tt0)/(i+1)*(maxiter-(i+1))/3600))
     #
     # save = "./../figures/cov_ref_{}.pt".format(file_index)
     # torch.save(cov_ref, save)
-
-
-    for i in range(maxiter):
-        tt1 = time.time()
-        i0 = i*nb
-        i1 = (i+1)*nb
-        seq_ref_batch = seqs_ref[i0:i1,:]
-        iii = ii_ref[i0:i1]
-        jjj = jj_ref[i0:i1]
-        # seq_batch = seq_batch.to(device)
-        tt2 = time.time()
-        with torch.no_grad():
-            results = model(seq_ref_batch)
-            tt3 = time.time()
-            pred = results['logits']
-            a=torch.arange(iii.shape[0],device=device)
-            pred = pred[a,iii,:]
-            pred = pred[:,4:-4]
-            prob = torch.softmax(pred, dim=1)
-            peff = prob
-            cov_ref[iii-1,jjj-1,:] = peff
-            tt4 = time.time()
-        print("{:}/{:} times {:2.2f},{:2.2f},{:2.2f},{:2.2f}s, ETA {:2.2f}h".format(i,maxiter,tt2-tt1,tt3-tt2,tt4-tt3,tt4-tt0,(tt4-tt0)/(i+1)*(maxiter-(i+1))/3600))
-
-    save = "./../figures/cov_ref_{}.pt".format(file_index)
-    torch.save(cov_ref, save)
 
     # seq = "MYMKKLKFITLTLAIIITLPMLQSCLDDNDHQSRSLVISTINQISEDSKEFYFTLDNGKTMFPSNSQAWGGEKFENGQRAFVIFNELEQPVNGYDYNIQVRDITKVLTKEIVTMDDEENTEEKIGDDKINATYMWISKDKKYLTIEFQYYSTHSEDKKHFLNLVINNKEADSAAENEDNTDDEYINLEFRHNSERDSPDHLGEGYVSFKLDKIEEQIEGKKGLNIRVRTLYDGIKNYKVQFP"
     # data = [("sequence",seq),]
@@ -183,7 +157,7 @@ for ii,npzfile in enumerate(npzfiles):
         seq_batch = seqs[i0:i1,:]
         iii = ii[i0:i1]
         jjj = jj[i0:i1]
-        prob_ref = cov_ref[iii,jjj,:]
+        prob_ref = cov_ref[iii-1,jjj-1,:]
         tok_i = toks[i0:i1]
         # seq_batch = seq_batch.to(device)
         tt2 = time.time()
@@ -200,8 +174,46 @@ for ii,npzfile in enumerate(npzfiles):
             tt4 = time.time()
         print("{:}/{:} times {:2.2f},{:2.2f},{:2.2f},{:2.2f}s, ETA {:2.2f}h".format(i,maxiter,tt2-tt1,tt3-tt2,tt4-tt3,tt4-tt0,(tt4-tt0)/(i+1)*(maxiter-(i+1))/3600))
 
+    #So we end up with cov of shape (l,l,nA,nA), where the first dimension is the masked residue, the second dimension is the one it is compared to, which is set the value in the third dimension, giving the probability in the 4th dimension
+
+
     save = "./../figures/cov_{}.pt".format(file_index)
     torch.save(cov, save)
+
+    import matplotlib
+    import matplotlib.pyplot as plt
+    nA = cov.shape[-1]
+    l = cov.shape[0]
+    fig = plt.figure(figsize=(15, 10))
+    for i in range(nA):
+        for j in range(nA):
+            plt.clf()
+            plt.imshow((cov[:,:,i,j].cpu()))
+            plt.title("Given amino acid i={:}, the probability for amino acid j={:} for all residue combinations.".format(i,j))
+            plt.xlabel("masked residue")
+            plt.ylabel("paired residue")
+            plt.colorbar()
+            save = "./../figures/cov_{:}_{:}_{:}".format(file_index,i,j)
+            plt.savefig("{:}.png".format(save))
+            # plt.pause(1)
+
+
+
+    for i in range(l):
+        for j in range(l):
+            plt.clf()
+            plt.imshow((cov[i,j,:,:].cpu()))
+            plt.title("residue i={:},j={:}".format(i,j))
+            plt.title("Residue i={:} is masked, and residue j={:} is set to the following amino acid.".format(i,j))
+            plt.xlabel("amino acid of residue j")
+            plt.ylabel("predicted amino acid of i")
+            plt.colorbar()
+            save = "./../figures/residue_cov_{:}_{:}_{:}".format(file_index,i,j)
+            plt.savefig("{:}.png".format(save))
+            # plt.pause(1)
+
+
+
 
     _, contact = msa2cov(MSA1hot, w, penalty=4.5)
     contact = contact.cpu()
