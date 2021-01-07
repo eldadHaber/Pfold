@@ -9,82 +9,98 @@ from src import pnetProcess
 from src import utils
 import matplotlib.pyplot as plt
 import torch.optim as optim
-
-
 from src import networks
-
-#X    = torch.load('../../../data/casp12Testing/Xtest.pt')
-Yobs = torch.load('../../../data/casp12Testing/Coordtest.pt')
-MSK  = torch.load('../../../data/casp12Testing/Masktest.pt')
-
-S     = torch.load('../../../data/casp12Testing/Seqtest.pt')
-Seq   = S[0].t()
-n = Seq.shape[1]
-Xtrue = Yobs[0][0,0,:n,:n]
-M     = MSK[0]
-
-M = torch.ger(M[:n],M[:n])
-X0 = torch.zeros(3,n)
-X0[0,:] = torch.linspace(-0.3309,0.9591,n)
-
-# initialization
-Z = torch.zeros(23,n)
-Z[:20,:] = 0.05*Seq
-Z[20:,:] = X0
+from src import graphUnetworks as gunts
 
 
-def gNN(Z,K,W):
+# Test Unet
+nLevels  = 4
+nin      = 40
+nsmooth  = 2
+nopen    = 64
+nLayers  = 18
+nout     = 3
+h        = 0.1
 
-    n = Seq.shape[1]
-    h = 0.1
-    l = W.shape[0]
-    # opening layer
-    Z = K@Z
-    for i in range(l):
-        # Compute eignevectors of the graph
-        L, D = utils.getGraphLap(Z, sig=2)
-        #L = L + 0.1*torch.eye(L.shape[0])
-        L    = L.t()@L
-        Wi = W[i, :, :]
+#model = gunts.GraphUnet(nL,nIn,nsmooth)
+model = gunts.stackedGraphUnet(nLevels,nsmooth,nin,nopen,nLayers,nout,h)
+x     = torch.randn(1,40,256)
+m     = torch.ones(1, 1,256)
 
-        # Layer
-        Z  = Z@L
-        Ai = Wi@Z
-        Ai = Ai - Ai.mean(dim=0,keepdim=True)
-        Ai = Ai/torch.sqrt(torch.sum(Ai**2,dim=0,keepdim=True)+1e-3)
-        Z  = Z - h*Wi.t()@torch.relu(Ai)@L.t()
+z, zold = model(x, m)
 
-    return Z
+'''
+# load Testing data
+AindTesting = torch.load('../../../data/casp11/AminoAcidIdxTesting.pt')
+YobsTesting = torch.load('../../../data/casp11/RCalphaTesting.pt')
+MSKTesting  = torch.load('../../../data/casp11/MasksTesting.pt')
+STesting     = torch.load('../../../data/casp11/PSSMTesting.pt')
 
-nopen = 128
-nlayers = 50
-K = nn.Parameter(1e-1*torch.rand(nopen,23))
-W = nn.Parameter(1e-5*torch.randn(nlayers,128,nopen))
-#Z = 0.5*Z
-lr = 1e-2
-sig = 0.2
-optimizer = optim.Adam([{'params': K},{'params': W}], lr=lr)
+def getIterData(S, Aind, Yobs, MSK, i, device='cpu',pad=0):
+    scale = 1e-3
+    PSSM = S[i].t()
+    n = PSSM.shape[1]
+    M = MSK[i][:n]
+    a = Aind[i]
 
-print('Number of parameters   ',W.numel() + K.numel())
+    # X = Yobs[i][0, 0, :n, :n]
+    X = Yobs[i].t()
+    X = utils.linearInterp1D(X, M)
+    X = torch.tensor(X)
 
-Kbest = K
-Wbest = W
-for j in range(1000):
+    X = X - torch.mean(X, dim=1, keepdim=True)
+    U, Lam, V = torch.svd(X)
 
-    optimizer.zero_grad()
-    Zout = gNN(Z,K,W)
-    D = torch.exp(-utils.getDistMat(Zout)/sig)
-    Dt = torch.exp(-utils.getDistMat(Xtrue)/sig)
-    loss = torch.norm(M*Dt-M*D)**2/torch.norm(M*Dt-0*D)**2
+    Coords = scale * torch.diag(Lam) @ V.t()
+    Coords = Coords.type('torch.FloatTensor')
 
-    loss.backward(retain_graph=True)
-    torch.nn.utils.clip_grad_norm_(K, 0.5)
-    torch.nn.utils.clip_grad_norm_(W, 0.5)
+    PSSM = PSSM.type(torch.float32)
+    #PSSM = augmentPSSM(PSSM, 0.01)
 
-    optimizer.step()
-    print(j,'     ',torch.sqrt(loss).item())
+    A = torch.zeros(20, n)
+    A[a, torch.arange(0, n)] = 1.0
+    Seq = torch.cat((PSSM, A))
+    Seq = Seq.to(device=device, non_blocking=True)
 
-plt.subplot(1,2,1)
-plt.imshow(D.detach())
-plt.subplot(1,2,2)
-plt.imshow(M*Dt)
+    Coords = Coords.to(device=device, non_blocking=True)
+    M = M.type('torch.FloatTensor')
+    M = M.to(device=device, non_blocking=True)
+
+    if pad > 0:
+        L = Coords.shape[1]
+        k = 2**torch.tensor(L, dtype=torch.float64).log2().round().int()
+        k = k.item()
+        CoordsPad = torch.zeros(3,k)
+        CoordsPad[:,:Coords.shape[1]] = Coords
+        SeqPad    = torch.zeros(Seq.shape[0],k)
+        SeqPad[:,:Seq.shape[1]] = Seq
+        Mpad      = torch.zeros(k)
+        Mpad[:M.shape[0]] = M
+        M = Mpad
+        Seq = SeqPad
+        Coords = CoordsPad
+
+    return Seq, Coords, M
+
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+Z, Coords, M = getIterData(STesting, AindTesting, YobsTesting, MSKTesting, 10, device=device, pad=1)
+
+n0 = 128
+sc = 3
+A = torch.tensor([128,256,512,1024])
+nin = 40
+nopen = 64
+nout =  3
+nL = 10
+h = 0.1
+
+model = networks.stackedUnet1D(A,nin,nopen,nout,nL)
+
+#Z = torch.randn(1,40,128)
+#m = torch.ones(1,128)
+Z = Z.unsqueeze(0)
+M = M.unsqueeze(0)
+Y = model(Z,M)
+
+Zh = model.backProp(Y,M)
+'''

@@ -23,10 +23,8 @@ def tv_norm(X, eps=1e-3):
     X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True) + eps)
     return X
 
-##### 1D VNET ###########################
-#
-#
-#
+
+
 class vnet1D(nn.Module):
     """ VNet """
     def __init__(self, Arch,nout,h=0.1):
@@ -153,6 +151,69 @@ class vnet1D(nn.Module):
 #
 #
 ##### END 1D VNET ###########################
+
+##### Stacked Unet ###########################
+
+class stackedUnet1D(nn.Module):
+    """ VNet """
+    def __init__(self, A,nin,nopen,nout,nL,h=0.1):
+        super(stackedUnet1D, self).__init__()
+        Unets, Kopen, Kclose = self.init_weights(A,nin,nopen,nout,nL,h)
+        self.Unets = nn.ModuleList(Unets)
+        self.h = h
+        self.Kopen = Kopen
+        self.Kclose = Kclose
+
+    def init_weights(self,A,nin,nopen,nout,nL,h):
+        print('Initializing network  ')
+        Kopen  = nn.Parameter(torch.rand(nopen, nin)*1e-3)
+        Kclose = nn.Parameter(torch.rand(nout, nopen)*1e-3)
+        A      = torch.cat((torch.tensor([nopen]),A))
+        Arch   = torch.zeros(len(A)-1,4,dtype=torch.int64)
+        for i in range(A.shape[0]-1):
+            Arch[i] = torch.tensor([A[i], A[i+1], 1, 5])
+
+        Unets = []
+        total_params = 0
+        for i in range(nL):
+            Unet = vnet1D(Arch,nopen,h)
+            Unets.append(Unet)
+            total_params += sum(p.numel() for p in Unet.parameters())
+
+        print('Total Number of parameters ', total_params)
+        return Unets, Kopen, Kclose
+
+    def forward(self, x, m=torch.tensor([1.0])):
+
+        nL = len(self.Unets)
+        x  = self.Kopen@x
+        xold = x
+        for i in range(nL):
+            temp = x
+            x = 2*x - xold - self.h**2*self.Unets[i](x,m)
+            xold = temp
+
+        x = self.Kclose@x
+        xold = self.Kclose@xold
+        return x, xold
+
+    def backProp(self, x, m=torch.tensor([1.0])):
+
+        nL = len(self.Unets)
+        x  = self.Kclose.t()@x
+        xold = x
+        for i in reversed(range(nL)):
+            temp = x
+            x = 2*x - xold - self.h**2*self.Unets[i](x,m)
+            xold = temp
+
+        x = self.Kopen.t()@x
+        xold = self.Kopen.t()@xold
+        return x, xold
+
+
+##### END 1D Stacked Unet ####################
+
 
 
 ##### VNET 2D ###########################

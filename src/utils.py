@@ -120,9 +120,6 @@ def rotatePoints(X, Xo):
     if X.shape != Xo.shape:
         U, S, V =  torch.svd(X)
         X = U[:,:3]@torch.diag(S[:3])@V[:3,:3].t()
-        #S[3:] = 0
-        #X = U@torch.diag(S)@V.t()
-        #X = X[:,:3]
 
     n, dim = X.shape
 
@@ -130,7 +127,6 @@ def rotatePoints(X, Xo):
     Xco = Xo - Xo.mean(dim=0)
 
     C = (Xc.t()@Xco) / n
-
     U, S, V = torch.svd(C)
     d = torch.sign((torch.det(U) * torch.det(V)))
 
@@ -149,7 +145,9 @@ def getRotDist(Xc, Xo, alpha = 1.0):
     Dc = torch.sum(Xc**2,dim=1,keepdim=True) + torch.sum(Xc**2,dim=1,keepdim=True).t() - 2*Xc@Xc.t()
     Dc = torch.sqrt(torch.relu(Dc))
 
-    return F.mse_loss(Xr, Xco) + alpha*F.mse_loss(Dc, Do)
+    dcoord = torch.norm(Xr-Xco)**2/torch.norm(Xco)**2
+    ddmat  = torch.norm(Dc-Do)**2/torch.norm(Do)**2
+    return dcoord + alpha*ddmat
 # Define some functions
 
 def move_tuple_to(args,device,non_blocking=True):
@@ -213,43 +211,7 @@ def orgProtData(x,normals,s, msk, sigma=1.0):
     # NN = NN[:, mm > 0]
     return XX, NN
 
-def getAdjMatrix(X,st=13):
-    # normalize the data
-    X = X - torch.mean(X, dim=1, keepdim=True)
-    X = X/torch.sqrt(torch.sum(X**2,dim=1,keepdim=True)/X.shape[1] + 1e-4)
-    W = getDistMat(X)
-    n = W.shape[0]
-    # Position matrix
-    P = torch.diag(torch.ones(n)) + \
-        torch.diag(torch.ones(n-1),-1) + \
-        torch.diag(torch.ones(n-2),-2) + \
-        torch.diag(torch.ones(n-3),-3)
-    P = P + P.t()
-    for jj in range(n):
-        if jj<W.shape[0]-1:
-            W[jj,jj+1] = 0
-        if jj > 0-1:
-            W[jj,jj-1] = 0
-        wj = W[jj, :]
-        ws, id = torch.sort(wj,descending=False)
-        idb = id[:st]
-        wjs = wj*0
-        wjs[idb] = wj[idb]*0+1
-        W[jj,:] = wjs
-    W = (W+W.t())/2.0 + P
-    W[W!=0] = 1.0
-    return W
 
-def getGraphLapBin(X,st=13):
-    W = getAdjMatrix(X, st=st)
-    D = torch.diag(torch.sum(W, dim=0))
-    L = D - W
-    #Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
-    #L = Dh @ L @ Dh
-
-    L = 0.5 * (L + L.t())
-
-    return L, W
 
 def getGraphLap(X,sig=10):
 
@@ -268,28 +230,6 @@ def getGraphLap(X,sig=10):
     L = D - We
     Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
     L = Dh @ L @ Dh
-
-    L = 0.5 * (L + L.t())
-
-    return L, W
-
-def getGraphLapFromSVD(X,sig=0.2,st=9):
-
-    W = torch.abs(X[:5,:].t()@X[5:,:])
-    W = torch.exp(-W/sig/W.max())
-    for jj in range(W.shape[0]):
-        wj = W[jj, :]
-        ws, id = torch.sort(wj,descending=True)
-        idb = id[:st]
-        wjs = wj*0
-        wjs[idb] = wj[idb]*0+1
-        W[jj,:] = wjs
-    W = (W+W.t())/2.0
-    W[W!=0] = 1.0
-    D = torch.diag(torch.sum(W, dim=0))
-    L = D - W
-    #Dh = torch.diag(1/torch.sqrt(torch.diag(D)));
-    #L = Dh @ L @ Dh
 
     L = 0.5 * (L + L.t())
 
