@@ -62,7 +62,7 @@ result_dir = "{root}/{runner_name}/{date:%Y-%m-%d_%H_%M_%S}".format(
     runner_name='run_amazon',
     date=datetime.now(),
 )
-enable_coord_loss = True
+enable_coord_loss = False
 os.makedirs(result_dir)
 logfile_loc = "{}/{}.log".format(result_dir, 'output')
 LOG = log.setup_custom_logger('runner', logfile_loc, 'Standard')
