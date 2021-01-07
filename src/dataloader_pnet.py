@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import time
 from src.dataloader_utils import AA_DICT, MASK_DICT, DSSP_DICT, NUM_DIMENSIONS
 from itertools import compress
+import torch
 
 class Dataset_pnet(Dataset):
     def __init__(self, file, transform=None, transform_target=None, transform_mask=None, max_seq_len=300):
@@ -149,9 +150,9 @@ def parse_pnet(file,max_seq_len=-1):
         pssm2 = []
         for i in range(len(pssm)): #We transform each of these, since they are inconveniently stored
             pssm2.append(flip_multidimensional_list(pssm[i]))
-            r1.append(separate_coords(coords[i], 0))
-            r2.append(separate_coords(coords[i], 1))
-            r3.append(separate_coords(coords[i], 2))
+            r1.append(separate_coords(coords[i],1))
+            r2.append(separate_coords(coords[i], 2))
+            r3.append(separate_coords(coords[i], 0))
             if i+1 % 1000 == 0:
                 print("flipping and separating: {:}, Time: {:2.2f}".format(len(id), time.time() - t0))
 
@@ -169,3 +170,11 @@ def parse_pnet(file,max_seq_len=-1):
         print("parse complete! Took: {:2.2f}".format(time.time() - t0))
     return new_args
 
+class ListToTorch(object):
+    def __init__(self):
+        pass
+    def __call__(self, args):
+        args_array = ()
+        for arg in args:
+            args_array += (torch.tensor(arg),)
+        return args_array
