@@ -186,7 +186,7 @@ class Loss_reg_min_separation(torch.nn.Module):
 
 
 
-data = np.load('./data/binding_distances.npz')
+data = np.load('./binding_distances.npz')
 d_mean = data['d_mean']
 d_std = data['d_std']
 loss_reg_fnc = Loss_reg(d_mean,d_std,device=device)
