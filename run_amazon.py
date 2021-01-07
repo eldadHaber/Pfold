@@ -37,23 +37,24 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 # STesting     = torch.load('./data/casp11/STesting.pt')
 #
 
+path = './../data/protein_design/'
 
 
-Aind = torch.load('./../data/casp11_protein_design/Aind.pt')
-Yobs = torch.load('./../data/casp11_protein_design/Yobs.pt')
-MSK  = torch.load('./../data/casp11_protein_design/MSK.pt')
-S     = torch.load('./../data/casp11_protein_design/S.pt')
+Aind = torch.load('{:}Aind.pt'.format(path))
+Yobs = torch.load('{:}Yobs.pt'.format(path))
+MSK  = torch.load('{:}MSK.pt'.format(path))
+S     = torch.load('{:}S.pt'.format(path))
 # load validation data
-AindVal = torch.load('./../data/casp11_protein_design/AindVal.pt')
-YobsVal = torch.load('./../data/casp11_protein_design/YobsVal.pt')
-MSKVal  = torch.load('./../data/casp11_protein_design/MSKVal.pt')
-SVal     = torch.load('./../data/casp11_protein_design/SVal.pt')
+AindVal = torch.load('{:}AindVal.pt'.format(path))
+YobsVal = torch.load('{:}YobsVal.pt'.format(path))
+MSKVal  = torch.load('{:}MSKVal.pt'.format(path))
+SVal     = torch.load('{:}SVal.pt'.format(path))
 
 # load Testing data
-AindTesting = torch.load('./../data/casp11_protein_design/AindTesting.pt')
-YobsTesting = torch.load('./../data/casp11_protein_design/YobsTesting.pt')
-MSKTesting  = torch.load('./../data/casp11_protein_design/MSKTesting.pt')
-STesting     = torch.load('./../data/casp11_protein_design/STesting.pt')
+AindTesting = torch.load('{:}AindTesting.pt'.format(path))
+YobsTesting = torch.load('{:}YobsTesting.pt'.format(path))
+MSKTesting  = torch.load('{:}MSKTesting.pt'.format(path))
+STesting     = torch.load('{:}STesting.pt'.format(path))
 
 
 result_dir = "{root}/{runner_name}/{date:%Y-%m-%d_%H_%M_%S}".format(
