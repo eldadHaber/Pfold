@@ -137,7 +137,8 @@ for j in range(epochs):
         dm = DMt.max()
         D = torch.exp(-DM / (dm * sig))
         Dt = torch.exp(-DMt / (dm * sig))
-        misfitBackward = torch.norm(M * Dt - M * D) ** 2 / torch.norm(M * Dt) ** 2
+        MM = torch.ger(M.squeeze(), M.squeeze())
+        misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
 
         #R = model.NNreg()
         C0 = torch.norm(Cout - CoutOld) ** 2 / torch.numel(Z)
@@ -190,7 +191,7 @@ for j in range(epochs):
             #Cout = utils.distConstraint(Cout.squeeze(0), d).unsqueeze(0)
             #CoutOld = utils.distConstraint(CoutOld.squeeze(0), d).unsqueeze(0)
 
-            MM = torch.ger(M.squeeze(0), M.squeeze(0))
+            MM = torch.ger(M.squeeze(), M.squeeze())
             DM = utils.getDistMat(Cout.squeeze(0))
             DMt = utils.getDistMat(Coords.squeeze(0))
             dm = DMt.max()

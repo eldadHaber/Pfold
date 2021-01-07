@@ -34,9 +34,10 @@ def getDistMat(X):
 
     return torch.sqrt(torch.relu(D))
 
-def getGraphLap(X,sig=10):
+def getGraphLap(X,M=torch.ones(1),sig=10):
 
     X = X.squeeze(0)
+    M = M.squeeze()
     # normalize the data
     X = X - torch.mean(X, dim=1, keepdim=True)
     X = X / (torch.std(X, dim=1, keepdim=True) + 1e-3)
@@ -45,11 +46,17 @@ def getGraphLap(X,sig=10):
     We = torch.exp(-W/sig)
     D = torch.diag(torch.sum(We, dim=0))
     L = D - We
+
+    if torch.numel(M)>1:
+        MM = torch.ger(M,M)
+        L  = MM*L
+        II = torch.diag(1-M)
+        L  = L+II
+
     Dh = torch.diag(1/torch.sqrt(torch.diag(D)))
     L = Dh @ L @ Dh
 
     L = 0.5 * (L + L.t())
-
     return L
 
 
@@ -180,9 +187,12 @@ class stackedGraphUnet(nn.Module):
         nL = len(self.Unets)
         x  = self.Kopen@x
         xold = x
+        X = self.Kclose@x
         for i in range(nL):
             temp = x
-            x = 2*x - xold - self.h**2*self.Unets[i](x,x,m)
+            if i%5==0:
+                X = self.Kclose@x
+            x = 2*x - xold - self.h**2*self.Unets[i](x,X,m)
             xold = temp
 
         x = self.Kclose@x
@@ -207,3 +217,10 @@ class stackedGraphUnet(nn.Module):
 ##### END 1D Stacked Unet ####################
 
 
+#X = torch.rand(1,3,8)*10
+#X[0,:,5:]=0
+#M = torch.ones(1,1,8)
+#M[0,0,5:] = 0
+#L = getGraphLap(X,M)
+
+#print(L)
