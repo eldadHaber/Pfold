@@ -137,7 +137,8 @@ for j in range(epochs):
         D = torch.exp(-DM / (dm * sig))
         Dt = torch.exp(-DMt / (dm * sig))
         MM = torch.ger(M.squeeze(), M.squeeze())
-        misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
+        #misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
+        misfitBackward, _, _ = utils.coord_loss(Cout, Coords, M)
 
         #R = model.NNreg()
         C0 = torch.norm(Cout - CoutOld) ** 2 / torch.numel(Z)

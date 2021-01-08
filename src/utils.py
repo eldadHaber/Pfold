@@ -150,6 +150,33 @@ def getRotDist(Xc, Xo, alpha = 1.0):
     return dcoord + alpha*ddmat
 # Define some functions
 
+def coord_loss(r1s, r2s, mask):
+    ind = mask.squeeze()>0
+    r1 = r1s[0, :, ind]
+    r2 = r2s[0, :, ind]
+
+    # First we translate the two sets, by setting both their centroids to origin
+    r1c = r1 - torch.sum(r1, dim=1, keepdim=True) / r1.shape[1]
+    r2c = r2 - torch.sum(r2, dim=1, keepdim=True) / r2.shape[1]
+
+    H = r1c@r2c.t()
+    U, S, V = torch.svd(H)
+
+    d = F.softsign(torch.det(V @ U.t()))
+
+    ones = torch.ones_like(d,device=r1s.device)
+    a = torch.stack((ones, ones, d), dim=-1)
+    tmp = torch.diag_embed(a)
+
+    R = V @ tmp @ U.t()
+
+    r1cr = torch.zeros(1,3,r1s.shape[2],device=r1.device)
+    r1cr[0,:,ind] = R @ r1c
+    r2cr = torch.zeros(1,3, r2s.shape[2], device=r1.device)
+    r2cr[0,:, ind] = r2c
+    loss_tr = torch.norm(r1cr - r2cr) ** 2 / torch.norm(r2cr) ** 2
+    return loss_tr, r1cr, r2cr
+
 def move_tuple_to(args,device,non_blocking=True):
     new_args = ()
     for arg in args:
