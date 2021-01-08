@@ -109,7 +109,7 @@ class GraphUnet(nn.Module):
         xS = [ ]
         mS = [m]
         Xs = [X]
-        L  = getGraphLap(X)
+        L  = getGraphLap(X,m)
         Ls = [L]
         # Step through the layers (down cycle)
         for i in range(nL):
@@ -126,7 +126,7 @@ class GraphUnet(nn.Module):
                 x = F.avg_pool1d(x, 3, stride=2, padding=1)
                 m = F.avg_pool1d(m, 3, stride=2, padding=1)
                 X = F.avg_pool1d(X, 3, stride=2, padding=1)
-                L = getGraphLap(X)
+                L = getGraphLap(X,m)
                 mS.append(m)
                 Ls.append(L)
 
@@ -169,8 +169,8 @@ class stackedGraphUnet(nn.Module):
     def init_weights(self,nLevels,nsmooth,nin,nopen,nLayers,nout):
 
         print('Initializing network  ')
-        Kopen  = nn.Parameter(torch.rand(nopen, nin)*1e-3)
-        Kclose = nn.Parameter(torch.rand(nout, nopen)*1e-3)
+        Kopen  = nn.Parameter(torch.rand(nopen, nin)*1e-1)
+        Kclose = nn.Parameter(torch.rand(nout, nopen)*1e-1)
 
         Unets = []
         total_params = 0
@@ -187,12 +187,13 @@ class stackedGraphUnet(nn.Module):
         nL = len(self.Unets)
         x  = self.Kopen@x
         xold = x
-        X = self.Kclose@x
+        #X = self.Kclose@x
         for i in range(nL):
             temp = x
-            if i%5==0:
-                X = self.Kclose@x
-            x = 2*x - xold - self.h**2*self.Unets[i](x,X,m)
+            #if i%5==0:
+                # X = self.Kclose@x
+            Ai = self.Unets[i](x,x,m)
+            x = 2*x - xold - self.h**2*Ai
             xold = temp
 
         x = self.Kclose@x

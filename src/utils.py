@@ -272,16 +272,27 @@ def linearInterp1D(X,M):
 
     return Xnew
 
-def distConstraint(X,dc=0.375):
+def distPenality(D,dc=0.379,M=torch.ones(1)):
+    U = torch.triu(D,2)
+    p2 = torch.norm(M*torch.relu(2*dc - U))**2
+
+    return p2
+
+def distConstraint(X,dc=0.379, M=torch.tensor([1])):
+    X = X.squeeze()
+    M = M.squeeze()
     n = X.shape[1]
     dX = X[:,1:] - X[:,:-1]
-    d  = torch.sqrt(torch.sum(dX**2,dim=0,keepdim=True))
-    dX = (dX/d)*dc
+    d  = torch.sum(dX**2,dim=0)
+
+    avM = (M[1:]+M[:-1])/2 < 0.5
+    dc = (avM==0)*dc
+    dX = (dX / torch.sqrt(d+avM)) * dc
 
     Xh = torch.zeros(3,n, device=X.device)
     Xh[:, 0]  = X[:, 0]
     Xh[:, 1:] = X[:, 0].unsqueeze(1) + torch.cumsum(dX, dim=1)
-    
+    Xh = M*Xh
     return Xh
 
 def kl_div(p, q, weight=False):

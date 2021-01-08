@@ -80,13 +80,14 @@ def getIterData(S, Aind, Yobs, MSK, i, device='cpu',pad=0):
     return Seq, Coords, M
 
 # Unet Architecture
-nLevels  = 4
+nLevels  = 3
 nin      = 40
 nsmooth  = 2
-nopen    = 64
+nopen    = 4 #64
 nLayers  = 18
 nout     = 3
 h        = 0.1
+
 
 model = gunts.stackedGraphUnet(nLevels,nsmooth,nin,nopen,nLayers,nout,h)
 model.to(device)
@@ -107,7 +108,7 @@ ndata = 1000 #n_data_total
 bestModel = model
 hist = torch.zeros(epochs)
 
-print('         Design       Coords      gradKo        gradKc')
+print('         Design       Coords      CoordPenalty  gradKo        gradKc')
 for j in range(epochs):
     # Prepare the data
     aloss = 0.0
@@ -123,14 +124,12 @@ for j in range(epochs):
         optimizer.zero_grad()
         # From Coords to Seq
         Cout, CoutOld = model(Z, M)
+        Cout = utils.distConstraint(Cout, dc=0.379, M=M).unsqueeze(0)
+        CoutOld = utils.distConstraint(CoutOld, dc=0.379,M=M).unsqueeze(0)
         Zout, Zold    = model.backProp(Coords,M)
 
         PSSMpred = F.softshrink(Zout[0,:20, :].abs(), Zout.abs().mean().item() / 5)
         misfit = utils.kl_div(PSSMpred, Z[0,:20, :], weight=True)
-
-        #d = torch.sqrt(torch.sum((Coords[0,:, 1:] - Coords[0,:, :-1]) ** 2, dim=0))
-        #Cout    = utils.distConstraint(Cout.squeeze(0), d).unsqueeze(0)
-        #CoutOld = utils.distConstraint(CoutOld.squeeze(0), d).unsqueeze(0)
 
         DM = utils.getDistMat(Cout.squeeze(0))
         DMt = utils.getDistMat(Coords.squeeze(0))
@@ -143,7 +142,8 @@ for j in range(epochs):
         #R = model.NNreg()
         C0 = torch.norm(Cout - CoutOld) ** 2 / torch.numel(Z)
         Z0 = torch.norm(Zout - Zold) ** 2 / torch.numel(Z)
-        loss = misfit + misfitBackward + C0 + Z0
+        lossDist = utils.distPenality(DM,dc=0.379,M=MM)
+        loss = misfit + misfitBackward + C0 + Z0 # + lossDist
 
         loss.backward(retain_graph=True)
 
@@ -157,8 +157,8 @@ for j in range(epochs):
         if (i + 1) % nprnt == 0:
             amis = amis / nprnt
             amisb = amisb / nprnt
-            print("%2d.%1d   %10.3E   %10.3E   %10.3E   %10.3E " %
-                  (j, i, amis, amisb,model.Kopen.grad.norm().item(), model.Kclose.grad.norm().item()))
+            print("%2d.%1d   %10.3E   %10.3E  %10.3E  %10.3E   %10.3E " %
+                  (j, i, amis, amisb,lossDist, model.Kopen.grad.norm().item(), model.Kclose.grad.norm().item()))
             amis = 0.0
             amisb = 0.0
     if aloss < alossBest:
@@ -181,6 +181,8 @@ for j in range(epochs):
             optimizer.zero_grad()
             # From Coords to Seq
             Cout, CoutOld = model(Z, M)
+            Cout = utils.distConstraint(Cout, dc=0.379, M=M)
+            CoutOld = utils.distConstraint(CoutOld, dc=0.379, M=M)
             Zout, ZOld = model.backProp(Coords, M)
 
             PSSMpred = F.softshrink(Zout[0,:20, :].abs(), Zout.abs().mean().item() / 5)
