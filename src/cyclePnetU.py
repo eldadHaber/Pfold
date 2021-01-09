@@ -35,13 +35,15 @@ STesting     = torch.load('../../../data/casp11/PSSMTesting.pt')
 print('Number of data: ', len(S))
 n_data_total = len(S)
 
-def getIterData(S, Aind, Yobs, MSK, i, device='cpu',pad=0):
+
+def getIterData(S, Aind, Yobs, MSK, i, device='cpu', pad=0):
     scale = 1e-3
     PSSM = S[i].t()
     n = PSSM.shape[1]
     M = MSK[i][:n]
     a = Aind[i]
 
+    # X = Yobs[i][0, 0, :n, :n]
     X = Yobs[i].t()
     X = utils.linearInterp1D(X, M)
     X = torch.tensor(X)
@@ -53,31 +55,38 @@ def getIterData(S, Aind, Yobs, MSK, i, device='cpu',pad=0):
     Coords = Coords.type('torch.FloatTensor')
 
     PSSM = PSSM.type(torch.float32)
+    # PSSM = augmentPSSM(PSSM, 0.01)
 
     A = torch.zeros(20, n)
     A[a, torch.arange(0, n)] = 1.0
     Seq = torch.cat((PSSM, A))
-    Seq = Seq.to(device=device, non_blocking=True)
-
-    Coords = Coords.to(device=device, non_blocking=True)
-    M = M.type('torch.FloatTensor')
-    M = M.to(device=device, non_blocking=True)
 
     if pad > 0:
         L = Coords.shape[1]
-        k = 2**torch.tensor(L, dtype=torch.float64).log2().ceil().int()
+        k = 2 ** torch.tensor(L, dtype=torch.float64).log2().ceil().int()
         k = k.item()
-        CoordsPad = torch.zeros(3,k)
-        CoordsPad[:,:Coords.shape[1]] = Coords
-        SeqPad    = torch.zeros(Seq.shape[0],k)
-        SeqPad[:,:Seq.shape[1]] = Seq
-        Mpad      = torch.zeros(k)
-        Mpad[:M.shape[0]] = M
+        CoordsPad = torch.zeros(3, k)
+        CoordsPad[:, :Coords.shape[1]] = Coords
+        SeqPad = torch.zeros(Seq.shape[0], k)
+        SeqPad[:, :Seq.shape[1]] = Seq
+        Mpad = torch.zeros(k)
+        MM = torch.zeros(k)
+        Mpad[:M.shape[0]] = torch.ones(M.shape[0], device=M.device)
         M = Mpad
+        MM[:M.shape[0]] = M
+        M = MM
         Seq = SeqPad
         Coords = CoordsPad
 
-    return Seq, Coords, M
+    Seq = Seq.to(device=device, non_blocking=True)
+    Coords = Coords.to(device=device, non_blocking=True)
+    M = M.type('torch.FloatTensor')
+    M = M.to(device=device, non_blocking=True)
+    Mpad = Mpad.type('torch.FloatTensor')
+    Mpad = Mpad.to(device=device, non_blocking=True)
+
+    return Seq, Coords, M, Mpad
+
 
 # Unet Architecture
 nLevels  = 3
@@ -108,7 +117,7 @@ ndata = 1000 #n_data_total
 bestModel = model
 hist = torch.zeros(epochs)
 
-print('         Design       Coords      CoordPenalty  gradKo        gradKc')
+print('         Design       Coords              gradKo        gradKc')
 for j in range(epochs):
     # Prepare the data
     aloss = 0.0
@@ -116,20 +125,33 @@ for j in range(epochs):
     amisb = 0.0
     for i in range(ndata):
 
-        Z, Coords, M = getIterData(S, Aind, Yobs, MSK, i, device=device, pad=1)
+        Z, Coords, M, Mpad = getIterData(S, Aind, Yobs, MSK, i, device=device, pad=1)
+        kk = i
+        flag = False
+        while torch.sum(M) < 0.75 * M.numel():
+            if kk + 1 < ndata:
+                Z, Coords, M, Mpad = getIterData(S, Aind, Yobs, MSK, kk + 1, device=device, pad=1)
+                kk += 1
+            else:
+                flag = True
+        if flag:
+            break
+
         Z = Z.unsqueeze(0)
         Coords = Coords.unsqueeze(0)
         M = M.unsqueeze(0).unsqueeze(0)
+        Mpad = Mpad.unsqueeze(0).unsqueeze(0)
 
         optimizer.zero_grad()
         # From Coords to Seq
-        Cout, CoutOld = model(Z, M)
+        Cout, CoutOld = model(Z, Mpad)
         Cout = utils.distConstraint(Cout, dc=0.379, M=M).unsqueeze(0)
-        CoutOld = utils.distConstraint(CoutOld, dc=0.379,M=M).unsqueeze(0)
-        Zout, Zold    = model.backProp(Coords,M)
+        CoutOld = utils.distConstraint(CoutOld, dc=0.379, M=M).unsqueeze(0)
 
-        PSSMpred = F.softshrink(Zout[0,:20, :].abs(), Zout.abs().mean().item() / 5)
-        misfit = utils.kl_div(PSSMpred, Z[0,:20, :], weight=True)
+        Zout, Zold = model.backProp(Coords, Mpad)
+
+        PSSMpred = F.softshrink(Zout[0, :20, :].abs(), Zout.abs().mean().item() / 5)
+        misfit = utils.kl_div(PSSMpred, Z[0, :20, :], weight=True)
 
         DM = utils.getDistMat(Cout.squeeze(0))
         DMt = utils.getDistMat(Coords.squeeze(0))
@@ -137,29 +159,32 @@ for j in range(epochs):
         D = torch.exp(-DM / (dm * sig))
         Dt = torch.exp(-DMt / (dm * sig))
         MM = torch.ger(M.squeeze(), M.squeeze())
-        #misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
+        # misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
         misfitBackward, _, _ = utils.coord_loss(Cout, Coords, M)
 
-        #R = model.NNreg()
+        # R = model.NNreg()
         C0 = torch.norm(Cout - CoutOld) ** 2 / torch.numel(Z)
         Z0 = torch.norm(Zout - Zold) ** 2 / torch.numel(Z)
-        lossDist = utils.distPenality(DM,dc=0.379,M=MM)
-        loss = misfit + misfitBackward + C0 + Z0 # + lossDist
+        loss = misfit + misfitBackward + C0 + Z0
 
-        loss.backward(retain_graph=True)
+        # loss.backward(retain_graph=True)
+        loss.backward()
 
         aloss += loss.detach()
         amis += misfit.detach().item()
         amisb += misfitBackward.detach().item()
 
+        gKopen = model.Kopen.grad.norm().item()
+        gKclose = model.Kclose.grad.norm().item()
+
         optimizer.step()
         # scheduler.step()
-        nprnt = 1
+        nprnt = 1000
         if (i + 1) % nprnt == 0:
             amis = amis / nprnt
             amisb = amisb / nprnt
-            print("%2d.%1d   %10.3E   %10.3E  %10.3E  %10.3E   %10.3E " %
-                  (j, i, amis, amisb,lossDist, model.Kopen.grad.norm().item(), model.Kclose.grad.norm().item()))
+            print("%2d.%1d   %10.3E   %10.3E   %10.3E   %10.3E " %
+                  (j, i, amis, amisb, gKopen, gKclose))
             amis = 0.0
             amisb = 0.0
     if aloss < alossBest:
@@ -174,25 +199,24 @@ for j in range(epochs):
         # nVal    = len(SVal)
         nVal = len(STesting)
         for jj in range(nVal):
-            Z, Coords, M = getIterData(STesting, AindTesting, YobsTesting, MSKTesting, jj, device=device, pad=1)
+            # Z, Coords, M = getIterData(SVal, AindVal, YobsVal, MSKVal, jj,device=device)
+            Z, Coords, M, Mpad = getIterData(STesting, AindTesting, YobsTesting, MSKTesting, jj, device=device, pad=1)
             Coords = Coords.unsqueeze(0)
             Z = Z.unsqueeze(0)
-            M = M.unsqueeze(0)
+            M = M.unsqueeze(0).unsqueeze(0)
+            Mpad = Mpad.unsqueeze(0).unsqueeze(0)
 
             optimizer.zero_grad()
             # From Coords to Seq
-            Cout, CoutOld = model(Z, M)
-            Cout = utils.distConstraint(Cout, dc=0.379, M=M)
-            CoutOld = utils.distConstraint(CoutOld, dc=0.379, M=M)
-            Zout, ZOld = model.backProp(Coords, M)
+            Cout, CoutOld = model(Z, Mpad)
+            Cout = utils.distConstraint(Cout, dc=0.379, M=M).unsqueeze(0)
+            CoutOld = utils.distConstraint(CoutOld, dc=0.379, M=M).unsqueeze(0)
 
-            PSSMpred = F.softshrink(Zout[0,:20, :].abs(), Zout.abs().mean().item() / 5)
-            misfit = utils.kl_div(PSSMpred, Z[0,:20, :], weight=True)
+            Zout, ZOld = model.backProp(Coords, Mpad)
+
+            PSSMpred = F.softshrink(Zout[0, :20, :].abs(), Zout.abs().mean().item() / 5)
+            misfit = utils.kl_div(PSSMpred, Z[0, :20, :], weight=True)
             misVal += misfit
-
-            #d = torch.sqrt(torch.sum((Coords[0,:, 1:] - Coords[0,:, :-1]) ** 2, dim=0)).mean()
-            #Cout = utils.distConstraint(Cout.squeeze(0), d).unsqueeze(0)
-            #CoutOld = utils.distConstraint(CoutOld.squeeze(0), d).unsqueeze(0)
 
             MM = torch.ger(M.squeeze(), M.squeeze())
             DM = utils.getDistMat(Cout.squeeze(0))
@@ -200,14 +224,15 @@ for j in range(epochs):
             dm = DMt.max()
             D = torch.exp(-DM / (dm * sig))
             Dt = torch.exp(-DMt / (dm * sig))
-            misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
-
+            # misfitBackward = torch.norm(MM * Dt - MM * D) ** 2 / torch.norm(MM * Dt) ** 2
+            misfitBackward, _, _ = utils.coord_loss(Cout, Coords, M)
 
             misbVal += misfitBackward
-            AQdis += torch.norm(MM * (DM - DMt)) / torch.sum(MM>0)
+            AQdis += torch.norm(MM * (DM - DMt)) / torch.sum(MM > 0)
 
         print("%2d       %10.3E   %10.3E   %10.3E" % (j, misVal / nVal, misbVal / nVal, AQdis / nVal))
         print('===============================================')
 
     hist[j] = (aloss).item() / (ndata)
+
 
