@@ -27,6 +27,13 @@ def setup_custom_logger(name,logfile_loc,mode):
     logger.info('Starting logfile at {}.'.format(datetime.now()))
     return logger
 
+def log_all_parameters(LOG,args):
+    LOG.info('---------Listing all parameters-------')
+    # state = {k: v for k, v in args._get_kwargs()}
+    # for key, value in state.items():
+    for key, value in args.items():
+        LOG.info("{:30s} : {}".format(key, value))
+
 
 def close_logger(log):
     '''

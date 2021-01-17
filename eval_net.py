@@ -4,11 +4,11 @@ import torch
 from torch import optim
 from torch.optim.lr_scheduler import OneCycleLR
 import numpy as np
-from src.IO import load_checkpoint
-from src.dataloader import PadCollate
-from src.dataloader_npz import Dataset_npz
-from src.network import select_network
-from src.optimization import net_prediction
+from supervised.IO import load_checkpoint
+from supervised.dataloader import PadCollate
+from supervised.dataloader_npz import Dataset_npz
+from supervised.network import select_network
+from supervised.optimization import net_prediction
 
 import pandas as pd
 desired_width = 1200
@@ -20,7 +20,9 @@ np.set_printoptions(linewidth=desired_width)
 if __name__ == '__main__':
     # network_path = 'D:/Pytorch/Pfold/pretrained_networks/2020-11-26_17_30_02/network.pt'
     network_path = 'D:/Pytorch/run_amazon/2020-12-09_22_45_12/network.pt'
-    dataset = './data/casp11_test_TBM/'
+    # dataset = './data/casp11_validation/'
+    # dataset = './data/casp11_test_TBM/'
+    dataset = './data/casp11_test_FM/'
     dataset_out = './results/figures/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -52,7 +54,7 @@ if __name__ == '__main__':
 
     pad_modulo = 8
 
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=2, shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
                                            drop_last=False)
 
 
@@ -72,5 +74,7 @@ if __name__ == '__main__':
     os.makedirs(dataset_out,exist_ok=True)
 
     # net_prediction(net, dl_test, device=device, plot_results=False, save_results=False)
-    net_prediction(net, dl_test, device=device, plot_results=False, save_results="{:}/".format(dataset_out))
+    # net_prediction(net, dl_test, device=device, plot_results=False, save_results="{:}/".format(dataset_out))
+    net_prediction(net, dl_test, device=device, plot_results=False, save_results=False)
+    # net_prediction(net, dl_test, device=device, plot_results=True, save_results=False)
 

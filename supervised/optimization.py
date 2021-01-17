@@ -2,10 +2,13 @@ import time
 
 import matplotlib
 
-from src.IO import save_checkpoint
-from src.loss import loss_tr_tuples, Loss_reg_min_separation, LossMultiTargets
-from src.utils import move_tuple_to
-from src.visualization import compare_distogram, plotfullprotein
+from supervised.IO import save_checkpoint
+from supervised.loss import loss_tr_tuples, Loss_reg_min_separation, LossMultiTargets
+from supervised.utils import move_tuple_to
+from supervised.visualization import compare_distogram, plotfullprotein
+from supervised.config import config as c, load_from_config
+import logging
+logger = logging.getLogger('runner')
 
 # from torch_lr_finder import LRFinder
 
@@ -13,7 +16,7 @@ matplotlib.use('Agg')
 
 import torch
 
-def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,ite=0,max_iter=100000,report_iter=1e4,checkpoint=1e19, scheduler=None, sigma=-1, save=None, use_loss_coord=True, viz=False, loss_reg_fnc=None):
+def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, dl_test=None, ite=0, max_iter=None, report_iter=None, checkpoint=None, scheduler=None, exp_dist_loss=None, result_dir=None, use_loss_coord=None, viz=None, loss_reg_fnc=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -26,6 +29,16 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     :param epochs: Number of epochs to train
     :return:
     '''
+
+    device = load_from_config(device,'device')
+    max_iter = load_from_config(max_iter,'max_iter')
+    report_iter = load_from_config(report_iter,'report_iter')
+    checkpoint = load_from_config(checkpoint,'checkpoint')
+    exp_dist_loss = load_from_config(exp_dist_loss,'exp_dist_loss')
+    result_dir = load_from_config(result_dir,'result_dir')
+    use_loss_coord = load_from_config(use_loss_coord,'use_loss_coord')
+    viz = load_from_config(viz,'viz')
+
     stop_run = False
     net.to(device)
     t0 = time.time()
@@ -38,7 +51,11 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
     # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
     best_v_loss = 9e9
     while True:
-        for i,(features, dists,mask, coords) in enumerate(dataloader_train):
+        for i, vars in enumerate(dataloader_train):
+            features = vars[0][0]
+            dists = vars[1]
+            coords = vars[2]
+            mask = vars[-1]
             features = features.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
@@ -50,7 +67,7 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
             dists_pred, coords_pred = net(features,mask)
 
             loss_d = loss_fnc(dists_pred, dists)
-            if coords_pred is not None and sigma<0 and use_loss_coord:
+            if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
                 loss_c = loss_tr_tuples(coords_pred, coords)
                 loss_train_c += loss_c.cpu().detach()
                 loss = (1-w)/2 * loss_d + (w+1)/2 * loss_c
@@ -92,12 +109,12 @@ def train(net,optimizer,dataloader_train,loss_fnc,LOG,device='cpu',dl_test=None,
                     loss_train_reg = 0
                     loss_train = 0
                     if loss_v < best_v_loss:
-                        filename = "{:}best_model_state.pt".format(save)
+                        filename = "{:}/best_model_state.pt".format(result_dir)
                         save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
-                        torch.save(net, "{:}best_model.pt".format(save))
+                        torch.save(net, "{:}/best_model.pt".format(result_dir))
                         best_v_loss = loss_v
             if (ite + 1) % checkpoint == 0:
-                filename = "{:}checkpoint.pt".format(save)
+                filename = "{:}/checkpoint.pt".format(result_dir)
                 save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
                 LOG.info("Checkpoint saved: {}".format(filename))
             ite += 1
@@ -130,13 +147,17 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
         loss_v = 0
         dist_err_mean = 0
         dist_err_mean_alq = 0
-        for i,(seq, dists,mask, coords) in enumerate(dl):
-            seq = seq.to(device, non_blocking=True)
+        for i, vars in enumerate(dl):
+            features = vars[0][0]
+            dists = vars[1]
+            coords = vars[2]
+            mask = vars[-1]
+            features = features.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
-            dists_pred, coords_pred = net(seq,mask)
-            nb = seq.shape[0]
+            dists_pred, coords_pred = net(features,mask)
+            nb = features.shape[0]
 
             loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
@@ -147,10 +168,10 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             loss_v += loss * nb
             M = dists[0] != 0
             L = torch.sum(mask,dim=1)
-            dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
+            dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2)))/(L*L) * 10)
             dist_err_mean += dist_err
 
-            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*(L-1))) * 10)
+            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2)))/(L*(L-1)) * 10)
             dist_err_mean_alq += dist_err_alq
 
             if save_results:
@@ -181,32 +202,52 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
     net.eval()
     with torch.no_grad():
         dist_err_mean = 0
+        dist_err_RMSD_mean = 0
+        dist_err_RMSD2_mean = 0
         dist_err_mean_alq = 0
-        for i,(seq, dists,mask, coords) in enumerate(dl):
+        for i,(seq, dists,mask, coords,ids) in enumerate(dl):
+            # if i!=23:
+            #     continue
             seq = seq.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
+            mask_padding_and_unknown = (coords[0][:,0,:] != 0)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
             dists_pred, coords_pred = net(seq,mask)
             _, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
+
+            DpA = dists_pred[0]*10 #Dist predicted in Angstrom
+            DtA = dists[0]*10 #Dist true in Angstrom
             M = dists[0] != 0
-            L = torch.sum(mask,dim=1)
-            dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*L)) * 10)
+            L = torch.sum(mask_padding_and_unknown,dim=1)
+            L2 = torch.sum(mask,dim=1)
+            dist_err = torch.sum(torch.sum(torch.abs(DpA - DtA) * M, dim=(1,2))/(L*(L-1)))
             dist_err_mean += dist_err
 
-            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2))/(L*(L-1))) * 10)
+            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((DpA - DtA) * M) ** 2, dim=(1, 2)))/(L*(L-1)))
             dist_err_mean_alq += dist_err_alq
 
+            dist_err_RMSD = torch.sum(torch.sqrt(torch.sum((DpA - DtA)**2 * M, dim=(1,2))/(L*L)))
+            dist_err_RMSD_mean += dist_err_RMSD
+
+            dist_err_RMSD2 = torch.sum(torch.sqrt(torch.sum((DpA - DtA)**2 * M, dim=(1,2))/(L2*L2)))
+            dist_err_RMSD2_mean += dist_err_RMSD2
+
             if save_results:
-                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i), error=dist_err)
-                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i), error=dist_err)
+                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}_ID_{:}".format(save_results,i,str(ids[0])), error=dist_err)
+                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}_ID_{:}".format(save_results,i,str(ids[0])), error=dist_err)
         if plot_results :
-            compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
+            # compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
             plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
         dist_err_mean /= len(dl.dataset)
         dist_err_mean_alq /= len(dl.dataset)
+        dist_err_RMSD_mean /= len(dl.dataset)
+        dist_err_RMSD2_mean /= len(dl.dataset)
+
         print("Average distogram error in angstrom = {:2.2f}".format(dist_err_mean))
-        print("Average distogram error in angstrom according to Alq = {:2.2f}".format(dist_err_mean_alq))
+        print("Average distogram error in angstrom according to Alq = {:2.5f}".format(dist_err_mean_alq))
+        print("Average distogram error in angstrom according to Jin = {:2.5f}".format(dist_err_RMSD_mean))
+        print("Average distogram error in angstrom according to Jin = {:2.5f}, when L is the full protein length irregardless of unknown parts".format(dist_err_RMSD2_mean))
     net.train()
     return
 

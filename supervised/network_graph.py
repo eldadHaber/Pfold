@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.network_transformer import tr2DistSmall
+from supervised.network_transformer import tr2DistSmall
 
 
 def conv2(X, Kernel):

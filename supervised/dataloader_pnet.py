@@ -1,3 +1,4 @@
+import os
 import random
 import re
 import time
@@ -5,7 +6,7 @@ import time
 import numpy as np
 from torch.utils.data import Dataset
 
-from src.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
+from supervised.dataloader_utils import AA_DICT, DSSP_DICT, NUM_DIMENSIONS, MASK_DICT, SeqFlip, ListToNumpy, \
     DrawFromProbabilityMatrix
 
 
@@ -138,10 +139,10 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False):
+def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, AA_DICT, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False,scaling=1):
     """
     Read all protein records from pnet file.
-    Note that pnet files have coordinates saved in picometers, but we load it in in nanometers instead, since that works better with the neural networks.
+    Note that pnet files have coordinates saved in picometers, which is not the normal standard.
     """
 
     id = []
@@ -152,7 +153,6 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
     coord = []
     mask = []
     seq_len = []
-    scaling = 0.001 # converts from pico meters to nanometers
 
     t0 = time.time()
     cnt = 0
@@ -200,19 +200,27 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
-def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True):
+def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True, AA_DICT=AA_DICT):
+    """
+    This is a wrapper for the read_record routine, which reads a pnet-file into memory.
+    This routine will convert the lists to numpy arrays, and flip their dimensions to be consistent with how data is normally used in a deep neural network.
+    Furthermore the routine will specify the log_unit you wish the data in default is -9 which is equal to nanometer. (Pnet data is given in picometer = -12 by standard)
+    """
     with open(file, 'r') as f:
+        pnet_log_unit = -12
+        scaling = 10.0 ** (pnet_log_unit - log_unit)
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len)
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
         print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
-        r1 = []
-        r2 = []
-        r3 = []
+        rCa = []
+        rCb = []
+        rN = []
+
         for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
             #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
-            r1.append((separate_coords(coords[i], 1)))
-            r2.append((separate_coords(coords[i], 2)))
-            r3.append((separate_coords(coords[i], 0)))
+            rCa.append((separate_coords(coords[i], 1)))
+            rCb.append((separate_coords(coords[i], 2)))
+            rN.append((separate_coords(coords[i], 0)))
 
         convert = ListToNumpy()
         seq = convert(seq)
@@ -222,12 +230,13 @@ def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_p
                 'seq_len': seq_len,
                 }
         if use_coord:
-            r1 = convert(r1)
-            r2 = convert(r2)
-            r3 = convert(r3)
-            args['r1'] = r1
-            args['r2'] = r2
-            args['r3'] = r3
+            rCa = convert(rCa)
+            rCb = convert(rCb)
+            rN = convert(rN)
+
+            args['rCa'] = rCa
+            args['rCb'] = rCb
+            args['rN'] = rN
         if use_entropy:
             entropy = convert(entropy)
             args['entropy'] = entropy
@@ -241,6 +250,30 @@ def parse_pnet(file, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_p
             mask = convert(mask)
             args['mask'] = mask
         print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
-    return args
+    return args, log_unit, AA_DICT
+
+if __name__ == '__main__':
+    pnetfile = './../data/casp11/training_90'
+    output_folder = './../data/casp11_training_90/'
+    # pnetfile = './../data/casp11/testing.pnet'
+    # output_folder = './../data/casp11_testing/'
+    # pnetfile = './../data/casp11/testing'
+    # output_folder = './../data/casp11_testing/'
+
+    os.makedirs(output_folder, exist_ok=True)
+    args, log_units, AA_DICT = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=1000, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=False, use_coord=True)
+
+    ids = args['id']
+    rCa = args['rCa']
+    rCb = args['rCb']
+    rN = args['rN']
+    pssm = args['pssm']
+    entropy = args['entropy']
+    seq = args['seq']
+    AA_LIST = list(AA_DICT)
+    for i,id in enumerate(ids):
+        filename = "{:}{:}.npz".format(output_folder,id)
+        entropy_i = entropy[i]
+        np.savez(file=filename, seq=seq[i],pssm=pssm[i],entropy=entropy_i[None,:],rCa=rCa[i].T,rCb=rCb[i].T,rN=rN[i].T,id=id, log_units=log_units, AA_LIST=AA_LIST)
 
 

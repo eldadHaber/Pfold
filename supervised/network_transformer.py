@@ -9,8 +9,6 @@ import torch
 import torch.nn as nn
 from torch.nn import LayerNorm
 
-nn.Transformer()
-nn.Embedding()
 class RoBERTa(nn.Module):
     # args.encoder_layers = getattr(args, "encoder_layers", 12)
     # args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 768)

@@ -1,11 +1,14 @@
 import time
 
 import matplotlib
+import numpy as np
 
 matplotlib.use('Agg')
 
 import torch
 import torch.nn as nn
+from supervised.config import config as c, load_from_config
+
 
 class LossMultiTargets(nn.Module):
     def __init__(self,loss_fnc=torch.nn.CrossEntropyLoss()):
@@ -85,8 +88,21 @@ class EMSELoss(torch.nn.Module):
         return result/nb
 
 
+def load_loss_reg(nn_dist_file,AA_list=None,log_units=None):
+    data = np.load(nn_dist_file)
+    d_mean = data['distances_mean']
+    d_std = data['distances_std']
+    nn_bind_AA_list = list(data['AA_LIST'])
+    nn_bind_log_units = data['log_units']
+    assert nn_bind_AA_list == list(AA_list), "The nn-distances were made with a different AA_list than the one currently used."
+    scaling = 10.0 ** (nn_bind_log_units - log_units)
+    loss_reg_fnc = Loss_reg(d_mean * scaling, d_std * scaling)
+    return loss_reg_fnc
+
 class Loss_reg(torch.nn.Module):
-    def __init__(self,d_mean,d_std,device='cpu'):
+    def __init__(self,d_mean,d_std,device=None):
+        device = load_from_config(device,'device')
+
         super(Loss_reg,self).__init__()
         A = torch.from_numpy(d_mean)
         AA = A + A.T

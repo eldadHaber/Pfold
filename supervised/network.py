@@ -1,16 +1,16 @@
-from src.network_graph import gNNC, hyperNet
-from src.network_resnet import ResNet
-from src.network_transformer import TransformerModel
-from src.network_vnet import vnet1D, vnet2D
+from supervised.network_graph import gNNC, hyperNet
+from supervised.network_resnet import ResNet
+from supervised.network_transformer import TransformerModel
+from supervised.network_vnet import vnet1D, vnet2D
 
 
-def select_network(network,network_args,feature_dim,cross_dist=False):
+def select_network(network,feature_dim,**network_args):
     '''
     This is a wrapper routine for various networks.
     :return:
     '''
     if network.lower() == 'vnet' and feature_dim == 1:
-        net = vnet1D(**network_args,cross_dist=cross_dist)
+        net = vnet1D(**network_args)
     elif network.lower() == 'vnet' and feature_dim == 2:
         net = vnet2D(**network_args)
     elif network.lower() == 'transformer' and feature_dim == 1:

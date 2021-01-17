@@ -1,7 +1,10 @@
 import argparse
 import os
+from typing import Dict, Any
 
-from src.main import main
+from supervised.config import config
+from supervised.main import main
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Distogram Predictor')
@@ -14,38 +17,46 @@ if __name__ == '__main__':
     # data
     # parser.add_argument('--dataset-train', default='./data/train_npz/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='./data/casp11_training_90/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./data/casp11_validation/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/casp11_testing/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/casp11_testing/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
-    # Input features
-    parser.add_argument('--seq-flip-prop', default=0.5, type=float, metavar='N', help='Input feature types')
-    parser.add_argument('--feature-dim', default=1, type=int, metavar='N', help='Input feature types')
-    parser.add_argument('--inpainting', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-seq', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-pssm', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-entropy', default=True, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-cov_all', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-cov', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--i-contact', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--random-crop', default=False, type=bool, metavar='N', help='Input feature types')
-    parser.add_argument('--use-cross-dist', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-loss-coord', default=True, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-loss-reg', default=True, type=bool, metavar='N', help='Input feature types')
 
+    # Input features
+    parser.add_argument('--feature-dim', default=1, type=int, metavar='N', help='Input feature types')
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=80000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=2, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--sigma', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--load-binding-dists', default='./binding_distances.npz', type=str, metavar='N', help='Input feature types')
+    parser.add_argument('--exp_dist_loss', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--load-nn-dists', default='./data/nn-distances.npz', type=str, metavar='N', help='Input feature types')
     parser.add_argument('--load-from-previous', default='', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--load-from-previous', default='C:/Users/Tue/PycharmProjects/Pfold/results/run_1d_vnet/2020-11-19_10_05_23/checkpoint.pt', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     args = parser.parse_args()
+
+    args.data_args = {
+        'i_seq': True,
+        'i_pssm': True,
+        'i_entropy': True,
+        'i_cov': False,
+        'i_contact': False,
+        'o_rCa': True,
+        'o_rCb': True,
+        'o_rN': False,
+        'o_dist': True,
+        'log_units': -10,
+        'flip_protein': 0.5,
+        'AA_list': 'ACDEFGHIKLMNPQRSTVWY-'
+    }
+
+
+
     if args.network.lower() == 'transformer':
         args.network_args = {
         'emsize': 128,  # embedding dimension
@@ -57,10 +68,9 @@ if __name__ == '__main__':
         'stencil': 5}
     elif args.network.lower() == 'vnet':
         args.network_args = {
-        'nblocks': 4,
-        'nlayers_pr_block': 5,
-        'channels': 280,
-        'chan_out': 6,
+        'nblocks': 2,
+        'nlayers_pr_block': 2,
+        'channels': 80,
         'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':
@@ -74,7 +84,17 @@ if __name__ == '__main__':
     else:
         raise UserWarning("network: {:} not recognised for arg.network_args".format(args.network))
 
-    losses = main(args)
+    if args.network.lower() == 'vnet':
+        pad_modulo = 2*args.network_args['nblocks']
+    else:
+        pad_modulo = 1
+    args.data_args['pad_modulo'] = pad_modulo
+    #Now we want to save all the arguments in args to a global config variable that can be imported anywhere.
+    config.update(vars(parser.parse_args()))
+    config['network_args'] = args.network_args
+    config['data_args'] = args.data_args
+
+    losses = main()
 
 
 

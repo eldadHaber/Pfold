@@ -1,4 +1,15 @@
 import torch
+import logging
+
+from supervised import config
+
+logger = logging.getLogger('runner')
+
+def dummy():
+
+    logger.info('submodule message')
+    logger.info("{:}".format(config.result_dir))
+
 
 def save_checkpoint(ite,net_state,opt_state,filename):
     d = {"ite": ite,
