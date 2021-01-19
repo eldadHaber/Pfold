@@ -6,13 +6,14 @@ class Translator(object):
     """
     Translates a batch of sentences from one language to another.
     """
-    def __init__(self, dict_forward, dict_backward, forward_action, backward_action):
+    def __init__(self):
         # Facebook_alphabet = ['<cls>', '<pad>', '<eos>', '<unk>', 'L', 'A', 'G', 'V', 'S', 'E', 'R', 'T', 'I', 'D', 'P', 'K', 'Q', 'N', 'F', 'Y', 'M', 'H', 'W', 'C', 'X', 'B', 'U', 'Z', 'O', '<null_1>', '<null_2>', '<null_3>', '<mask>']
         # Protein_net_alphabet = list('ACDEFGHIKLMNPQRSTVWY-')
         # self.forward_table = np.array([5, 23, 13, 9, 18, 6, 21, 12, 15, 4, 20, 17, 14, 16, 10, 8, 11, 7, 22, 19, 24, 32]) # Pnet to facebook
         # self.backward_table = np.array([-1, -1, -1, -1, 9, 0, 5, 17, 15, 3, 14, 16, 7, 2, 12, 8, 13, 11, 4, 19, 10, 6, 18, 1, 20, 20, 20, 20, 20, -1, -1, -1, -1]) # Facebook to Pnet
-        self.forward_table = np.array([5, 23, 13, 9, 18, 6, 21, 12, 15, 4, 20, 17, 14, 16, 10, 8, 11, 7, 22, 19, 24, 32]) # Pnet to facebook
-        self.backward_table = np.array([-1, -1, -1, -1, 9, 0, 5, 17, 15, 3, 14, 16, 7, 2, 12, 8, 13, 11, 4, 19, 10, 6, 18, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) # Facebook to Pnet
+        self.forward_table = torch.tensor([5, 23, 13, 9, 18, 6, 21, 12, 15, 4, 20, 17, 14, 16, 10, 8, 11, 7, 22, 19, 24, 32]) # Pnet to facebook
+        self.backward_table = torch.tensor([-1, -1, -1, -1, 9, 0, 5, 17, 15, 3, 14, 16, 7, 2, 12, 8, 13, 11, 4, 19, 10, 6, 18, 1, 20, 20, 20, 20, 20, -1, -1, -1, -1]) # Facebook to Pnet
+        self.backward_idx_shift = torch.argsort(self.backward_table[4:-9])
 
     def forward(self,seqs):
         nb,n = seqs.shape
@@ -28,6 +29,18 @@ class Translator(object):
         seq_out = seq_out[:,1:-1]
         return seq_out
 
+    def backward_probability_dist(self,p_facebook):
+        """
+        This function shifts a probability distribution back from facebook format to pnet format
+        This includes removing the <eos> <cls> tokens from the sequence,
+        as well as removing this first 4 and 9 last tokens from the probabilities,
+        and shifting all the rest to their correct spot
+        p_facebook is assumed to have the shape (nb,n,nA)
+        """
+        p = p_facebook[:, 1:-1, 4:-9] # We remove the dummy tokens
+        #Next we need to shift the tokens around in the last dimension
+        pnet = p[:,:,self.backward_idx_shift]
+        return pnet
 
 class AA_converter(object):
     def __init__(self, aa_list, unk_idx):

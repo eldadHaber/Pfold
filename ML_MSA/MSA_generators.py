@@ -47,14 +47,13 @@ class ModelWrapper(nn.Module):
         """
         seqs has shape (nb,n)
         """
-        seqs_translated = self.translator(seqs)
+        seqs_translated = self.translator.forward(seqs)
         results = self.model(seqs_translated)
-        pred = results['logits']
-        pred = pred[:, 4:-9] # We remove the dummy tokens
+        pred_facebook = results['logits']
+        pred_pnet = self.translator.backward_probability_dist(pred_facebook)
+        prob_pnet = torch.softmax(pred_pnet, dim=-1)
 
-        prob = torch.softmax(pred, dim=1)
-
-        return prob
+        return prob_pnet
 
 
 
@@ -342,7 +341,10 @@ def compute_kl_divergence_matrix(q,p):
             if i==j:
                 continue
             for k in range(nA):
-                M[i,j] += torch.sum(p[i,j,k,:] * torch.log(p[i,j,k,:]/(q[i,j,:]*q[j,i,k])))
+                tmp =torch.sum(p[i, j, k, :] * torch.log(p[i, j, k, :] / (q[i, j, :] * q[j, i, k])))
+                if torch.isnan(tmp) or torch.isinf(tmp):
+                    print("stop")
+                M[i,j] += tmp
     return M
 
 
