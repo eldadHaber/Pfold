@@ -16,7 +16,7 @@ from supervised.log import log_all_parameters
 from supervised.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg, load_loss_reg
 from supervised.network import select_network
 from supervised.optimization import eval_net, train
-from supervised.utils import determine_network_param
+from supervised.utils import determine_network_param, create_optimizer, create_lr_scheduler
 from supervised.utils import fix_seed
 import pandas as pd
 desired_width = 600
@@ -51,26 +51,25 @@ def main():
         loss_inner_fnc = EMSELoss(sigma=c['exp_dist_loss'])
     loss_fnc = LossMultiTargets(loss_inner_fnc)
 
-    net = select_network(c['network'],c['feature_dim'],**c['network_args'])
-
-    LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
-    net.to(c['device'])
-    optimizer = optim.Adam(list(net.parameters()), lr=c['SL_lr'])
-    scheduler = OneCycleLR(optimizer, c['SL_lr'], total_steps=c['max_iter'], pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
-                                        max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
     if c['load_from_previous'] != "":
-        net, optimizer, scheduler, ite_start = load_checkpoint(net, optimizer, scheduler, c['load_from_previous'], lr=c['SL_lr'])
+        ite_start, net, optimizer, lr_scheduler = load_checkpoint(c['load_from_previous'],device=c['device'])
         LOG.info("Loading Checkpoint {:}, starting from iteration {:}".format(c['load_from_previous'],ite_start))
     else:
         ite_start = 0
+        net = select_network(c['network'],c['feature_dim'],**c['network_args'])
+        LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
+        net.to(c['device'])
+        optimizer = create_optimizer(c['optimizer'], list(net.parameters()), c['SL_lr'])
+        lr_scheduler = create_lr_scheduler(c['lr_scheduler'], optimizer, c['SL_lr'], c['max_iter'])
+
     if c['use_loss_reg']:
-        load_loss_reg(c['load_nn_dists'],AA_list=c['data_args']['AA_list'],log_units=c['data_args']['log_units'])
+        loss_reg_fnc = load_loss_reg(c['load_nn_dists'],AA_list=c['data_args']['AA_list'],log_units=c['data_args']['log_units'])
     else:
         loss_reg_fnc = None
 
     log_all_parameters(LOG, c)
-    net = train(net, optimizer, dl_train, loss_fnc, dl_test=dl_test, scheduler=scheduler,ite=ite_start, loss_reg_fnc=loss_reg_fnc)
-    torch.save(net, "{:}/network.pt".format(c.result_dir))
-    eval_net(net, dl_test, loss_fnc, device=c.device, save_results="{:}/".format(c.result_dir))
+    net = train(net, optimizer, dl_train, loss_fnc, dl_test=dl_test, scheduler=lr_scheduler,ite=ite_start, loss_reg_fnc=loss_reg_fnc)
+    torch.save(net, "{:}/network.pt".format(c['result_dir']))
+    eval_net(net, dl_test, loss_fnc, device=c['device'], save_results="{:}/".format(c['result_dir']))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))
     print("Done")

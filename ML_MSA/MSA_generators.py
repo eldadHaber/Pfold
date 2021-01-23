@@ -9,23 +9,26 @@ import torch.nn.functional as F
 class DummyModel(nn.Module):
     """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
-    def __init__(self, alphabet,unknown_idx):
+    def __init__(self, alphabet, mask_idx, unknown_idx):
         super(DummyModel, self).__init__()
         self.alphabet = alphabet
-        self.n = len(alphabet)
-        self.unknown_idx = unknown_idx
+        if len(alphabet) >= unknown_idx and unknown_idx >= 0:
+            #unknown_idx is within the alphabet.
+            self.n = len(alphabet) - 1
+        else:
+            self.n = len(alphabet)
+        self.mask_idx = mask_idx
 
     def forward(self, seq):
-        mask = seq == self.unknown_idx
         tmp = seq.clone()
-        mm = tmp == self.unknown_idx
+        mm = tmp == self.mask_idx
         tmp[mm] = 0
         onehot = F.one_hot(tmp.long(), num_classes=self.n,).to(dtype=torch.float32)
         nb,l = seq.shape
         for i in range(nb):
             for j in range(l):
-                if seq[i,j] == self.unknown_idx:
-                    tt = torch.rand(len(self.alphabet))
+                if seq[i,j] == self.mask_idx:
+                    tt = torch.rand(self.n)
                     tt = tt / torch.sum(tt)
                     onehot[i,j,:] = tt
         return onehot
@@ -280,8 +283,7 @@ def setup_conditional_prob_matrix_job(seq_tok,alphabet=['A','B','C'],mask_id=32)
 
     n = seq_tok.shape[-1]
     nt = len(alphabet)
-    nc = n*(n-1)
-    nb = nc*nt
+    nb = n*(n-1)*nt
     alphabet_num = list(range(nt))
     seq_rep = seq_tok.repeat(nb,1)
     seq_batch = torch.empty(nb,n,dtype=torch.int64,device=seq_tok.device)

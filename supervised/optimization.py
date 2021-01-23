@@ -110,12 +110,15 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                     loss_train = 0
                     if loss_v < best_v_loss:
                         filename = "{:}/best_model_state.pt".format(result_dir)
-                        save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
-                        torch.save(net, "{:}/best_model.pt".format(result_dir))
+                        save_checkpoint(filename, ite + 1, max_iter, c['feature_dim'], c['SL_lr'], c['network'],
+                                        c['network_args'], net.state_dict(), c['optimizer'], optimizer.state_dict(),
+                                        c['lr_scheduler'], scheduler.state_dict())
                         best_v_loss = loss_v
             if (ite + 1) % checkpoint == 0:
                 filename = "{:}/checkpoint.pt".format(result_dir)
-                save_checkpoint(ite + 1, net.state_dict(), optimizer.state_dict(), filename=filename)
+                save_checkpoint(filename, ite + 1, max_iter, c['feature_dim'], c['SL_lr'], c['network'],
+                                c['network_args'], net.state_dict(), c['optimizer'], optimizer.state_dict(),
+                                c['lr_scheduler'], scheduler.state_dict())
                 LOG.info("Checkpoint saved: {}".format(filename))
             ite += 1
 

@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from supervised.dataloader_utils import AA_LIST
 from supervised.dataloader_npz import Dataset_npz
 
-def select_dataset(path_train,path_test,feature_dim,batch_size, pad_modulo=1, i_seq=True,i_pssm=True,i_entropy=True,i_cov=True,i_contact=True,o_rCa=True,o_rCb=True,o_rN=True, o_dist=True,flip_protein=0.5,AA_list=AA_LIST,log_units=-9):
+def select_dataset(path_train,path_test,feature_dim,batch_size, pad_modulo=1, i_seq=True,i_pssm=True,i_entropy=True, i_inpaint=True, i_cov=True,i_contact=True,o_rCa=True,o_rCb=True,o_rN=True, o_dist=True,flip_protein=0.5,AA_list=AA_LIST,log_units=-9):
     """
     This is a wrapper routine for selecting the right dataloader.
     Currently it only supports datasets saved in npz format.
@@ -14,13 +14,13 @@ def select_dataset(path_train,path_test,feature_dim,batch_size, pad_modulo=1, i_
     assert feature_dim==1, "Feature dimensions different from 1 is not currently supported."
 
     if os.path.isdir(path_train):
-        dataset_train = Dataset_npz(path_train, flip_protein=flip_protein, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_contact=i_contact, o_rCa=o_rCa,o_rCb=o_rCb, o_rN=o_rN, o_dist=o_dist, AA_list=AA_list, log_units=log_units)
+        dataset_train = Dataset_npz(path_train, flip_protein=flip_protein, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_inpaint=i_inpaint, i_cov=i_cov, i_contact=i_contact, o_rCa=o_rCa,o_rCb=o_rCb, o_rN=o_rN, o_dist=o_dist, AA_list=AA_list, log_units=log_units)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 
     # Test Dataset
     if os.path.isdir(path_test):
-        dataset_test = Dataset_npz(path_test, flip_protein=0, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_contact=i_contact, o_rCa=o_rCa,o_rCb=o_rCb, o_rN=o_rN, o_dist=o_dist, AA_list=AA_list, log_units=log_units)
+        dataset_test = Dataset_npz(path_test, flip_protein=0, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_inpaint=i_inpaint, i_cov=i_cov, i_contact=i_contact, o_rCa=o_rCa,o_rCb=o_rCb, o_rN=o_rN, o_dist=o_dist, AA_list=AA_list, log_units=log_units)
     else:
         raise NotImplementedError("dataset not implemented yet.")
 

@@ -28,30 +28,34 @@ if __name__ == '__main__':
 
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
+    parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
+    parser.add_argument('--lr-scheduler', default='onecyclelr', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
-    parser.add_argument('--max-iter', default=80000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--max-iter', default=3, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=2, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--checkpoint', default=10000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--checkpoint', default=2, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--exp_dist_loss', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-nn-dists', default='./data/nn-distances.npz', type=str, metavar='N', help='Input feature types')
     parser.add_argument('--load-from-previous', default='', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    # parser.add_argument('--load-from-previous', default='./results/pretrained_networks/test.pt', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--load-from-previous', default='C:/Users/Tue/PycharmProjects/Pfold/results/run_1d_vnet/2020-11-19_10_05_23/checkpoint.pt', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     args = parser.parse_args()
 
     args.data_args = {
         'i_seq': True,
-        'i_pssm': True,
-        'i_entropy': True,
+        'i_pssm': False,
+        'i_entropy': False,
         'i_cov': False,
         'i_contact': False,
+        'i_inpaint': True,
         'o_rCa': True,
-        'o_rCb': True,
+        'o_rCb': False,
         'o_rN': False,
         'o_dist': True,
         'log_units': -10,
-        'flip_protein': 0.5,
+        'flip_protein': 0.0,
         'AA_list': 'ACDEFGHIKLMNPQRSTVWY-'
     }
 

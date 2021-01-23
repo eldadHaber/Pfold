@@ -6,9 +6,26 @@ import random
 
 import numpy as np
 import torch
+from torch.optim.lr_scheduler import OneCycleLR
 
 
 # Define some functions
+
+def create_optimizer(opt_type,net_parameters,lr):
+    if opt_type.lower() == 'adam':
+        opt = torch.optim.Adam(net_parameters, lr=lr)
+    else:
+        raise NotImplementedError("The optimizer you have selected ({:}), has not been implemented.".format(opt_type))
+    return opt
+
+def create_lr_scheduler(lr_scheduler_type,opt,lr,max_iter):
+    if lr_scheduler_type.lower() == 'onecyclelr':
+        lr_scheduler = OneCycleLR(opt, lr, total_steps=max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
+                                        max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
+    else:
+        raise NotImplementedError("The learning rate scheduler you have selected ({:}), has not been implemented.".format(schedule_type))
+    return lr_scheduler
+
 
 def move_tuple_to(args,device,non_blocking=True):
     new_args = ()

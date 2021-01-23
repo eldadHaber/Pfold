@@ -2,7 +2,9 @@ import torch
 import logging
 
 from supervised import config
-
+from supervised.network import select_network
+from supervised.utils import create_optimizer, create_lr_scheduler
+from supervised.config import config as c
 logger = logging.getLogger('runner')
 
 def dummy():
@@ -11,24 +13,43 @@ def dummy():
     logger.info("{:}".format(config.result_dir))
 
 
-def save_checkpoint(ite,net_state,opt_state,filename):
+def save_checkpoint(filename,ite,max_iter,feature_dim,lr,net_type,net_args,net_state,opt_type,opt_state,lr_scheduler_type,lr_scheduler_state):
     d = {"ite": ite,
-         "net": net_state,
-         "opt": opt_state
+         "max_iter": max_iter,
+         'feature_dim': feature_dim,
+         'lr': lr,
+         "net_type": net_type,
+         "net_args": net_args,
+         "net_state": net_state,
+         "opt_type": opt_type,
+         "opt_state": opt_state,
+         'lr_scheduler_type': lr_scheduler_type,
+         'lr_scheduler_state': lr_scheduler_state
          }
     torch.save(d,filename)
     return
 
 
 
-def load_checkpoint(net,opt,lr_scheduler,filename, lr=None):
+def load_checkpoint(filename,device):
     f = torch.load(filename)
-    net.load_state_dict(f['net'])
-    opt.load_state_dict(f['opt'])
-    if lr is not None:
-        for g in opt.param_groups:
-            g['lr'] = lr
     ite_start = f['ite']
-    for i in range(ite_start):
-        lr_scheduler.step()
-    return net, opt, lr_scheduler, ite_start
+    max_iter = f['max_iter']
+    feature_dim = f['feature_dim']
+    lr = f['lr']
+
+    net_type = f['net_type']
+    net_args = f['net_args']
+    net = select_network(net_type, feature_dim, **net_args)
+    net.load_state_dict(f['net_state'])
+    net.to(device)
+
+    opt_type = f['opt_type']
+    opt = create_optimizer(opt_type, list(net.parameters()), lr)
+    opt.load_state_dict(f['opt_state'])
+
+    lr_scheduler_type = f['lr_scheduler_type']
+    lr_scheduler = create_lr_scheduler(lr_scheduler_type, opt, lr, max_iter)
+    lr_scheduler.load_state_dict(f['lr_scheduler_state'])
+
+    return ite_start, net, opt, lr_scheduler

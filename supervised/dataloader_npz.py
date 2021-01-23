@@ -28,7 +28,7 @@ class Dataset_npz(data.Dataset):
 
 
     '''
-    def __init__(self, folder,  flip_protein, i_seq, i_pssm, i_entropy, i_cov, i_contact, o_rCa,o_rCb, o_rN, o_dist, AA_list, log_units):
+    def __init__(self, folder,  flip_protein, i_seq, i_pssm, i_entropy, i_inpaint, i_cov, i_contact, o_rCa,o_rCb, o_rN, o_dist, AA_list, log_units):
         """
         log_units[int]: Gives the log10 units that coordinates/distances should be returned in. (picometer = -12, nanometer = -9...)
 
@@ -42,6 +42,7 @@ class Dataset_npz(data.Dataset):
         self.i_seq = i_seq
         self.i_pssm = i_pssm
         self.i_entropy = i_entropy
+        self.i_inpaint = i_inpaint
         self.i_cov = i_cov
         self.i_contact = i_contact
         self.o_rCa = o_rCa
@@ -51,6 +52,7 @@ class Dataset_npz(data.Dataset):
         self.AA_list = list(AA_list)
         self.log_units = log_units
         self.coord_to_dist = ConvertCoordToDists()
+        self.seq_mask = MaskRandomSubset()
 
         # We run the first example to get the input and output channels and perform sanity checks
         arg = self.__getitem__(0)
@@ -86,6 +88,10 @@ class Dataset_npz(data.Dataset):
             features += (data['pssm'],)
         if self.i_entropy:
             features += (data['entropy'],)
+        if self.i_inpaint:
+            r, m = self.seq_mask(coords[0])
+            features += (r,m[None,:],)
+
         if self.i_cov:
             cov = data['cov']
             cov = cov.reshape(-1,cov.shape[-1])

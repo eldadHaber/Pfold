@@ -43,15 +43,16 @@ if __name__ == "__main__":
     filename = '10#2O8M_2_C'
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     outputfolder = './../results/ML_MSA/'
-    os.makedirs(outputfolder,exist_ok=True)
-    model_facebook, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
-    translator = Translator()
-    model = ModelWrapper(model_facebook.to(device),translator)
-    # model = DummyModel(aa_list,unknown_idx = mask_idx)
-
     pnet_alphabet = list('ACDEFGHIKLMNPQRSTVWY-')
     unk_idx = len(pnet_alphabet) - 1
     mask_idx = len(pnet_alphabet)
+
+    # model_facebook, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
+    translator = Translator()
+    # model = ModelWrapper(model_facebook.to(device),translator)
+    model = DummyModel(pnet_alphabet, mask_idx=mask_idx, unknown_idx=unk_idx)
+    os.makedirs(outputfolder,exist_ok=True)
+
     AA_to_idx = AA_converter(pnet_alphabet,unk_idx)
     maxresidues = 10000
 
