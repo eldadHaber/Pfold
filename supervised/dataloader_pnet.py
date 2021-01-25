@@ -253,12 +253,12 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
     return args, log_unit, AA_DICT
 
 if __name__ == '__main__':
-    pnetfile = './../data/casp11/training_90'
-    output_folder = './../data/casp11_training_90/'
-    # pnetfile = './../data/casp11/testing.pnet'
-    # output_folder = './../data/casp11_testing/'
+    # pnetfile = './../data/casp11/training_90'
+    # output_folder = './../data/casp11_training_90/'
     # pnetfile = './../data/casp11/testing'
     # output_folder = './../data/casp11_testing/'
+    pnetfile = './../data/casp11/validation'
+    output_folder = './../data/casp11_validation/'
 
     os.makedirs(output_folder, exist_ok=True)
     args, log_units, AA_DICT = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=1000, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=False, use_coord=True)

@@ -7,7 +7,7 @@ matplotlib.use('TkAgg') #TkAgg
 # from scipy.special import softmax
 # from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_results=False, save_results=False, error=0):
+def compare_distogram(outputs, targets, padding_mask, units, highlight=None, plot_results=False, save_results=False, error=None):
 
     plt.figure(num=1, figsize=[15, 10])
     plt.clf()
@@ -42,8 +42,11 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
                 plt.subplot(n,3, i*3+1)
 
             plt.imshow(output, vmin=0, vmax=vmax)
-            plt.colorbar()
-            tit = name + "(prediction) {:2.2f} Å".format(error)
+            plt.colorbar(label=units)
+            if error is not None:
+                tit = "{:} prediction {:2.2f}".format(name,error)
+            else:
+                tit = "{:} prediction".format(name)
             plt.title(tit)
 
             if highlight is not None:
@@ -51,8 +54,8 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
             else:
                 plt.subplot(n,3, i*3+2)
             plt.imshow(target, vmin=0, vmax=vmax)
-            plt.colorbar()
-            tit = name + "(target)"
+            plt.colorbar(label=units)
+            tit = "{:} target".format(name)
             plt.title(tit)
 
             if highlight is not None:
@@ -60,14 +63,14 @@ def compare_distogram(outputs, targets, padding_mask, highlight=None, plot_resul
             else:
                 plt.subplot(n,3, i*3+3)
             plt.imshow(np.abs(mask * output - target), vmin=0)
-            plt.colorbar()
-            tit = name + "(diff)"
+            plt.colorbar(label=units)
+            tit = "{:} diff".format(name)
             plt.title(tit)
             if highlight is not None:
                 plt.subplot(n,4, i*4+4)
                 plt.imshow(highlight)
-                plt.colorbar()
-                tit = name + "(highlight)"
+                plt.colorbar(label=units)
+                tit = "{:} highlight".format(name)
                 plt.title(tit)
 
         if plot_results:

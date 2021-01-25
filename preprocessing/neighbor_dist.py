@@ -98,8 +98,8 @@ def count_nn_dist(dataloader,max_count=1000000,report_iter=100000):
 
 
 if __name__ == '__main__':
-    # dataset = './../data/casp11_training_90/'
-    dataset = './../data/casp11_testing/'
+    dataset = './../data/casp11_training_90/'
+    # dataset = './../data/casp11_testing/'
     output_folder = './../data/'
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
@@ -110,6 +110,7 @@ if __name__ == '__main__':
     i_seq = True
     i_pssm = False
     i_entropy = False
+    i_inpaint = False
     i_cov = False
     i_contact = False
     o_rCa = True
@@ -119,8 +120,7 @@ if __name__ == '__main__':
     AA_list = AA_LIST
     log_units = -9
 
-    dataset_test = Dataset_npz(dataset, flip_protein, i_seq, i_pssm, i_entropy, i_cov, i_contact, o_rCa,
-             o_rCb, o_rN, o_dist, AA_list, log_units=log_units)
+    dataset_test = Dataset_npz(dataset, flip_protein, i_seq, i_pssm, i_entropy, i_inpaint, i_cov, i_contact, o_rCa, o_rCb, o_rN, o_dist, AA_list, log_units=log_units)
     pad_var_list = list([[0, 0], [0, 0], [0]])
     dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0, drop_last=False,collate_fn=PadCollate(pad_modulo=1,pad_var_list=pad_var_list))
 

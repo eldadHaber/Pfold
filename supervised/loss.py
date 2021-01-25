@@ -142,9 +142,15 @@ class Loss_reg(torch.nn.Module):
 
 
 class Loss_reg_min_separation(torch.nn.Module):
-    def __init__(self,d_mean=0.3432,d_std=0.0391):
+    def __init__(self,log_units):
         super(Loss_reg_min_separation,self).__init__()
-        self.d = d_mean - 3 * d_std
+        d_mean = 0.3432 # In nanometer
+        d_std = 0.0391  # In nanometer
+        d_units = -9
+        scaling = 10.0 ** (d_units - log_units)
+        self.d_mean = scaling * d_mean
+        self.d_std = scaling * d_std
+        self.d = self.d_mean - 3 * self.d_std
         return
 
     def forward(self, dists, mask_padding):

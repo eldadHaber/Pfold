@@ -303,7 +303,7 @@ class MaskRandomSubset(object):
 
     def __call__(self, r):
         m = np.ones(r.shape[1])
-        pos_range = np.arange(10,r.shape[1]-10)
+        pos_range = np.arange(0,r.shape[1])
         endpoints = np.random.choice(pos_range,size=2,replace=False)
         endpoints = np.sort(endpoints)
         r_m = copy.deepcopy(r)

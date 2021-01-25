@@ -39,7 +39,7 @@ class vnet1D(nn.Module):
             else:
                 chan_i = channels * 2**(i - 1)
             chan_o = channels * 2**i
-            stdv = 1e-2 * chan_i / chan_o
+            stdv = 1e-1 * chan_i / chan_o
             Ki = torch.zeros(chan_o, chan_i, stencil_size)
             Ki.data.uniform_(-stdv, stdv)
             Ki = nn.Parameter(Ki)
@@ -48,14 +48,14 @@ class vnet1D(nn.Module):
             if i != nblocks-1:
                 # Last block is just a coarsening, since it is a vnet and not a unet
                 for j in range(nlayers_pr_block):
-                    stdv = 1e-3
+                    stdv = 1e-2
                     chan = channels * 2 ** i
                     Ki = torch.zeros(chan, chan, stencil_size)
                     Ki.data.uniform_(-stdv, stdv)
                     Ki = nn.Parameter(Ki)
                     K.append(Ki)
 
-        W = nn.Parameter(1e-2*torch.randn(chan_out, channels, 1))
+        W = nn.Parameter(1e-1*torch.randn(chan_out, channels, 1))
         return K, W
 
     def forward(self, x, mask=None):

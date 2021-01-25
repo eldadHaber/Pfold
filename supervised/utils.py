@@ -11,6 +11,20 @@ from torch.optim.lr_scheduler import OneCycleLR
 
 # Define some functions
 
+def name_log_units(log_units):
+    if log_units == -9:
+        name = 'nm'
+    elif log_units == -10:
+        name = 'Å'
+    elif log_units == -12:
+        name = 'pm'
+    else:
+        name = str(log_units)
+    return name
+
+
+
+
 def create_optimizer(opt_type,net_parameters,lr):
     if opt_type.lower() == 'adam':
         opt = torch.optim.Adam(net_parameters, lr=lr)

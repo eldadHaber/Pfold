@@ -47,7 +47,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     loss_train_c = 0
     loss_train_reg = 0
     loss_train = 0
-    loss_reg_min_sep_fnc = Loss_reg_min_separation()
+    loss_reg_min_sep_fnc = Loss_reg_min_separation(c['data_args']['log_units'])
     # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
     best_v_loss = 9e9
     while True:
@@ -65,8 +65,8 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
 
             optimizer.zero_grad()
             dists_pred, coords_pred = net(features,mask)
-
             loss_d = loss_fnc(dists_pred, dists)
+            loss_train_d += loss_d.cpu().detach()
             if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
                 loss_c = loss_tr_tuples(coords_pred, coords)
                 loss_train_c += loss_c.cpu().detach()
@@ -75,17 +75,16 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                 loss = loss_d
             if coords_pred is not None and loss_reg_fnc:
                 seq = torch.argmax(features[:,0:20,:],dim=1)
-                loss_reg = 10 * loss_reg_fnc(seq, coords_pred, mask)
+                loss_reg = 1 * loss_reg_fnc(seq, coords_pred, mask)
                 loss_train_reg += loss_reg.cpu().detach()
                 loss += loss_reg
             if coords_pred is not None and loss_reg_min_sep_fnc:
-                loss_reg_min_sep = 100 * loss_reg_min_sep_fnc(dists_pred,mask)
+                loss_reg_min_sep = 10 * loss_reg_min_sep_fnc(dists_pred,mask)
                 loss += loss_reg_min_sep
                 loss_train_reg += loss_reg_min_sep.cpu().detach()
 
             loss.backward()
             optimizer.step()
-            loss_train_d += loss_d.cpu().detach()
             loss_train += loss.cpu().detach()
 
             if scheduler is not None:
@@ -94,15 +93,15 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             if (ite + 1) % report_iter == 0:
                 if dl_test is not None:
                     t2 = time.time()
-                    loss_v, dist_err_ang, dist_err_ang_alq = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord, weight=w)
+                    loss_v, dist_err_mean = eval_net(net, dl_test, loss_fnc, device=device, plot_results=viz, use_loss_coord=use_loss_coord, weight=w)
                     t3 = time.time()
                     if scheduler is None:
                         lr = optimizer.param_groups[0]['lr']
                     else:
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err(ang): {:2.6f}  Dist_err(alq): {:2.6f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, dist_err_ang, dist_err_ang_alq, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err({:}): {:2.6f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
+                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, c['units'], dist_err_mean, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train_d = 0
                     loss_train_c = 0
@@ -148,7 +147,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
     net.eval()
     with torch.no_grad():
         loss_v = 0
-        dist_err_mean = 0
+        dist_err_mean_sum = 0
         dist_err_mean_alq = 0
         for i, vars in enumerate(dl):
             features = vars[0][0]
@@ -170,21 +169,23 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
                 loss = loss_d
             loss_v += loss * nb
             M = dists[0] != 0
-            L = torch.sum(mask,dim=1)
-            dist_err = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2)))/(L*L) * 10)
-            dist_err_mean += dist_err
+            dist_err_mean = torch.sum((torch.abs(dists_pred[0] - dists[0]) * M), dim=(1, 2))/torch.sum(M,dim=(1,2))
+            dist_err_mean_sum += torch.sum(dist_err_mean)
 
-            dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2)))/(L*(L-1)) * 10)
-            dist_err_mean_alq += dist_err_alq
+            # L = torch.sum(mask,dim=1)
+            # dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2)))/(L*(L-1)))
+            # dist_err_mean_alq += dist_err_alq
 
             if save_results:
-                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}".format(save_results,i))
-                plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i))
+                compare_distogram(dists_pred, dists, mask, c['units'], save_results="{:}dist_{:}".format(save_results,i))
+                if coords_pred is not None and use_loss_coord:
+                    plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i))
         if plot_results :
-            compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
-            plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
+            compare_distogram(dists_pred, dists, mask, c['units'], plot_results=plot_results)
+            if coords_pred is not None and use_loss_coord:
+                plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
     net.train()
-    return loss_v/len(dl.dataset), dist_err_mean/len(dl.dataset), dist_err_mean_alq/len(dl.dataset)
+    return loss_v/len(dl.dataset), dist_err_mean_sum/len(dl.dataset)
 
 
 
@@ -237,10 +238,10 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
             dist_err_RMSD2_mean += dist_err_RMSD2
 
             if save_results:
-                compare_distogram(dists_pred, dists, mask, save_results="{:}dist_{:}_ID_{:}".format(save_results,i,str(ids[0])), error=dist_err)
+                compare_distogram(dists_pred, dists, mask, c['units'], save_results="{:}dist_{:}_ID_{:}".format(save_results,i,str(ids[0])), error=dist_err)
                 plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}_ID_{:}".format(save_results,i,str(ids[0])), error=dist_err)
         if plot_results :
-            # compare_distogram(dists_pred, dists, mask, plot_results=plot_results)
+            # compare_distogram(dists_pred, dists, mask, c['units'], plot_results=plot_results)
             plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
         dist_err_mean /= len(dl.dataset)
         dist_err_mean_alq /= len(dl.dataset)
