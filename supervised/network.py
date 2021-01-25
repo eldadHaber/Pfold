@@ -1,7 +1,7 @@
 from supervised.network_graph import gNNC, hyperNet
 from supervised.network_resnet import ResNet
 from supervised.network_transformer import TransformerModel
-from supervised.network_vnet import vnet1D, vnet2D
+from supervised.network_vnet import vnet1D, vnet2D, vnet1D_inpaint
 
 
 def select_network(network,feature_dim,**network_args):
@@ -11,6 +11,8 @@ def select_network(network,feature_dim,**network_args):
     '''
     if network.lower() == 'vnet' and feature_dim == 1:
         net = vnet1D(**network_args)
+    elif network.lower() == 'vnet_inpaint' and feature_dim == 1:
+        net = vnet1D_inpaint(**network_args)
     elif network.lower() == 'vnet' and feature_dim == 2:
         net = vnet2D(**network_args)
     elif network.lower() == 'transformer' and feature_dim == 1:

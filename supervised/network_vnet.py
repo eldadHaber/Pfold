@@ -19,6 +19,153 @@ def conv2T(X, Kernel):
 
 
 
+class vnet1D_inpaint(nn.Module):
+    """ VNet """
+    def __init__(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size,cross_dist=False):
+        super(vnet1D_inpaint, self).__init__()
+        K, W = self.init_weights(chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size=stencil_size)
+        self.K = K
+        self.W = W
+        self.h = 0.1
+        self.cross_dist = cross_dist
+
+    def init_weights(self, chan_in, chan_out, channels, nblocks, nlayers_pr_block, stencil_size = 3):
+        K = nn.ParameterList([])
+        for i in range(nblocks):
+            # First the channel change.
+            if i == 0:
+                chan_i = chan_in
+            else:
+                chan_i = channels * 2**(i - 1)
+            chan_o = channels * 2**i
+            stdv = 1e-1 * chan_i / chan_o
+            Ki = torch.zeros(chan_o, chan_i, stencil_size)
+            Ki.data.uniform_(-stdv, stdv)
+            Ki = nn.Parameter(Ki)
+            K.append(Ki)
+
+            if i != nblocks-1:
+                # Last block is just a coarsening, since it is a vnet and not a unet
+                for j in range(nlayers_pr_block):
+                    stdv = 1e-2
+                    chan = channels * 2 ** i
+                    Ki = torch.zeros(chan, chan, stencil_size)
+                    Ki.data.uniform_(-stdv, stdv)
+                    Ki = nn.Parameter(Ki)
+                    K.append(Ki)
+
+        W = nn.Parameter(1e-1*torch.randn(chan_out, channels, 1))
+        return K, W
+
+    def forward(self, x, mask=None):
+        if mask is None:
+            mask = torch.ones_like(x[:,0,:])
+
+        coords = x[:,-4:-1,:]
+        tmp = x[:,-1,:] == 1
+        mask_coords = torch.repeat_interleave(tmp[:,None,:],3,dim=1)
+        """ Forward propagation through the network """
+
+        mask = mask.unsqueeze(1)
+
+        # Number of layers
+        nL = len(self.K)
+
+        # Store the output at different scales to add back later
+        xS = []
+
+        # Store the masks at different scales to mask with later
+        mS = []
+
+        # Opening layer
+        z = conv1(x, self.K[0]) * mask
+        z = masked_instance_norm(z,mask)
+        x = F.relu(z)
+
+        # Step through the layers (down cycle)
+        for i in range(1, nL):
+
+            # First case - Residual blocks
+            # (same number of input and output kernels)
+
+            sK = self.K[i].shape
+
+            if sK[0] == sK[1]:
+                z = conv1(x, self.K[i]) * mask
+                z = masked_instance_norm(z,mask)
+                z = F.relu(z)
+                z = conv1T(z, self.K[i]) * mask
+                x = x - self.h*z
+
+            # Change number of channels/resolution
+            else:
+                # Store the features
+                xS.append(x)
+
+                z = conv1(x, self.K[i]) * mask
+                z = masked_instance_norm(z,mask)
+                x = F.relu(z)
+
+                # Downsample by factor of 2
+                mS.append(mask)
+                mask = F.avg_pool1d(mask.float(), 3, stride=2, padding=1).ge(0.5).long()
+                x = F.avg_pool1d(x, 3, stride=2, padding=1) * mask
+
+        # Number of scales being computed (how many downsampling)
+        n_scales = len(xS)
+
+        # Step back through the layers (up cycle)
+        for i in reversed(range(1, nL)):
+
+            # First case - Residual blocks
+            # (same number of input and output kernels)
+            sK = self.K[i].shape
+            if sK[0] == sK[1]:
+                z = conv1T(x, self.K[i]) * mask
+                z = masked_instance_norm(z,mask)
+                z = F.relu(z)
+                z = conv1(z, self.K[i]) * mask
+                x = x - self.h*z
+
+            # Change number of channels/resolution
+            else:
+                n_scales -= 1
+                # Upsample by factor of 2
+                mask = mS[n_scales]
+                x = F.interpolate(x, scale_factor=2) * mask
+
+                z = conv1T(x, self.K[i]) * mask
+                z = masked_instance_norm(z,mask)
+                x = F.relu(z) + xS[n_scales]
+
+        x = conv1(x, self.W) * mask
+
+        x[mask_coords] = coords[mask_coords]
+        if self.cross_dist:
+            nl = x.shape[-1]
+            nc = x.shape[1]//3
+            x_long = torch.empty_like(x)
+            x_long = x_long.reshape((x.shape[0],3,-1))
+            for i in range(x.shape[1]//3):
+                x_long[:,:,i*nl:(i+1)*nl] = x[:,i*3:(i+1)*3,:]
+            dist_long = tr2DistSmall(x_long)
+            dists = ()
+            for i in range(nc):
+                for j in range(nc):
+                    dists += (dist_long[:,i*nl:(i+1)*nl,j*nl:(j+1)*nl],)
+
+
+
+        else:
+            dists = ()
+            for i in range(x.shape[1]//3):
+                dists += (tr2DistSmall(x[:,i*3:(i+1)*3,:]),)
+
+        return dists, x
+
+
+
+
 
 class vnet1D(nn.Module):
     """ VNet """

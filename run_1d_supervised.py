@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--feature-dim', default=1, type=int, metavar='N', help='Input feature types')
 
     # Learning
-    parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
+    parser.add_argument('--network', default='vnet_inpaint', type=str, metavar='N', help='network to use')
     parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
     parser.add_argument('--lr-scheduler', default='', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
@@ -70,10 +70,10 @@ if __name__ == '__main__':
         'dropout': 1e-2,  # 0.2 # the dropout value
         'chan_out': 3,  # the output channels, need 3 for each atom type
         'stencil': 5}
-    elif args.network.lower() == 'vnet':
+    elif args.network.lower() == 'vnet_inpaint':
         args.network_args = {
-        'nblocks': 4,
-        'nlayers_pr_block': 5,
+        'nblocks': 2,
+        'nlayers_pr_block': 3,
         'channels': 80,
         'stencil_size': 3,
         }
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     else:
         raise UserWarning("network: {:} not recognised for arg.network_args".format(args.network))
 
-    if args.network.lower() == 'vnet':
+    if args.network.lower() == 'vnet' or args.network.lower() == 'vnet_inpaint':
         pad_modulo = 2*args.network_args['nblocks']
     else:
         pad_modulo = 1
