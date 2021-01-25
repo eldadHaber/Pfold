@@ -18,7 +18,7 @@ if __name__ == '__main__':
     # parser.add_argument('--dataset-train', default='./data/train_npz/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-train', default='./data/casp11_training_90/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./data/casp11_validation/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./data/casp11_testing/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-loss-reg', default=True, type=bool, metavar='N', help='Input feature types')
@@ -29,11 +29,11 @@ if __name__ == '__main__':
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
     parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
-    parser.add_argument('--lr-scheduler', default='onecyclelr', type=str, metavar='N', help='network to use')
+    parser.add_argument('--lr-scheduler', default='', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=5000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--exp_dist_loss', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-nn-dists', default='./data/nn-distances.npz', type=str, metavar='N', help='Input feature types')
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         args.network_args = {
         'nblocks': 4,
         'nlayers_pr_block': 5,
-        'channels': 280,
+        'channels': 80,
         'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':

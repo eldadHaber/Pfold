@@ -1,5 +1,6 @@
 import copy
 import random
+import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,6 +28,10 @@ COORDS_PAD_VALUE = 0
 
 def convert_seq_to_onehot(seq):
     return np.eye(len(AA_DICT)-1, dtype=np.float32)[np.int64(seq)].T
+
+def convert_seq_to_onehot_torch(seq):
+    batch = F.one_hot(seq.long(), num_classes=len(AA_DICT)-1)
+    return batch.transpose_(0, 1)
 
 def convert_1d_features_to_2d(f1d):
     f1d = np.concatenate(f1d, axis=0).swapaxes(0, 1)

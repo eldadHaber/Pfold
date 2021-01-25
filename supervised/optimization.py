@@ -75,11 +75,11 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                 loss = loss_d
             if coords_pred is not None and loss_reg_fnc:
                 seq = torch.argmax(features[:,0:20,:],dim=1)
-                loss_reg = 1 * loss_reg_fnc(seq, coords_pred, mask)
+                loss_reg = 0.1 * loss_reg_fnc(seq, coords_pred, mask)
                 loss_train_reg += loss_reg.cpu().detach()
                 loss += loss_reg
             if coords_pred is not None and loss_reg_min_sep_fnc:
-                loss_reg_min_sep = 10 * loss_reg_min_sep_fnc(dists_pred,mask)
+                loss_reg_min_sep = 0.1 * loss_reg_min_sep_fnc(dists_pred,mask)
                 loss += loss_reg_min_sep
                 loss_train_reg += loss_reg_min_sep.cpu().detach()
 
@@ -110,8 +110,8 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                     if loss_v < best_v_loss:
                         filename = "{:}/best_model_state.pt".format(result_dir)
                         save_checkpoint(filename, ite + 1, max_iter, c['feature_dim'], c['SL_lr'], c['network'],
-                                        c['network_args'], net.state_dict(), c['optimizer'], optimizer.state_dict(),
-                                        c['lr_scheduler'], scheduler.state_dict())
+                                        c['network_args'], net, c['optimizer'], optimizer,
+                                        c['lr_scheduler'], scheduler)
                         best_v_loss = loss_v
             if (ite + 1) % checkpoint == 0:
                 filename = "{:}/checkpoint.pt".format(result_dir)

@@ -13,16 +13,20 @@ def dummy():
     logger.info("{:}".format(config.result_dir))
 
 
-def save_checkpoint(filename,ite,max_iter,feature_dim,lr,net_type,net_args,net_state,opt_type,opt_state,lr_scheduler_type,lr_scheduler_state):
+def save_checkpoint(filename,ite,max_iter,feature_dim,lr,net_type,net_args,net,opt_type,opt,lr_scheduler_type,lr_scheduler):
+    if lr_scheduler_type is not None:
+        lr_scheduler_state = lr_scheduler_type.state_dict()
+    else:
+        lr_scheduler_state = None
     d = {"ite": ite,
          "max_iter": max_iter,
          'feature_dim': feature_dim,
          'lr': lr,
          "net_type": net_type,
          "net_args": net_args,
-         "net_state": net_state,
+         "net_state": net.state_dict(),
          "opt_type": opt_type,
-         "opt_state": opt_state,
+         "opt_state": opt.state_dict(),
          'lr_scheduler_type': lr_scheduler_type,
          'lr_scheduler_state': lr_scheduler_state
          }
@@ -49,7 +53,10 @@ def load_checkpoint(filename,device):
     opt.load_state_dict(f['opt_state'])
 
     lr_scheduler_type = f['lr_scheduler_type']
-    lr_scheduler = create_lr_scheduler(lr_scheduler_type, opt, lr, max_iter)
-    lr_scheduler.load_state_dict(f['lr_scheduler_state'])
+    if lr_scheduler_type is not None:
+        lr_scheduler = create_lr_scheduler(lr_scheduler_type, opt, lr, max_iter)
+        lr_scheduler.load_state_dict(f['lr_scheduler_state'])
+    else:
+        lr_scheduler = None
 
     return ite_start, net, opt, lr_scheduler

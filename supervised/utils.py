@@ -36,8 +36,10 @@ def create_lr_scheduler(lr_scheduler_type,opt,lr,max_iter):
     if lr_scheduler_type.lower() == 'onecyclelr':
         lr_scheduler = OneCycleLR(opt, lr, total_steps=max_iter, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
+    elif lr_scheduler_type.lower() == '':
+        lr_scheduler = None
     else:
-        raise NotImplementedError("The learning rate scheduler you have selected ({:}), has not been implemented.".format(schedule_type))
+        raise NotImplementedError("The learning rate scheduler you have selected ({:}), has not been implemented.".format(lr_scheduler_type))
     return lr_scheduler
 
 

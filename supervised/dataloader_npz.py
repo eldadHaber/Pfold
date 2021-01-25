@@ -2,7 +2,6 @@ import glob
 
 import numpy as np
 import torch.utils.data as data
-
 from supervised.dataloader_utils import SeqFlip, DrawFromProbabilityMatrix, MaskRandomSubset, convert_seq_to_onehot, \
     convert_1d_features_to_2d, ConvertCoordToDists, Random2DCrop
 from supervised.config import config as c
