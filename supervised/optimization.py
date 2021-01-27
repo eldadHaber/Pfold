@@ -5,14 +5,14 @@ import matplotlib
 from supervised.IO import save_checkpoint
 from supervised.loss import loss_tr_tuples, Loss_reg_min_separation, LossMultiTargets
 from supervised.utils import move_tuple_to
-from supervised.visualization import compare_distogram, plotfullprotein
+from supervised.visualization import compare_distogram, plotfullprotein, plotsingleprotein
 from supervised.config import config as c, load_from_config
 import logging
 logger = logging.getLogger('runner')
 
 # from torch_lr_finder import LRFinder
-
-matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
 
 import torch
 
@@ -52,6 +52,11 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     best_v_loss = 9e9
     while True:
         for i, vars in enumerate(dataloader_train):
+            if i==1508:
+                print('check here')
+            if ite == 3006:
+                print('problem next iter')
+
             features = vars[0][0]
             dists = vars[1]
             coords = vars[2]
@@ -61,11 +66,31 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
 
+            mask_inpaint = (features[:,-1,:] != 0).float()
+            mask_inpaint_2d = mask_inpaint.unsqueeze(2) @ mask_inpaint.unsqueeze(1)
+            mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
+
+            dists_select = dists[0]*mask_inpaint_2d
+            # plt.figure(1)
+            # plt.imshow(mask_inpaint_2d[0,:,:].cpu())
+            # plt.colorbar()
+            #
+            # plt.figure(2)
+            # plt.imshow(dists[0][0,:,:].cpu())
+            # plt.colorbar()
+            #
+            # plt.figure(3)
+            # plt.imshow(dists_select[0,:,:].cpu())
+            # plt.colorbar()
+
+            # plt.show()
+            # plt.pause(1)
+
             w = ite / max_iter
 
             optimizer.zero_grad()
             dists_pred, coords_pred = net(features,mask)
-            loss_d = loss_fnc(dists_pred, dists)
+            loss_d = loss_fnc(dists_pred, (dists_select,))
             loss_train_d += loss_d.cpu().detach()
             if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
                 loss_c = loss_tr_tuples(coords_pred, coords)
@@ -116,8 +141,8 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             if (ite + 1) % checkpoint == 0:
                 filename = "{:}/checkpoint.pt".format(result_dir)
                 save_checkpoint(filename, ite + 1, max_iter, c['feature_dim'], c['SL_lr'], c['network'],
-                                c['network_args'], net.state_dict(), c['optimizer'], optimizer.state_dict(),
-                                c['lr_scheduler'], scheduler.state_dict())
+                                c['network_args'], net, c['optimizer'], optimizer,
+                                c['lr_scheduler'], scheduler)
                 LOG.info("Checkpoint saved: {}".format(filename))
             ite += 1
 
@@ -161,7 +186,14 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             dists_pred, coords_pred = net(features,mask)
             nb = features.shape[0]
 
-            loss_d = loss_fnc(dists_pred, dists)
+            mask_inpaint = (features[:,-1,:] != 0).float()
+            mask_inpaint_2d = mask_inpaint.unsqueeze(2) @ mask_inpaint.unsqueeze(1)
+            mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
+
+            dists_select = dists[0]*mask_inpaint_2d
+
+
+            loss_d = loss_fnc(dists_pred, (dists_select,))
             if coords_pred is not None and use_loss_coord:
                 loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
                 loss = (1 - weight) / 2 * loss_d + (weight + 1) / 2 * loss_c
@@ -171,19 +203,21 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             M = dists[0] != 0
             dist_err_mean = torch.sum((torch.abs(dists_pred[0] - dists[0]) * M), dim=(1, 2))/torch.sum(M,dim=(1,2))
             dist_err_mean_sum += torch.sum(dist_err_mean)
-
             # L = torch.sum(mask,dim=1)
             # dist_err_alq = torch.sum(torch.sqrt(torch.sum(((dists_pred[0] - dists[0]) * M) ** 2, dim=(1, 2)))/(L*(L-1)))
             # dist_err_mean_alq += dist_err_alq
-
             if save_results:
                 compare_distogram(dists_pred, dists, mask, c['units'], save_results="{:}dist_{:}".format(save_results,i))
                 if coords_pred is not None and use_loss_coord:
                     plotfullprotein(coords_pred_tr, coords_tr, save_results="{:}coord_{:}".format(save_results,i))
+                elif coords_pred is not None:
+                    plotsingleprotein(coords_pred[-1,:,:], save_results="{:}coord_{:}".format(save_results,i))
         if plot_results :
             compare_distogram(dists_pred, dists, mask, c['units'], plot_results=plot_results)
             if coords_pred is not None and use_loss_coord:
                 plotfullprotein(coords_pred_tr, coords_tr, plot_results=plot_results)
+            elif coords_pred is not None:
+                plotsingleprotein(coords_pred[-1,:,:].cpu().numpy(), plot_results=plot_results)
     net.train()
     return loss_v/len(dl.dataset), dist_err_mean_sum/len(dl.dataset)
 

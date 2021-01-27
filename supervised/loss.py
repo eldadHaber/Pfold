@@ -2,8 +2,8 @@ import time
 
 import matplotlib
 import numpy as np
-
-matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
 
 import torch
 import torch.nn as nn
@@ -30,9 +30,27 @@ class MSELoss(torch.nn.Module):
     def __init__(self):
         super(MSELoss,self).__init__()
 
-    def forward(self, input, target):
+    def forward(self, input, target, safeversion=True):
         #We only want places where the target is larger than zero (remember this is for distances)
         mask = target > 0
+
+        # plt.figure(1)
+        # plt.imshow(mask[0, :, :].cpu())
+        # plt.colorbar()
+        #
+        # plt.figure(2)
+        # plt.imshow(target[0, :, :].cpu())
+        # plt.colorbar()
+        #
+        # plt.figure(3)
+        # plt.imshow(input[0, :, :].cpu().detach().numpy())
+        # plt.colorbar()
+        # a= input[0, :, :] * mask[0, :, :]
+        # plt.figure(4)
+        # plt.imshow((input[0, :, :]*mask[0,:,:]).cpu().detach().numpy())
+        # plt.colorbar()
+        #
+        # plt.pause(1)
 
         batch_mask = torch.sum(mask, dim=(1, 2)) > 0
         input = input[batch_mask, :, :]
@@ -40,9 +58,20 @@ class MSELoss(torch.nn.Module):
         mask = mask[batch_mask, :, :]
         nb = target.shape[0]
 
-        result = torch.sum(torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
+        if safeversion:
+            result = torch.tensor(0.0,device=target.device)
+            for i in range(nb):
+                inputi = input[i,...]
+                targeti = target[i,...]
+                maski = mask[i,...]
+                result += torch.sum(torch.norm(inputi[maski] - targeti[maski]) ** 2 / torch.norm(targeti[maski]) ** 2)
+        else:
+            result = torch.sum(torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
 
-        return result/nb
+        if nb == 0:
+            return result
+        else:
+            return result/nb
 
 
 class EMSELoss(torch.nn.Module):

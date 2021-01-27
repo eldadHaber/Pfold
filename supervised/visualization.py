@@ -83,6 +83,29 @@ def compare_distogram(outputs, targets, padding_mask, units, highlight=None, plo
     return
 
 
+
+def plotsingleprotein(p,plot_results=False, save_results=False):
+    """
+    We assume that p is a protein of shape (3,n), where n is the length of the protein
+    """
+    fig = plt.figure(num=2, figsize=[15, 10])
+    plt.clf()
+    axes = plt.axes(projection='3d')
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    axes.set_zlabel("z")
+
+    n = p.shape[-1] # Number of amino acids in the protein
+    target_h, = axes.plot3D(p[0, :], p[1, :], p[2, :], 'red', marker='x')
+    if plot_results:
+        matplotlib.use('TkAgg')
+        plt.pause(0.5)
+    if save_results:
+        save = "{}.png".format(save_results)
+        fig.savefig(save)
+    return
+
+
 def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False, error=None):
     nb = ps[0].shape[0]
     if save_results:

@@ -307,10 +307,21 @@ class MaskRandomSubset(object):
         pass
 
     def __call__(self, r):
-        m = np.ones(r.shape[1])
-        pos_range = np.arange(0,r.shape[1])
-        endpoints = np.random.choice(pos_range,size=2,replace=False)
+        n = r.shape[1]
+        max_dist = np.floor(n*self.max_ratio)
+        m = np.ones(n)
+        pos_range = np.arange(n)
+        np.random.shuffle(pos_range)
+        point1 = pos_range[0]
+        for i in range(1,len(pos_range)):
+            d = np.abs(point1-pos_range[i])
+            if d < max_dist:
+                point2 = pos_range[i]
+                break
+        # endpoints = np.random.choice(pos_range,size=2,replace=False)
+        endpoints = np.asarray([point1,point2])
         endpoints = np.sort(endpoints)
+        # print("masking from {:} to {:}".format(endpoints[0],endpoints[1]))
         r_m = copy.deepcopy(r)
         r_m[:,endpoints[0]:endpoints[1]] = 0
         idx = r_m[0,:] == 0

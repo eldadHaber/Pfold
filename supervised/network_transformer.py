@@ -150,13 +150,26 @@ class CNN(nn.Module):
 
 
 def tr2DistSmall(Y):
-
     k = Y.shape[1]
     Z = Y - torch.mean(Y, dim=2, keepdim=True)
     D = torch.sum(Z**2, dim=1).unsqueeze(1) + torch.sum(Z**2, dim=1).unsqueeze(2) - 2*Z.transpose(1,2) @ Z
     D = 3*D/k
     D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
-    return torch.sqrt(torch.relu(D))
+    D = torch.relu(D)
+    D = torch.sqrt(D)
+    return D
+
+def tr2Dist_new(r):
+    nb,_,n = r.shape
+    d = torch.zeros((nb,n,n),dtype=r.dtype,device=r.device)
+    tmp = torch.sum(r ** 2, dim=1).unsqueeze(1) + torch.sum(r ** 2, dim=1).unsqueeze(2) - 2 * r.transpose(1,2) @ r
+    m = torch.ones_like(d,dtype=torch.bool,device=r.device)
+    m[..., torch.arange(m.shape[-1]), torch.arange(m.shape[-1])] = False
+    m2 = tmp > 0
+    m3 = m*m2
+    tmp2 = tmp[m3]
+    d[m3] = torch.sqrt(tmp2)
+    return d
 
 def tr2DistSmall_with_std(Y):
     k = Y.shape[1]

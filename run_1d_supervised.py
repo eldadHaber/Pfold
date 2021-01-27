@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=5000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--exp_dist_loss', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-nn-dists', default='./data/nn-distances.npz', type=str, metavar='N', help='Input feature types')
@@ -70,12 +70,19 @@ if __name__ == '__main__':
         'dropout': 1e-2,  # 0.2 # the dropout value
         'chan_out': 3,  # the output channels, need 3 for each atom type
         'stencil': 5}
-    elif args.network.lower() == 'vnet_inpaint':
+    elif args.network.lower() == 'vnet':
         args.network_args = {
-        'nblocks': 2,
-        'nlayers_pr_block': 3,
+        'nblocks': 4,
+        'nlayers_pr_block': 5,
         'channels': 80,
         'stencil_size': 3,
+        }
+    elif args.network.lower() == 'vnet_inpaint':
+        args.network_args = {
+            'nblocks': 4,
+            'nlayers_pr_block': 5,
+            'channels': 80,
+            'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':
         args.network_args = {
