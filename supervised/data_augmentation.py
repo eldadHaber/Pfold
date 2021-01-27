@@ -9,12 +9,13 @@ from scipy.ndimage import maximum_filter
 from supervised.IO import load_checkpoint
 from supervised.dataloader_pnet import parse_pnet
 from supervised.dataloader_utils import ConvertCoordToDists, convert_seq_to_onehot, convert_seq_to_onehot_torch
+from supervised.loss import Loss_reg_min_separation
 from supervised.network_transformer import tr2DistSmall
 import matplotlib.pyplot as plt
 import scipy.ndimage as ip
 from skimage.feature import peak_local_max
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation
 from scipy.signal import find_peaks
@@ -24,7 +25,14 @@ for i in range(3):
     for j in range(3):
         a[i,j] = i*3+j+1
 
-torch.nn.Dropout(p)
+
+def distPenality(D,dc=0.379,M=torch.ones(1)):
+    U = torch.triu(D,2)
+    p2 = torch.norm(M*torch.relu(2*dc - U))**2
+
+    return p2
+
+
 
 print("here")
 a1 = torch.cumsum(a,dim=1)
@@ -338,7 +346,14 @@ def predicting_missing_coordinates(seq,r,net):
         with torch.no_grad():
             _, coords_pred_ext = net(f_ext[None,:,:],mask_pad[None,:])
         coords_pred = coords_pred_ext[0][:,:n]
-        r[:,mask_pred] = coords_pred[:,mask_pred]
+
+        x = distConstraint(coords_pred)
+
+        r[:,mask_pred] = coords_pred[:,mask_pred].to(dtype=r.dtype)
+
+
+
+
     else:
         pass
     return r, mask_pred
@@ -346,9 +361,9 @@ def predicting_missing_coordinates(seq,r,net):
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 # device = 'cpu'
-inpainter = './../results/pretrained_networks/inpaint_200k_100k.pt'
+inpainter = './../results/pretrained_networks/inpaint_small.pt'
 pnetfile = './../data/casp11/validation'
-output_folder = './../results/figures/data_aug/v1/'
+output_folder = './../results/figures/data_aug/v2/'
 os.makedirs(output_folder, exist_ok=True)
 min_subprotein_len = 20
 max_peak_cost = 0.3
@@ -359,7 +374,7 @@ net.eval()
 args, log_units, AA_DICT = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=1000, use_entropy=True, use_pssm=True,
                                       use_dssp=False, use_mask=False, use_coord=True)
 
-
+minsep = Loss_reg_min_separation(-10)
 ids = args['id']
 rCas = args['rCa']
 rCbs = args['rCb']
@@ -373,16 +388,33 @@ t0 = time.time()
 for ii in range(nb):
     t1 = time.time()
     rCa = rCas[ii].swapaxes(0, 1) * 10
-    seq = torch.from_numpy(seqs[ii]).to(device)
-    r = torch.from_numpy(rCa).to(device,dtype=torch.float32)
+    seq = torch.from_numpy(seqs[ii]).to(device,dtype=torch.float64)
+    r = torch.from_numpy(rCa).to(device,dtype=torch.float64)
     r, mask_pred = predicting_missing_coordinates(seq, r, net)
     t2 = time.time()
 
     D = tr2DistSmall(r[None,:,:])
+
+    # For now we limit how small a distance in D can be.
+    m1 = (D > 0).float()
+    m2 = (D < minsep.d_mean).float()
+    M = (m1 * m2).bool()
+    D[M] = minsep.d_mean
+
     D2 = D**2
     iD2 = 1/D2
     idx = D == 0
     iD2[idx] = 0
+    # plt.figure()
+    # plt.imshow(D[0,:,:].cpu())
+    # plt.colorbar()
+    # plt.pause(1)
+    #
+    # plt.figure()
+    # plt.imshow(iD2[0,:,:])
+    # plt.colorbar()
+    # plt.pause(1)
+
     n = iD2.shape[-1]
     t3 = time.time()
     costM = compute_cost_matrix_fast2(iD2, 0)
@@ -413,9 +445,9 @@ for ii in range(nb):
     peak_idx = peak_idx[:,m4]
 
 
-    costM2 = costM.clone()
-    costM2[peak_idx[0,:5],peak_idx[1,:5]] = -1
-    costM2[peak_idx[0,5:],peak_idx[1,5:]] = -0.8
+    # costM2 = costM.clone()
+    # costM2[peak_idx[0,:5],peak_idx[1,:5]] = -1
+    # costM2[peak_idx[0,5:],peak_idx[1,5:]] = -0.8
     t5 =time.time()
     # tmp = peak_local_max(-A, min_distance=5,exclude_border=False)
     # tmp = ip.maximum_filter(-A, 2)
@@ -449,7 +481,7 @@ for ii in range(nb):
     # plt.colorbar()
 
     plt.subplot(1,3,3)
-    plt.imshow(costM2.cpu())
+    plt.imshow(costM.cpu())
     plt.title("Cost of subprotein")
     plt.colorbar()
     plt.savefig("{:}{:}".format(output_folder,ii))

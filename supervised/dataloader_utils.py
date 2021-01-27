@@ -304,18 +304,20 @@ class MaskRandomSubset(object):
     '''
     def __init__(self):
         self.max_ratio = 0.3
+        self.min_num = 10
+        self.max_num = 30
         pass
 
     def __call__(self, r):
         n = r.shape[1]
-        max_dist = np.floor(n*self.max_ratio)
+        max_dist = np.min(np.floor(n*self.max_ratio),self.max_num)
         m = np.ones(n)
         pos_range = np.arange(n)
         np.random.shuffle(pos_range)
         point1 = pos_range[0]
         for i in range(1,len(pos_range)):
             d = np.abs(point1-pos_range[i])
-            if d < max_dist:
+            if d <= max_dist and d >= self.min_num:
                 point2 = pos_range[i]
                 break
         # endpoints = np.random.choice(pos_range,size=2,replace=False)

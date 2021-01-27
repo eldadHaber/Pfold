@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--network', default='vnet_inpaint', type=str, metavar='N', help='network to use')
     parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
     parser.add_argument('--lr-scheduler', default='', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=1, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-3, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=500, type=int, metavar='N', help='select the neural network to train (resnet)')

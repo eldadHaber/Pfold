@@ -139,7 +139,7 @@ def letter_to_bool(string, dict_):
 
 
 
-def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, AA_DICT, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False,scaling=1):
+def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mask, use_coord, AA_DICT, report_iter=1000, min_seq_len=-1, max_seq_len=999999,save=False,scaling=1, min_known_ratio=0):
     """
     Read all protein records from pnet file.
     Note that pnet files have coordinates saved in picometers, which is not the normal standard.
@@ -210,7 +210,7 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
         pnet_log_unit = -12
         scaling = 10.0 ** (pnet_log_unit - log_unit)
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling, min_known_ratio=min_known_ratio)
         print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
         rCa = []
         rCb = []

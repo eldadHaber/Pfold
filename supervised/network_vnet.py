@@ -17,6 +17,25 @@ def conv1T(X, Kernel):
 def conv2T(X, Kernel):
     return F.conv_transpose2d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
 
+def distConstraint(X,dc=0.379, M=None):
+    X = X.squeeze()
+    n = X.shape[-1]
+    if M is None:
+        M = torch.ones_like(X[0,:])
+    M = M.squeeze()
+    dX = X[:,1:] - X[:,:-1]
+    d  = torch.sum(dX**2,dim=0)
+
+    avM = (M[1:]+M[:-1])/2 < 0.5
+    dc = (avM==0)*dc
+    dX = (dX / torch.sqrt(d+avM)) * dc
+
+    Xh = torch.zeros_like(X)
+    Xh[:, 0]  = X[:, 0]
+    Xh[:, 1:] = X[:, 0].unsqueeze(1) + torch.cumsum(dX, dim=1)
+    Xh = M*Xh
+    return Xh
+
 
 
 class vnet1D_inpaint(nn.Module):
@@ -140,7 +159,12 @@ class vnet1D_inpaint(nn.Module):
 
         x = conv1(x, self.W) * mask
 
+        #Now we anchor in the coordinates that we know
         x[mask_coords] = coords[mask_coords]
+
+        #next we constrain the coordinates in the predicted to have an acceptable range
+        x2 = distConstraint(x,M=mask_coords)
+
         if self.cross_dist:
             nl = x.shape[-1]
             nc = x.shape[1]//3
