@@ -15,7 +15,7 @@ def dummy():
 
 def save_checkpoint(filename,ite,max_iter,feature_dim,lr,net_type,net_args,net,opt_type,opt,lr_scheduler_type,lr_scheduler):
     if lr_scheduler_type != '':
-        lr_scheduler_state = lr_scheduler_type.state_dict()
+        lr_scheduler_state = lr_scheduler.state_dict()
     else:
         lr_scheduler_state = None
     d = {"ite": ite,

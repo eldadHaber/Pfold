@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from supervised.network_transformer import tr2DistSmall, tr2DistSmall_with_std, tr2Dist_new
+from supervised.visualization import plotsingleprotein, plot_coordcomparison
 
 
 def conv2(X, Kernel):
@@ -17,26 +18,164 @@ def conv1T(X, Kernel):
 def conv2T(X, Kernel):
     return F.conv_transpose2d(X, Kernel, padding=int((Kernel.shape[-1] - 1) / 2))
 
-def distConstraint(X,dc=0.379, M=None):
+def distConstraint(X,dc=3.79, M_fixed=None, M_padding=None):
+    #TODO FIX THIS SO ITS A CLASS AND HAVE DC IN IT
     X = X.squeeze()
     n = X.shape[-1]
-    if M is None:
-        M = torch.ones_like(X[0,:])
-    M = M.squeeze()
-    dX = X[:,1:] - X[:,:-1]
-    d  = torch.sum(dX**2,dim=0)
+    nb = X.shape[0]
+    if M_padding is None:
+        M_padding = torch.ones_like(X[:,0,:])
+    if M_fixed is None:
+        M_fixed = torch.zeros_like(X[:,0,:])
+    dX = X[:,:,1:] - X[:,:,:-1]
+    d = torch.sum(dX**2,dim=1)
 
-    avM = (M[1:]+M[:-1])/2 < 0.5
+    avM = torch.round((M_padding[:,1:]+M_padding[:,:-1])/2.0) < 0.5
     dc = (avM==0)*dc
-    dX = (dX / torch.sqrt(d+avM)) * dc
+    dX = (dX / torch.sqrt(d[:,None,:]+avM[:,None,:])) * dc[:,None,:]
 
-    Xh = torch.zeros_like(X)
-    Xh[:, 0]  = X[:, 0]
-    Xh[:, 1:] = X[:, 0].unsqueeze(1) + torch.cumsum(dX, dim=1)
-    Xh = M*Xh
-    return Xh
+    Xleft = torch.zeros_like(X)
+    Xleft[:,:, 0]  = X[:,:, 0]
+    Xright = torch.zeros_like(X)
+    Xright[:,:,-1] = X[:,:, -1]
+    for i in range(1,n):
+        Xleft[:,:,i] =M_fixed[:,i][:,None] * X[:,:,i] + (M_fixed[:,i] == 0).float()[:,None] * (Xleft[:,:,i-1] + dX[:,:,i-1])
+        j = n-i-1
+        Xright[:,:,j] = M_fixed[:,j][:,None] * X[:,:,j] + (M_fixed[:,j] == 0).float()[:,None] * (Xright[:,:,j+1] - dX[:,:,j])
+    M_free = (M_fixed == 0).float()
+    w = torch.zeros((nb,n,2),device=X.device)
+    w[:,0,0] = M_free[:,0] * 1e10
+    w[:,-1,1] = M_free[:,-1] * 1e10
+    # w[:,0,0] = 0
+    # w[:,-1,1] = 0
+
+    for i in range(1,n):
+        w[:,i,0] = (w[:,i-1,0] + 1) * M_free[:,i]
+        j = n-i-1
+        w[:,j,1] = (w[:,j+1,1] + 1) * M_free[:,j]
+
+    # m = w > 88888
+    # w[m] = 0
+
+    wsum = torch.sum(w, dim=2,keepdim=True)
+    w = (wsum-w) / wsum
+    m = torch.isnan(w)
+    w[m] = 0.5
 
 
+    # w = w / torch.sum(w,dim=2,keepdim=True)
+    w = w[:,None,:,:]
+    X2 = Xleft * w[:,:,:,0] + Xright * w[:,:,:,1]
+
+    X2 = M_padding[:,None,:]*X2
+
+    # plot_coordcomparison(X.cpu().detach(), X2.cpu().detach(),M_fixed.cpu().detach(),num=1,plot_results=True)
+    #
+    dX2 = X2[:,:, 1:] - X2[:,:, :-1]
+    d2 = torch.sum(dX2 ** 2, dim=1)
+
+    torch.mean(torch.sqrt(d2))
+    torch.mean(torch.sqrt(d))
+
+
+
+    return X2
+
+
+
+
+#
+# def distConstraint(X,dc=3.79, M_fixed=None, M_padding=None):
+#     #TODO FIX THIS SO ITS A CLASS AND HAVE DC IN IT
+#     X = X.squeeze()
+#     n = X.shape[-1]
+#     nb = X.shape[0]
+#     if M_padding is None:
+#         M_padding = torch.ones_like(X[:,0,:])
+#     if M_fixed is None:
+#         M_fixed = torch.zeros_like(X[:,0,:])
+#     dX = X[:,:,1:] - X[:,:,:-1]
+#     d = torch.sum(dX**2,dim=1)
+#
+#     avM = torch.round((M_padding[:,1:]+M_padding[:,:-1])/2.0) < 0.5
+#     dc = (avM==0)*dc
+#     dX = (dX / torch.sqrt(d[:,None,:]+avM[:,None,:])) * dc[:,None,:]
+#
+#     Xleft = torch.zeros_like(X)
+#     Xleft[:,:, 0]  = X[:,:, 0]
+#     Xright = torch.zeros_like(X)
+#     Xright[:,:,-1] = X[:,:, -1]
+#     for i in range(1,n):
+#         Xleft[:,:,i] =M_fixed[:,i][:,None] * X[:,:,i] + (M_fixed[:,i] == 0).float()[:,None] * (Xleft[:,:,i-1] + dX[:,:,i-1])
+#         j = n-i-1
+#         Xright[:,:,j] = M_fixed[:,j][:,None] * X[:,:,j] + (M_fixed[:,j] == 0).float()[:,None] * (Xright[:,:,j+1] - dX[:,:,j])
+#     w = torch.zeros((nb,n,2),device=X.device)
+#     w[:,0,0] = M_fixed[:,0]
+#     w[:,-1,1] = M_fixed[:,-1]
+#
+#     for i in range(1,n):
+#         w[:,i,0] = torch.max(M_fixed[:,i],w[:,i-1,0])
+#         j = n-i-1
+#         w[:,j,1] = torch.max(M_fixed[:,j],w[:,j+1,1])
+#
+#     w = w / torch.sum(w,dim=2,keepdim=True)
+#     w = w[:,None,:,:]
+#     X2 = Xleft * w[:,:,:,0] + Xright * w[:,:,:,1]
+#
+#     X2 = M_padding[:,None,:]*X2
+#
+#     # plot_coordcomparison(X.cpu().detach(), X2.cpu().detach(),M_fixed.cpu().detach(),num=1,plot_results=True)
+#     #
+#     dX2 = X2[:,:, 1:] - X2[:,:, :-1]
+#     d2 = torch.sum(dX2 ** 2, dim=1)
+#
+#     torch.mean(torch.sqrt(d2))
+#     torch.mean(torch.sqrt(d))
+#
+#
+#
+#     return X2
+#
+# #
+
+
+#
+# n=9
+# X = torch.zeros((3,n),dtype=torch.float32)
+# X2 = torch.zeros((2,3,n),dtype=torch.float32)
+# X[0,1] = 4
+# X[0,2] = 7
+# X[0,3] = 9
+# X[0,4] = 12
+# X[0,5] = 13
+# X[0,6] = 15
+# X[0,7] = 16
+# X[0,8] = 21
+#
+# X[1,1] = 1
+# X[1,2] = 2
+# X[1,3] = 2
+# X[1,4] = 3
+# X[1,5] = 4
+# X[1,6] = 3
+# X[1,7] = 2
+# X[1,8] = 1
+#
+# #
+# M_f = torch.zeros_like(X[0,:])
+# M_f[2] = 1
+# M_f[3] = 1
+# M_f[6] = 1
+#
+# M2 = torch.zeros((2,n),dtype=torch.float32)
+# M2[0,:] = M_f
+# M2[1,:] = M_f
+# #
+# X2[0,:,:] = X
+# X2[1,:,:] = X
+# distConstraint(X2,dc=2, M_fixed=M2, M_padding=None)
+#
+# print("test")
 
 class vnet1D_inpaint(nn.Module):
     """ VNet """
@@ -163,7 +302,7 @@ class vnet1D_inpaint(nn.Module):
         x[mask_coords] = coords[mask_coords]
 
         #next we constrain the coordinates in the predicted to have an acceptable range
-        x2 = distConstraint(x,M=mask_coords)
+        x = distConstraint(x,M_fixed=mask_coords[:,0,:].float(),M_padding=mask[:,0,:])
 
         if self.cross_dist:
             nl = x.shape[-1]

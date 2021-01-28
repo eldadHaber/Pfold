@@ -84,11 +84,11 @@ def compare_distogram(outputs, targets, padding_mask, units, highlight=None, plo
 
 
 
-def plotsingleprotein(p,plot_results=False, save_results=False):
+def plotsingleprotein(p,plot_results=False, save_results=False,num=2):
     """
     We assume that p is a protein of shape (3,n), where n is the length of the protein
     """
-    fig = plt.figure(num=2, figsize=[15, 10])
+    fig = plt.figure(num=num, figsize=[15, 10])
     plt.clf()
     axes = plt.axes(projection='3d')
     axes.set_xlabel("x")
@@ -104,6 +104,35 @@ def plotsingleprotein(p,plot_results=False, save_results=False):
         save = "{}.png".format(save_results)
         fig.savefig(save)
     return
+
+
+
+def plot_coordcomparison(p,p2,M_fixed,plot_results=False, save_results=False,num=2):
+    """
+    We assume that p is a protein of shape (3,n), where n is the length of the protein
+    """
+    fig = plt.figure(num=num, figsize=[15, 10])
+    plt.clf()
+    axes = plt.axes(projection='3d')
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    axes.set_zlabel("z")
+    M_fixed = M_fixed.bool()
+    n = p.shape[-1] # Number of amino acids in the protein
+    target_h, = axes.plot3D(p[0, :], p[1, :], p[2, :], 'lightpink', marker='x')
+    target_h, = axes.plot3D(p[0, M_fixed], p[1, M_fixed], p[2, M_fixed], 'red', marker='x')
+
+    target_h, = axes.plot3D(p2[0, :], p2[1, :], p2[2, :], 'lightblue', marker='x')
+    target_h, = axes.plot3D(p2[0, M_fixed], p2[1, M_fixed], p2[2, M_fixed], 'blue', marker='x')
+
+    if plot_results:
+        matplotlib.use('TkAgg')
+        plt.pause(0.5)
+    if save_results:
+        save = "{}.png".format(save_results)
+        fig.savefig(save)
+    return
+
 
 
 def plotfullprotein(ps,ts,highlight=None, plot_results=False, save_results=False, error=None):

@@ -6,7 +6,7 @@ import random
 
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import OneCycleLR, _LRScheduler
 
 
 # Define some functions
@@ -38,9 +38,61 @@ def create_lr_scheduler(lr_scheduler_type,opt,lr,max_iter):
                                         max_momentum=0.95, div_factor=25.0, final_div_factor=10000.0)
     elif lr_scheduler_type.lower() == '':
         lr_scheduler = None
+    elif lr_scheduler_type.lower() == 'linearrampupanddown':
+        rampup = int(0.01 * max_iter)
+        rampdown = max_iter - rampup
+        lr_scheduler = LinearRampUpAndDown(opt,base_lr=lr,steps_up=rampup,steps_down=rampdown)
     else:
         raise NotImplementedError("The learning rate scheduler you have selected ({:}), has not been implemented.".format(lr_scheduler_type))
     return lr_scheduler
+
+
+
+class LinearRampUpAndDown(torch.nn.Module):
+    def __init__(self, optimizer, base_lr, steps_up, steps_down):
+        super(LinearRampUpAndDown, self).__init__()
+        self.base_lr = base_lr
+        self.steps_up = steps_up
+        self.steps_down = steps_down
+        self.optimizer = optimizer
+        self.curr_step = 0
+        self.nsteps = steps_up + steps_down
+        self.lr = 0
+
+        self.step()
+
+
+
+    def step(self):
+        self.curr_step += 1
+        assert self.curr_step <= self.nsteps, "Number of steps was greater than expected."
+
+        if self.curr_step < self.steps_up:
+            lr = self.base_lr * self.curr_step / self.steps_up
+        elif self.curr_step > self.steps_up:
+            lr = self.base_lr * (self.steps_down-(self.curr_step - self.steps_up)) / self.steps_down
+        else:
+            lr = self.base_lr
+
+        self.lr = lr
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
+        # print("lr set to {:}".format(lr))
+        return
+
+    def get_last_lr(self):
+        return (self.lr,)
+
+    def state_dict(self):
+        """Returns the state of the scheduler as a :class:`dict`.
+
+        It contains an entry for every variable in self.__dict__ which
+        is not the optimizer.
+        """
+        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
+
+
+
 
 
 def move_tuple_to(args,device,non_blocking=True):

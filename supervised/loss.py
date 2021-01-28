@@ -7,6 +7,8 @@ matplotlib.use('TkAgg')
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from supervised.config import config as c, load_from_config
 
 
@@ -64,8 +66,10 @@ class MSELoss(torch.nn.Module):
                 inputi = input[i,...]
                 targeti = target[i,...]
                 maski = mask[i,...]
-                result += torch.sum(torch.norm(inputi[maski] - targeti[maski]) ** 2 / torch.norm(targeti[maski]) ** 2)
+                # result += torch.sum(torch.norm(inputi[maski] - targeti[maski]) ** 2 / torch.norm(targeti[maski]) ** 2)
+                result += F.mse_loss(inputi[maski],targeti[maski],reduction='sum') / torch.sum(targeti ** 2)
         else:
+            # ((input - target) ** 2)
             result = torch.sum(torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
 
         if nb == 0:
@@ -161,8 +165,8 @@ class Loss_reg(torch.nn.Module):
         df_all = torch.stack((df_u,df_l))
         df = torch.min(df_all,dim=0)[0]
 
-        # loss = torch.mean(torch.norm(df*M,1,dim=1))
-        loss = torch.mean(torch.norm(df*M,1,dim=1)/torch.sum(mask_padding[:,1:],dim=1))
+        loss = torch.mean(torch.norm(df*M,1,dim=1))
+        # loss = torch.mean(torch.norm(df*M,1,dim=1)/torch.sum(mask_padding[:,1:],dim=1))
 
 
         # loss = torch.mean((torch.norm((d-d_reg)*mask_padding[:,1:],1,dim=1)))

@@ -26,7 +26,9 @@ np.set_printoptions(linewidth=desired_width)
 # torch.autograd.set_detect_anomaly(True)
 
 
-def main():
+
+
+def main_inpaint():
     c['device'] = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     #Initialize things
     fix_seed(c['seed']) #Set a seed, so we make reproducible results.
@@ -61,7 +63,7 @@ def main():
         net.to(c['device'])
         optimizer = create_optimizer(c['optimizer'], list(net.parameters()), c['SL_lr'])
         lr_scheduler = create_lr_scheduler(c['lr_scheduler'], optimizer, c['SL_lr'], c['max_iter'])
-    torch.optim.lr_scheduler
+
     if c['use_loss_reg']:
         loss_reg_fnc = load_loss_reg(c['load_nn_dists'],AA_list=c['data_args']['AA_list'],log_units=c['data_args']['log_units'])
     else:
@@ -69,7 +71,3 @@ def main():
 
     log_all_parameters(LOG, c)
     net = train(net, optimizer, dl_train, loss_fnc, dl_test=dl_test, scheduler=lr_scheduler,ite=ite_start, loss_reg_fnc=loss_reg_fnc)
-    torch.save(net, "{:}/network.pt".format(c['result_dir']))
-    eval_net(net, dl_test, loss_fnc, device=c['device'], save_results="{:}/".format(c['result_dir']))
-    # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))
-    print("Done")

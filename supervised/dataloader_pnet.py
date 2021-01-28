@@ -2,6 +2,7 @@ import os
 import random
 import re
 import time
+from datetime import datetime
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -200,7 +201,7 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
-def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True, AA_DICT=AA_DICT):
+def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True, AA_DICT=AA_DICT, min_ratio=0):
     """
     This is a wrapper for the read_record routine, which reads a pnet-file into memory.
     This routine will convert the lists to numpy arrays, and flip their dimensions to be consistent with how data is normally used in a deep neural network.
@@ -210,46 +211,66 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
         pnet_log_unit = -12
         scaling = 10.0 ** (pnet_log_unit - log_unit)
         t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling, min_known_ratio=min_known_ratio)
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
         print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
         rCa = []
         rCb = []
         rN = []
+
 
         for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
             #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
             rCa.append((separate_coords(coords[i], 1)))
             rCb.append((separate_coords(coords[i], 2)))
             rN.append((separate_coords(coords[i], 0)))
-
         convert = ListToNumpy()
+        rCa = convert(rCa)
+        rCb = convert(rCb)
+        rN = convert(rN)
+        nrCa = len(rCa)
+        idx_to_keep = np.ones(nrCa, dtype=np.bool)
+        if min_ratio > 0:
+            for i in range(len(rCa)):
+                n = rCa[i].shape[0]
+                m = np.sum(rCa[i][:,0] != 0)
+                ratio = m/n
+                idx_to_keep[i] = ratio >= min_ratio
+        indices = np.where(idx_to_keep == True)[0]
+        id = [id[index] for index in indices]
         seq = convert(seq)
+        seq = [seq[index] for index in indices]
         seq_len = np.array(seq_len)
         args = {'id': id,
                 'seq': seq,
-                'seq_len': seq_len,
+                'seq_len': seq_len[idx_to_keep],
                 }
         if use_coord:
-            rCa = convert(rCa)
-            rCb = convert(rCb)
-            rN = convert(rN)
+            rCa = [rCa[index] for index in indices]
+            rCb = [rCb[index] for index in indices]
+            rN = [rN[index] for index in indices]
 
             args['rCa'] = rCa
             args['rCb'] = rCb
             args['rN'] = rN
         if use_entropy:
             entropy = convert(entropy)
+            entropy = [entropy[index] for index in indices]
             args['entropy'] = entropy
         if use_pssm:
             pssm = convert(pssm)
+            pssm = [pssm[index] for index in indices]
             args['pssm'] = pssm
         if use_dssp:
             dssp = convert(dssp)
+            dssp = [dssp[index] for index in indices]
             args['dssp'] = dssp
         if use_mask:
             mask = convert(mask)
+            mask = [mask[index] for index in indices]
             args['mask'] = mask
         print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
+
+
     return args, log_unit, AA_DICT
 
 if __name__ == '__main__':
@@ -258,10 +279,18 @@ if __name__ == '__main__':
     # pnetfile = './../data/casp11/testing'
     # output_folder = './../data/casp11_testing/'
     pnetfile = './../data/casp11/validation'
-    output_folder = './../data/casp11_validation/'
+    output_folder = './../data/casp11_validation_inpaint/'
+    min_seq_len = 50
+    max_seq_len = 1000
+    use_entropy = True
+    use_pssm = True
+    use_dssp = False
+    use_mask = False
+    use_coord = True
+    min_ratio = 0.7
 
     os.makedirs(output_folder, exist_ok=True)
-    args, log_units, AA_DICT = parse_pnet(pnetfile, min_seq_len=-1, max_seq_len=1000, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=False, use_coord=True)
+    args, log_units, AA_DICT = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_ratio=min_ratio)
 
     ids = args['id']
     rCa = args['rCa']
@@ -275,5 +304,17 @@ if __name__ == '__main__':
         filename = "{:}{:}.npz".format(output_folder,id)
         entropy_i = entropy[i]
         np.savez(file=filename, seq=seq[i],pssm=pssm[i],entropy=entropy_i[None,:],rCa=rCa[i].T,rCb=rCb[i].T,rN=rN[i].T,id=id, log_units=log_units, AA_LIST=AA_LIST)
-
+    my_file = open("{:}logfile.txt".format(output_folder), "w+")
+    my_file.write("Current time = {date:%Y-%m-%d_%H_%M_%S} \n".format(date=datetime.now()))
+    my_file.write("pnetfile = {:} \n".format(pnetfile))
+    my_file.write("output_folder = {:} \n".format(output_folder))
+    my_file.write("min_seq_len = {:} \n".format(min_seq_len))
+    my_file.write("max_seq_len = {:} \n".format(max_seq_len))
+    my_file.write("use_entropy = {:} \n".format(use_entropy))
+    my_file.write("use_pssm = {:} \n".format(use_pssm))
+    my_file.write("use_dssp = {:} \n".format(use_dssp))
+    my_file.write("use_mask = {:} \n".format(use_mask))
+    my_file.write("use_coord = {:} \n".format(use_coord))
+    my_file.write("min_ratio = {:} \n".format(min_ratio))
+    my_file.write("number of samples = {:} \n".format(len(seq)))
 

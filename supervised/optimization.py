@@ -45,14 +45,15 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     t1 = time.time()
     loss_train_d = 0
     loss_train_c = 0
-    loss_train_reg = 0
+    loss_train_nn = 0
+    loss_train_min_sep = 0
     loss_train = 0
     loss_reg_min_sep_fnc = Loss_reg_min_separation(c['data_args']['log_units'])
     # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
     best_v_loss = 9e9
     while True:
         for i, vars in enumerate(dataloader_train):
-            if i==1508:
+            if i==3:
                 print('check here')
             if ite == 3006:
                 print('problem next iter')
@@ -71,25 +72,28 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
 
             dists_select = dists[0]*mask_inpaint_2d
-            # plt.figure(1)
-            # plt.imshow(mask_inpaint_2d[0,:,:].cpu())
-            # plt.colorbar()
-            #
-            # plt.figure(2)
-            # plt.imshow(dists[0][0,:,:].cpu())
-            # plt.colorbar()
-            #
-            # plt.figure(3)
-            # plt.imshow(dists_select[0,:,:].cpu())
-            # plt.colorbar()
-
-            # plt.show()
-            # plt.pause(1)
 
             w = ite / max_iter
 
             optimizer.zero_grad()
             dists_pred, coords_pred = net(features,mask)
+
+            # plt.figure(1)
+            # plt.clf()
+            # plt.imshow(dists_pred[0][0,:,:].cpu().detach())
+            # plt.colorbar()
+            #
+            # plt.figure(2)
+            # plt.clf()
+            # plt.imshow(dists[0][0,:,:].cpu().detach())
+            # plt.colorbar()
+            #
+            # plt.figure(3)
+            # plt.clf()
+            # plt.imshow(dists_select[0,:,:].cpu().detach())
+            # plt.colorbar()
+            # plt.pause(1)
+
             loss_d = loss_fnc(dists_pred, (dists_select,))
             loss_train_d += loss_d.cpu().detach()
             if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
@@ -100,13 +104,13 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                 loss = loss_d
             if coords_pred is not None and loss_reg_fnc:
                 seq = torch.argmax(features[:,0:20,:],dim=1)
-                loss_reg = 0.1 * loss_reg_fnc(seq, coords_pred, mask)
-                loss_train_reg += loss_reg.cpu().detach()
-                loss += loss_reg
+                loss_nn = 0.01 * loss_reg_fnc(seq, coords_pred, mask)
+                loss_train_nn += loss_nn.cpu().detach()
+                loss += loss_nn
             if coords_pred is not None and loss_reg_min_sep_fnc:
-                loss_reg_min_sep = 0.1 * loss_reg_min_sep_fnc(dists_pred,mask)
+                loss_reg_min_sep = 10 * loss_reg_min_sep_fnc(dists_pred,mask)
                 loss += loss_reg_min_sep
-                loss_train_reg += loss_reg_min_sep.cpu().detach()
+                loss_train_min_sep += loss_reg_min_sep.cpu().detach()
 
             loss.backward()
             optimizer.step()
@@ -125,12 +129,13 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                     else:
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.4f}%  Loss(test): {:6.4f}%  Loss(dist): {:6.4f}%  Loss(coord): {:6.4f}%  Loss(reg): {:6.4f}  Dist_err({:}): {:2.6f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter*100, loss_v*100, loss_train_d/report_iter*100, loss_train_c/report_iter*100, loss_train_reg/report_iter, c['units'], dist_err_mean, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{:6d}/{:6d}  Loss(training): {:6.4f}  Loss(test): {:6.4f}  Loss(dist): {:6.4f}  Loss(coord): {:6.4f}  Loss(nn): {:6.4f}  Loss(min sep): {:6.4f}  Dist_err({:}): {:2.6f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
+                            ite + 1,int(max_iter), loss_train/report_iter, loss_v, loss_train_d/report_iter, loss_train_c/report_iter, loss_train_nn/report_iter, loss_train_min_sep/report_iter, c['units'], dist_err_mean, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train_d = 0
                     loss_train_c = 0
-                    loss_train_reg = 0
+                    loss_train_nn = 0
+                    loss_train_min_sep = 0
                     loss_train = 0
                     if loss_v < best_v_loss:
                         filename = "{:}/best_model_state.pt".format(result_dir)

@@ -303,14 +303,14 @@ class MaskRandomSubset(object):
     '''
     '''
     def __init__(self):
-        self.max_ratio = 0.3
-        self.min_num = 10
-        self.max_num = 30
+        self.max_ratio = 0.8
+        self.min_num = 20
+        self.max_num = 20
         pass
 
     def __call__(self, r):
         n = r.shape[1]
-        max_dist = np.min(np.floor(n*self.max_ratio),self.max_num)
+        max_dist = min(np.floor(n*self.max_ratio),self.max_num)
         m = np.ones(n)
         pos_range = np.arange(n)
         np.random.shuffle(pos_range)
