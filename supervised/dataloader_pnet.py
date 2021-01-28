@@ -201,15 +201,23 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
-def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True, AA_DICT=AA_DICT, min_ratio=0):
+def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True, AA_DICT=AA_DICT, min_ratio=0, sanitize_data=True):
     """
     This is a wrapper for the read_record routine, which reads a pnet-file into memory.
     This routine will convert the lists to numpy arrays, and flip their dimensions to be consistent with how data is normally used in a deep neural network.
     Furthermore the routine will specify the log_unit you wish the data in default is -9 which is equal to nanometer. (Pnet data is given in picometer = -12 by standard)
     """
     with open(file, 'r') as f:
+        min_acceptable_nn_dist = 300 #picometer
+        max_acceptable_nn_dist = 500 #picometer
+        min_acceptable_nn_dist_problems = 0
+        max_acceptable_nn_dist_problems = 0
+        ratio_problems = 0
         pnet_log_unit = -12
         scaling = 10.0 ** (pnet_log_unit - log_unit)
+        min_acceptable_nn_dist *= scaling
+        max_acceptable_nn_dist *= scaling
+
         t0 = time.time()
         id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
         print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
@@ -234,7 +242,28 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
                 n = rCa[i].shape[0]
                 m = np.sum(rCa[i][:,0] != 0)
                 ratio = m/n
+                if ratio < min_ratio:
+                    ratio_problems += 1
                 idx_to_keep[i] = ratio >= min_ratio
+        if sanitize_data:
+            # We want to remove suspicious datapoints, that include datapoints where the same coordinate have been repeat multiple times, or where datapoints are suspiciously close or far away from their neighbours
+            for i in range(len(rCa)):
+                rCai = rCa[i]
+                m = (rCai[:,0] != 0).astype(np.float32)
+                m2 = np.floor((m[1:] + m[:-1]) / 2.0) < 0.5
+                m3 = ~ m2
+                drCai = rCai[1:,:] - rCai[:-1,:]
+                d = np.sqrt(np.sum(drCai**2,axis=1))
+                dmin = np.min(d[m3])
+                dmax = np.max(d[m3])
+                if dmin < min_acceptable_nn_dist:
+                    min_acceptable_nn_dist_problems += 1
+                    idx_to_keep[i] = False
+                if dmax > max_acceptable_nn_dist:
+                    max_acceptable_nn_dist_problems += 1
+                    idx_to_keep[i] = False
+
+        n_removed = np.sum(idx_to_keep == False)
         indices = np.where(idx_to_keep == True)[0]
         id = [id[index] for index in indices]
         seq = convert(seq)
@@ -271,15 +300,15 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
         print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
 
 
-    return args, log_unit, AA_DICT
+    return args, log_unit, AA_DICT, n_removed, min_acceptable_nn_dist_problems, max_acceptable_nn_dist_problems, ratio_problems
 
 if __name__ == '__main__':
-    # pnetfile = './../data/casp11/training_90'
-    # output_folder = './../data/casp11_training_90/'
+    pnetfile = './../data/casp11/training_90'
+    output_folder = './../data/casp11_training_90_inpaint/'
     # pnetfile = './../data/casp11/testing'
-    # output_folder = './../data/casp11_testing/'
-    pnetfile = './../data/casp11/validation'
-    output_folder = './../data/casp11_validation_inpaint/'
+    # output_folder = './../data/casp11_testing_inpaint/'
+    # pnetfile = './../data/casp11/validation'
+    # output_folder = './../data/casp11_validation_inpaint/'
     min_seq_len = 50
     max_seq_len = 1000
     use_entropy = True
@@ -288,9 +317,10 @@ if __name__ == '__main__':
     use_mask = False
     use_coord = True
     min_ratio = 0.7
+    sanitize_data = True
 
     os.makedirs(output_folder, exist_ok=True)
-    args, log_units, AA_DICT = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_ratio=min_ratio)
+    args, log_units, AA_DICT, n_removed, min_acceptable_nn_dist_problems, max_acceptable_nn_dist_problems, ratio_problems = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_ratio=min_ratio, sanitize_data=sanitize_data)
 
     ids = args['id']
     rCa = args['rCa']
@@ -316,5 +346,9 @@ if __name__ == '__main__':
     my_file.write("use_mask = {:} \n".format(use_mask))
     my_file.write("use_coord = {:} \n".format(use_coord))
     my_file.write("min_ratio = {:} \n".format(min_ratio))
-    my_file.write("number of samples = {:} \n".format(len(seq)))
+    my_file.write("number of samples saved = {:} \n".format(len(seq)))
+    my_file.write("number of samples removed = {:} \n".format(n_removed))
+    my_file.write("samples that violated the minimum neighbouring distance = {:} \n".format(min_acceptable_nn_dist_problems))
+    my_file.write("samples that violated the maximum neighbouring distance = {:} \n".format(max_acceptable_nn_dist_problems))
+    my_file.write("samples that violated the ratio of known coordinates = {:} \n".format(ratio_problems))
 

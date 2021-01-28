@@ -29,6 +29,8 @@ def distConstraint(X,dc=3.79, M_fixed=None, M_padding=None):
         M_fixed = torch.zeros_like(X[:,0,:])
     dX = X[:,:,1:] - X[:,:,:-1]
     d = torch.sum(dX**2,dim=1)
+    M_padding = M_padding.squeeze()
+    M_fixed = M_fixed.squeeze()
 
     avM = torch.round((M_padding[:,1:]+M_padding[:,:-1])/2.0) < 0.5
     dc = (avM==0)*dc
@@ -76,6 +78,154 @@ def distConstraint(X,dc=3.79, M_fixed=None, M_padding=None):
 
     torch.mean(torch.sqrt(d2))
     torch.mean(torch.sqrt(d))
+
+
+
+    return X2
+
+
+
+
+
+def distConstraint_fast(X,dc=3.79, M_fixed=None, M_padding=None):
+    def getleftcoords(M_diff_fixed,Xleft,dX,n_individual):
+        nb = Xleft.shape[0]
+        for i in range(nb):
+            lstarts = torch.where(M_diff_fixed[i, ...] == -1)[1]
+            rstarts = torch.where(M_diff_fixed[i, ...] == 1)[1]
+            if rstarts[0] < lstarts[0]:
+                ml = 1
+            else:
+                ml = 0
+            lends = torch.empty_like(lstarts)
+            lends[:-1] = rstarts[ml:]
+            lends[-1] = n_individual[i] - 1
+            for lstart, lend in zip(lstarts, lends):
+                a = Xleft[i, :, lstart]
+                Xleft[i, :, lstart + 1:lend + 1] = a[:, None] + torch.cumsum(dX[i, :, lstart:lend], dim=-1)
+        return Xleft
+
+    def getrightcoords(M_diff_fixed,Xright,dX,n_individual):
+        nb = Xleft.shape[0]
+        for i in range(nb):
+            lstarts = torch.where(M_diff_fixed[i, ...] == -1)[1]
+            rstarts = torch.where(M_diff_fixed[i, ...] == 1)[1]
+            if rstarts[0] < lstarts[0]:
+                ml = 1
+            else:
+                ml = 0
+            lends = torch.empty_like(lstarts)
+            lends[:-1] = rstarts[ml:]
+            lends[-1] = n_individual[i] - 1
+            for lstart, lend in zip(lstarts, lends):
+                a = Xleft[i, :, lstart]
+                Xleft[i, :, lstart + 1:lend + 1] = a[:, None] + torch.cumsum(dX[i, :, lstart:lend], dim=-1)
+        return Xleft
+
+
+    #TODO FIX THIS SO ITS A CLASS AND HAVE DC IN IT
+    nb,_,n = X.shape
+    if M_padding is None:
+        M_padding = torch.ones((nb,1,n),dtype=X.dtype,device=X.device)
+    if M_fixed is None:
+        M_fixed = torch.ones((nb,1,n),dtype=X.dtype,device=X.device)
+    dX = X[:,:,1:] - X[:,:,:-1]
+    d = torch.sum(dX**2,dim=1,keepdim=True)
+    M_free = (M_fixed == 0).float()
+
+    n_individual = torch.sum(M_padding,dim=(1,2))
+    avM = torch.floor((M_padding[...,1:]+M_padding[...,:-1])/2.0) < 0.5
+    dc = (avM == 0) * dc
+    dX = (dX / torch.sqrt(d + avM )) * dc
+
+    dX_flipped = torch.flip(dX,dims=(2,))
+
+
+    Xleft2 = torch.zeros_like(X)
+    Xleft2[:,:, 0]  = X[:,:, 0]
+    Xright2 = torch.zeros_like(X)
+    Xright2[:,:,-1] = X[:,:, -1]
+    for i in range(1,n):
+        Xleft2[:,:,i] =M_fixed[...,i] * X[:,:,i] + M_free[...,i] * (Xleft2[:,:,i-1] + dX[:,:,i-1])
+        j = n-i-1
+        Xright2[:,:,j] = M_fixed[...,j] * X[:,:,j] + M_free[...,j] * (Xright2[:,:,j+1] - dX[:,:,j])
+
+
+
+    M_diff_fixed = M_fixed[...,1:] - M_fixed[...,:-1]
+    Xleft = X.clone()
+    Xright = X.clone().flip(dims=(-1,))
+
+    Xleft = getleftcoords(M_diff_fixed, Xleft, dX, n_individual)
+
+    Xright = getleftcoords(M_diff_fixed, Xright, dX_flipped, n_individual)
+
+    for i in range(nb):
+        lstarts = torch.where(M_diff_fixed[i,...] == -1)[1]
+        rstarts = torch.where(M_diff_fixed[i,...] == 1)[1]
+        if rstarts[0] < lstarts[0]:
+            ml = 1
+        else:
+            ml = 0
+        if lstarts[-1] > rstarts[-1]:
+            mr = len(lstarts)-1
+        else:
+            mr = len(lstarts)
+        lends = torch.empty_like(lstarts)
+        lends[:-1] = rstarts[ml:]
+        lends[-1] = n_individual[i]-1
+
+        rends = torch.empty_like(rstarts)
+        if len(lstarts) > len(rstarts):
+            rends[:] = lstarts[:mr]
+        else:
+            rends[1:] = lstarts[:mr]
+            rends[0] = 0
+
+        rstarts2 = n - rstarts - 1
+        rends2 = n - rends - 1
+
+        for lstart,lend,rstart,rend in zip(lstarts,lends,rstarts2,rends2):
+            a = Xleft[i,:,lstart]
+            Xleft[i,:,lstart+1:lend+1] = a[:,None] + torch.cumsum(dX[i,:,lstart:lend],dim=-1)
+            a = Xright[i,:,rstart]
+            Xright[i,:,rstart+1:rend+1] = a[:,None] + torch.cumsum(dX_flipped[i,:,rstart:rend],dim=-1)
+            print("here")
+
+    Xright = Xright.flip(dims=(-1,))
+
+
+    w = torch.zeros((nb,n,2),device=X.device)
+    w[:,0,0] = M_free[:,0,0] * 1e10
+    w[:,-1,1] = M_free[:,0,-1] * 1e10
+
+    for i in range(1,n):
+        w[:,i,0] = (w[:,i-1,0] + 1) * M_free[:,0,i]
+        j = n-i-1
+        w[:,j,1] = (w[:,j+1,1] + 1) * M_free[:,0,j]
+
+    # m = w > 88888
+    # w[m] = 0
+
+    wsum = torch.sum(w, dim=2,keepdim=True)
+    w = (wsum-w) / wsum
+    m = torch.isnan(w)
+    w[m] = 0.5
+
+
+    # w = w / torch.sum(w,dim=2,keepdim=True)
+    w = w[:,None,:,:]
+    X2 = Xleft * w[:,:,:,0] + Xright * w[:,:,:,1]
+
+    X2 = M_padding*X2
+
+    # plot_coordcomparison(X.cpu().detach(), X2.cpu().detach(),M_fixed.cpu().detach(),num=1,plot_results=True)
+    #
+    # dX2 = X2[:,:, 1:] - X2[:,:, :-1]
+    # d2 = torch.sum(dX2 ** 2, dim=1)
+    #
+    # torch.mean(torch.sqrt(d2))
+    # torch.mean(torch.sqrt(d))
 
 
 
@@ -302,7 +452,8 @@ class vnet1D_inpaint(nn.Module):
         x[mask_coords] = coords[mask_coords]
 
         #next we constrain the coordinates in the predicted to have an acceptable range
-        x = distConstraint(x,M_fixed=mask_coords[:,0,:].float(),M_padding=mask[:,0,:])
+        x2 = distConstraint(x,M_fixed=mask_coords[:,:1,:].float(),M_padding=mask)
+        x3 = distConstraint_fast(x,M_fixed=mask_coords[:,:1,:].float(),M_padding=mask)
 
         if self.cross_dist:
             nl = x.shape[-1]
