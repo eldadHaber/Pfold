@@ -93,16 +93,17 @@ def distConstraint_fast(X,dc=3.79, M_fixed=None, M_padding=None):
     def getleftcoords(M_diff_fixed,Xleft,dX,n_individual):
         nb = Xleft.shape[0]
         for i in range(nb):
-            lstarts = torch.where(M_diff_fixed[i, ...] == -1)[1]
-            rstarts = torch.where(M_diff_fixed[i, ...] == 1)[1]
-            if rstarts[0] < lstarts[0]:
-                ml = 1
+            startpoints = torch.where(M_diff_fixed[i, ...] == -1)[1]
+            endpoints = torch.where(M_diff_fixed[i, ...] == 1)[1]
+            if endpoints[0] < startpoints[0]:
+                endpoints = endpoints[1:]
+            if len(endpoints) < len(startpoints):
+                endpoints2 = torch.empty_like(startpoints)
+                endpoints2[:-1] = endpoints
+                endpoints2[-1] = n_individual[i] - 1
             else:
-                ml = 0
-            lends = torch.empty_like(lstarts)
-            lends[:-1] = rstarts[ml:]
-            lends[-1] = n_individual[i] - 1
-            for lstart, lend in zip(lstarts, lends):
+                endpoints2 = endpoints
+            for lstart, lend in zip(startpoints, endpoints2):
                 a = Xleft[i, :, lstart]
                 Xleft[i, :, lstart + 1:lend + 1] = a[:, None] + torch.cumsum(dX[i, :, lstart:lend], dim=-1)
         return Xleft
@@ -424,7 +425,7 @@ class vnet1D_inpaint(nn.Module):
         # t1 = time.time()
         # x2 = distConstraint(x,M_fixed=mask_coords[:,:1,:].float(),M_padding=mask)
         # t2 = time.time()
-        x3 = distConstraint_fast(x,M_fixed=mask_coords[:,:1,:].float(),M_padding=mask)
+        x = distConstraint_fast(x,M_fixed=mask_coords[:,:1,:].float(),M_padding=mask)
         # t3 = time.time()
         # print("time {:2.4f}, time {:2.4f}".format(t2-t1,t3-t2))
 

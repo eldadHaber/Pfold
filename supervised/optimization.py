@@ -53,9 +53,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     best_v_loss = 9e9
     while True:
         for i, vars in enumerate(dataloader_train):
-            if i==3:
-                print('check here')
-            if ite == 3006:
+            if ite == 655:
                 print('problem next iter')
 
             features = vars[0][0]
@@ -77,6 +75,8 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
 
             optimizer.zero_grad()
             dists_pred, coords_pred = net(features,mask)
+            if torch.isnan(coords_pred).any():
+                print("Iter: {:} nan".format(ite))
 
             # plt.figure(1)
             # plt.clf()
