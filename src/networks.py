@@ -516,6 +516,7 @@ class hyperNet(nn.Module):
         L, D = utils.getGraphLap(Z)
         Z = Kopen@Z
         Zold = Z
+        #ZZ = [Kclose@Z]
         for i in range(l):
             if i%10==0:
                 L, D = utils.getGraphLap(Kclose@Z)
@@ -527,9 +528,12 @@ class hyperNet(nn.Module):
             #Ai = self.doubleSymGradLayer(Z, Wi, Bi, D)
             Ztemp = Z
             Z = 2*Z - Zold - (h**2)*Ai.squeeze(0)
+            #Z = Z - h*Ai.squeeze(0)
+
             Zold = Ztemp
             # for non hyperbolic use
             # Z = Z - h*Ai.squeeze(0)
+            #ZZ.append(self.Kclose@Z)
         # closing layer back to desired shape
         Z    = Kclose@Z
         Zold = Kclose@Zold
@@ -575,4 +579,50 @@ class hyperNet(nn.Module):
 
 ##### END hyper Convolution Neural Networks ######
 
+class simpleNet(nn.Module):
+    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
+    # #X1 = Kclose*relu(Kopen*S*W + B);
 
+    def __init__(self, Arch):
+        super(simpleNet, self).__init__()
+        Kopen, Kclose, W, Bias= self.init_weights(Arch)
+        self.Kopen  = Kopen
+        self.Kclose = Kclose
+        self.W = W
+        self.Bias = Bias
+
+    def init_weights(self,A):
+        # X1 = Kclose*relu(Kopen*S*W + B);
+        print('Initializing network  ')
+        #Arch = [nstart, nopen, nhid, nclose]
+        nstart = A[0]
+        nopen  = A[1]
+        stsz   = A[2]
+        nclose = A[3]
+
+        Kopen = torch.zeros(nopen, nstart)
+        stdv = 1e-3 * Kopen.shape[0]/Kopen.shape[1]
+        Kopen.data.uniform_(-stdv, stdv)
+        Kopen = nn.Parameter(Kopen)
+
+        Kclose = torch.zeros(nclose, nopen)
+        stdv = 1e-3 * Kclose.shape[0] / Kclose.shape[1]
+        Kclose.data.uniform_(-stdv, stdv)
+        Kclose = nn.Parameter(Kclose)
+
+        W = torch.zeros(nopen, nopen, stsz)
+        stdv = 1e-4
+        W.data.uniform_(-stdv, stdv)
+        W = nn.Parameter(W)
+
+        Bias = torch.rand(nopen,1)*1e-4
+        Bias = nn.Parameter(Bias)
+
+        return Kopen, Kclose, W, Bias
+
+    def forward(self, Z):
+        Z = self.Kopen@Z
+        Z = conv1(Z,self.W)
+        Z = F.instance_norm(Z)
+        X = self.Kclose@(Z + torch.relu(Z + self.Bias))
+        return X

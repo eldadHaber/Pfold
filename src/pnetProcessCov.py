@@ -70,16 +70,6 @@ def read_a2m_gz_folder(folder):
         msas.append(msa)
     return msas
 
-def randsvd(A,k):
-
-    n = A.shape
-    Omega = torch.randn(n[1],k,dtype=A.dtype)
-    Y     = A@Omega
-    Q,R   = torch.qr(Y)
-    B     = Q.t()@A
-    U, S, V = torch.svd(B)
-    U = Q[:k,:]@U
-    return U, S, V
 
 def speye(size,tt=torch.float32):
     """
@@ -105,39 +95,6 @@ def weight_msa(msa_1hot, cutoff):
 
     return w
 
-
-def blockLSQR(A, B, iter=100):
-
-    X = torch.zeros(A.shape[1], B.shape[1])
-
-    beta = torch.norm(B)
-    U     = B / beta
-    AtU   = A.t()@U
-    alpha = torch.norm(AtU)
-    V = (AtU) / alpha
-    W = V
-    phiBar = beta
-    rhoBar = alpha
-
-    for i in range(iter):
-        Wc = A@V - alpha*U
-        beta = torch.norm(Wc)
-        U = Wc/beta
-        Sc = A.t()@U - beta*V
-        alpha = torch.norm(Sc)
-        V = Sc/alpha
-        rho = torch.sqrt(rhoBar**2 + beta**2)
-        c = rhoBar/rho
-        s = beta/rho
-        theta = s*alpha
-        rhoBar = c*alpha
-        phi = c*phiBar
-        phiBar = -s*phiBar
-        X = X + (phi/rho)*W
-        W = V - (theta/rho)*W
-
-    res = torch.norm(A@X - B) / torch.norm(B)
-    return X, res
 
 def weight_msaFast(msa_1hot, cutoff):
     """
@@ -187,44 +144,14 @@ def dca(msa_1hot, w, penalty=4.5):
     contacts = (x3 - apc) * (1 - np.eye(nc))
     return np.concatenate([features, contacts[:, :, None]], axis=2)
 
-def dcaFast(msa_1hot, w, penalty=4.5, kw=1000):
-    """
-    This follows the procedures used by trRossetta.
-    Computes the covariance and inverse covariance matrix (equation 2), as well as the APC (equation 4).
-    """
-
-    nr, nc, ns = msa_1hot.shape
-    x = msa_1hot.reshape(nr, nc * ns)
-    x = torch.tensor(x)
-    x = x - torch.mean(x,dim=0,keepdim=True)
-    U, S, V = randsvd(x,50)
-    x  = U@torch.diag(S)@V.t()
-    x  = x.numpy()
-    nr = x.shape[0]
-    w  = np.ones(50)
-
-    num_points = np.sum(w) - np.sqrt(np.mean(w))
-    mean = np.sum(x * w[:, None], axis=0, keepdims=True) / num_points
-    x = (x - mean) * np.sqrt(w[:, None])
-    cov = np.matmul(x.T, x) / num_points
-    cov_reg = cov + np.eye(nc * ns) * penalty / np.sqrt(np.sum(w))
-    inv_cov = np.linalg.inv(cov_reg)
-
-    x1 = inv_cov.reshape(nc, ns, nc, ns)
-    x2 = x1.transpose((0,2,1,3))
-    features = x2.reshape(nc, nc, ns * ns)
-
-    x3 = np.sqrt(np.sum(np.square(x1[:, :-1, :, :-1]), axis=(1,3))) * (1 - np.eye(nc))
-    apc = np.sum(x3, axis=0, keepdims=True) * np.sum(x3, axis=1, keepdims=True) / np.sum(x3)
-    contacts = (x3 - apc) * (1 - np.eye(nc))
-    return np.concatenate([features, contacts[:, :, None]], axis=2)
 
 
 if __name__ == "__main__":
-    path = "/Users/eldadhaber/Dropbox/ComputationalGenetics/data/raw_MSA/" # Path to a folder with a2m.gz files in it.
+    path = "/Users/eldadhaber/Dropbox/ComputationalBio/data/raw_MSA/" # Path to a folder with a2m.gz files in it.
     msas = read_a2m_gz_folder(path)
 
-    msa = msas[0]
+    msa = msas[1]
+    msa = msa[:10000,:]
 
     t0 = time.time()
     msa_1hot = np.eye(21, dtype=np.float32)[msa]
@@ -234,9 +161,11 @@ if __name__ == "__main__":
     t1 = time.time()
     pssm = msa2pssm(msa_1hot, w)
     t2 = time.time()
-    f2d_dcaF = dcaFast(msa_1hot, w, penalty=10, kw=3000)
-    t3 = time.time()
     f2d_dca = dca(msa_1hot, w, penalty=10)
-    t4 = time.time()
-    print("time taken: {:2.2f}, {:2.2f}, {:2.2f}, {:2.2f}".format(t1-t0,t2-t1,t3-t2,t4-t3))
+    t3 = time.time()
+    print("time taken: {:2.2f}, {:2.2f}, {:2.2f}".format(t1-t0,t2-t1,t3-t2))
+
+    CM = f2d_dca[:, :, -1]
+    plt.imshow(CM)
+    plt.colorbar()
 

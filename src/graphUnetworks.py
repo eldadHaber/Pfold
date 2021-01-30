@@ -32,15 +32,15 @@ def getDistMat(X):
     D = torch.sum(torch.pow(X, 2), dim=0, keepdim=True) + torch.sum(torch.pow(X, 2), dim=0,
                   keepdim=True).t() - 2 * X.t() @ X
 
-    return torch.sqrt(torch.relu(D))
+    return torch.relu(D) #torch.sqrt(torch.relu(D))
 
 def getGraphLap(X,M=torch.ones(1),sig=10):
 
     X = X.squeeze(0)
     M = M.squeeze()
     # normalize the data
-    X = X - torch.mean(X, dim=1, keepdim=True)
-    X = X / (torch.std(X, dim=1, keepdim=True) + 1e-3)
+    #X = X - torch.mean(X, dim=1, keepdim=True)
+    X = X / (torch.std(X, dim=1, keepdim=True) + 1e-2)
 
     W = getDistMat(X)
     We = torch.exp(-W/sig)
@@ -53,8 +53,8 @@ def getGraphLap(X,M=torch.ones(1),sig=10):
         II = torch.diag(1-M)
         L  = L+II
 
-    Dh = torch.diag(1/torch.sqrt(torch.diag(D)))
-    L = Dh @ L @ Dh
+    #Dh = torch.diag(1/torch.sqrt(torch.diag(D)))
+    #L = Dh @ L @ Dh
 
     L = 0.5 * (L + L.t())
     return L
@@ -62,30 +62,41 @@ def getGraphLap(X,M=torch.ones(1),sig=10):
 
 class GraphUnet(nn.Module):
     """ VNet """
+
     def __init__(self, nLevels, nIn, nsmooth):
         super(GraphUnet, self).__init__()
         K = self.init_weights(nLevels, nIn, nsmooth)
         self.K = K
 
-    def init_weights(self,nL, nIn, nsmooth):
+    def init_weights(self, nL, nIn, nsmooth):
         print('Initializing network  ')
 
-        stencil_size = 5
+        stencil_size = 9
         K = nn.ParameterList([])
         npar = 0
-        cnt  = 1
-        k    = nIn
+        cnt = 1
+        k = nIn
         stdv = 1e-3
         # Kernels the reduce the size
         for i in range(nL):
-                Ki = torch.zeros(2*k, k, stencil_size)
+            # Smoothing layer
+            for jj in range(nsmooth):
+                Ki = torch.zeros(k, k, stencil_size)
                 Ki.data.uniform_(-stdv, stdv)
                 Ki = nn.Parameter(Ki)
                 print('layer number', cnt, 'layer size', Ki.shape[0], Ki.shape[1], Ki.shape[2])
                 cnt += 1
                 npar += np.prod(Ki.shape)
                 K.append(Ki)
-                k = 2*k
+
+            Ki = torch.zeros(2 * k, k, stencil_size)
+            Ki.data.uniform_(-stdv, stdv)
+            Ki = nn.Parameter(Ki)
+            print('layer number', cnt, 'layer size', Ki.shape[0], Ki.shape[1], Ki.shape[2])
+            cnt += 1
+            npar += np.prod(Ki.shape)
+            K.append(Ki)
+            k = 2 * k
         # Smoothing on the coarsest grid kernels
         for i in range(nsmooth):
             Ki = torch.zeros(k, k, stencil_size)
@@ -99,17 +110,17 @@ class GraphUnet(nn.Module):
         print('Number of parameters  ', npar)
         return K
 
-    def forward(self, x, X, m = torch.ones(1)):
+    def forward(self, x, X, m=torch.ones(1)):
         """ Forward propagation through the network """
 
         # Number of layers
         nL = len(self.K)
 
         # Store the output at different scales to add back later
-        xS = [ ]
+        xS = []
         mS = [m]
         Xs = [X]
-        L  = getGraphLap(X,m)
+        L = getGraphLap(X, m)
         Ls = [L]
         # Step through the layers (down cycle)
         for i in range(nL):
@@ -117,16 +128,19 @@ class GraphUnet(nn.Module):
             if coarsen:
                 xS.append(x)
 
-            #print(mS[-1].shape,x.shape)
-            z  = mS[-1]*conv1(x@Ls[-1], self.K[i])
-            z  = F.instance_norm(z)
-            x  = F.relu(z)
+            # print(mS[-1].shape,x.shape)
+            z = mS[-1] * conv1(x @ Ls[-1], self.K[i])
+            z = F.instance_norm(z)
+            if coarsen == False:
+                x = x + F.relu(z)
+            else:
+                x = F.relu(z)
 
             if coarsen:
                 x = F.avg_pool1d(x, 3, stride=2, padding=1)
                 m = F.avg_pool1d(m, 3, stride=2, padding=1)
                 X = F.avg_pool1d(X, 3, stride=2, padding=1)
-                L = getGraphLap(X,m)
+                L = getGraphLap(X, m)
                 mS.append(m)
                 Ls.append(L)
 
@@ -143,17 +157,19 @@ class GraphUnet(nn.Module):
                 mS = mS[:-1]
                 Ls = Ls[:-1]
 
-            #print(mS[-1].shape, x.shape)
-            z  = mS[-1]*conv1T(x@Ls[-1], self.K[i])
-            z  = F.instance_norm(z)
-            x  = F.relu(z)
+            # print(mS[-1].shape, x.shape)
+            z = mS[-1] * conv1T(x @ Ls[-1], self.K[i])
+            z = F.instance_norm(z)
+            if refine:
+                x = F.relu(z)
+            else:
+                x = x + F.relu(z)
             if refine:
                 x = x + xS[n_scales]
 
-
         return x
 
-#
+
 ##### END UNET ###########################
 
 class stackedGraphUnet(nn.Module):
@@ -185,14 +201,18 @@ class stackedGraphUnet(nn.Module):
     def forward(self, x, m=torch.tensor([1.0])):
 
         nL = len(self.Unets)
+
         x  = self.Kopen@x
         xold = x
-        #X = self.Kclose@x
+
         for i in range(nL):
-            temp = x
+
             #if i%5==0:
-                # X = self.Kclose@x
-            Ai = self.Unets[i](x,x,m)
+            Coords = self.Kclose@x
+            Coords = utils.distConstraint(Coords).unsqueeze(0)
+            #x = self.Kclose.t()@X
+            temp = x
+            Ai = self.Unets[i](x,Coords,m)
             x = 2*x - xold - self.h**2*Ai
             xold = temp
 
@@ -207,7 +227,9 @@ class stackedGraphUnet(nn.Module):
         xold = x
         for i in reversed(range(nL)):
             temp = x
-            x = 2*x - xold - self.h**2*self.Unets[i](x,x,m)
+            Coords = self.Kclose@x
+            Coords = utils.distConstraint(Coords).unsqueeze(0)
+            x = 2*x - xold - self.h**2*self.Unets[i](x,Coords,m)
             xold = temp
 
         x = self.Kopen.t()@x

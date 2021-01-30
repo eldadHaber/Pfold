@@ -301,22 +301,28 @@ def linearInterp1D(X,M):
 
 def distPenality(D,dc=0.379,M=torch.ones(1)):
     U = torch.triu(D,2)
-    p2 = torch.norm(M*torch.relu(2*dc - U))**2
+    p2 = torch.norm(M*torch.relu(2*dc - U))**2/torch.sum(M>0)
 
     return p2
 
-def distConstraint(X,dc=0.379, M=torch.tensor([1])):
+def distConstraint(X,dc=torch.tensor([3.79]), M=torch.tensor([1])):
     X = X.squeeze()
     M = M.squeeze()
     n = X.shape[1]
     dX = X[:,1:] - X[:,:-1]
     d  = torch.sum(dX**2,dim=0)
 
-    avM = (M[1:]+M[:-1])/2 < 0.5
-    dc = (avM==0)*dc
+    ind = d==0
+    d[ind] = torch.mean(dc)
+    #if torch.numel(M)>1:
+    #    avM = (M[1:]+M[:-1])/2 < 0.5
+    #    dc = (avM==0)*dc
+    #else:
+    #    avM = 1e-3
+    avM = 1e-4
     dX = (dX / torch.sqrt(d+avM)) * dc
 
-    Xh = torch.zeros(3,n, device=X.device)
+    Xh = torch.zeros(X.shape[0],n, device=X.device)
     Xh[:, 0]  = X[:, 0]
     Xh[:, 1:] = X[:, 0].unsqueeze(1) + torch.cumsum(dX, dim=1)
     Xh = M*Xh
@@ -360,3 +366,66 @@ def graphDiv(c, D):
     b = torch.sum(C,2) - torch.sum(C,1)
 
     return b
+
+def getIterData(S, Aind, Yobs, MSK, i, device='cpu'):
+    scale = 1e-2
+    PSSM = S[i].t()
+    n = PSSM.shape[1]
+    M = MSK[i][:n]
+    a = Aind[i]
+
+    # X = Yobs[i][0, 0, :n, :n]
+    X = Yobs[i].t()
+    X = linearInterp1D(X, M)
+    X = torch.tensor(X)
+
+    X = X - torch.mean(X, dim=1, keepdim=True)
+    U, Lam, V = torch.svd(X)
+
+    Coords = scale * torch.diag(Lam) @ V.t()
+    Coords = Coords.type('torch.FloatTensor')
+
+    PSSM = PSSM.type(torch.float32)
+
+    A = torch.zeros(20, n)
+    A[a, torch.arange(0, n)] = 1.0
+    Seq = torch.cat((PSSM, A))
+    Seq = Seq.to(device=device, non_blocking=True)
+
+    Coords = Coords.to(device=device, non_blocking=True)
+    M = M.type('torch.FloatTensor')
+    M = M.to(device=device, non_blocking=True)
+
+    return Seq, Coords, M
+
+
+def dRMSD(X,Xobs, M):
+
+    X    = torch.squeeze(X)
+    Xobs = torch.squeeze(Xobs)
+    M    = torch.squeeze(M)
+
+    # Compute distance matrices
+    D = torch.sum(torch.pow(X, 2), dim=0, keepdim=True) + torch.sum(torch.pow(X, 2), dim=0,
+                                                                    keepdim=True).t() - 2 * X.t() @ X
+    D = torch.sqrt(torch.relu(D))
+    Dobs = torch.sum(torch.pow(Xobs, 2), dim=0, keepdim=True) + torch.sum(torch.pow(Xobs, 2), dim=0,
+                                                                    keepdim=True).t() - 2 * Xobs.t() @ Xobs
+    Dobs = torch.sqrt(torch.relu(Dobs))
+
+    # Filter non-physical ones
+    n = X.shape[-1]
+    Xl = torch.zeros(3,n,device=X.device)
+    Xl[0,:] = 3.8*torch.arange(0,n)
+    Dl = torch.sum(Xl**2,dim=0,keepdim=True) + torch.sum(Xl**2,dim=0,keepdim=True).t() - 2*Xl.t()@Xl
+    Dl = M*torch.sqrt(torch.relu(Dl))
+    ML = (Dl-Dobs)>0
+
+    MS = D < 7*3.8
+    M  = M > 0
+    M  = (M&MS&ML)*1.0
+    R  = torch.triu(D-Dobs,2)
+    M  = torch.triu(M,2)
+    loss = torch.norm(M*R)**2/torch.sum(M)
+
+    return loss
