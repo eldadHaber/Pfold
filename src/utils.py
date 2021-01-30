@@ -408,20 +408,20 @@ def dRMSD(X,Xobs, M):
     # Compute distance matrices
     D = torch.sum(torch.pow(X, 2), dim=0, keepdim=True) + torch.sum(torch.pow(X, 2), dim=0,
                                                                     keepdim=True).t() - 2 * X.t() @ X
-    D = torch.sqrt(torch.relu(D))
+    #D = torch.sqrt(torch.relu(D))
     Dobs = torch.sum(torch.pow(Xobs, 2), dim=0, keepdim=True) + torch.sum(torch.pow(Xobs, 2), dim=0,
                                                                     keepdim=True).t() - 2 * Xobs.t() @ Xobs
-    Dobs = torch.sqrt(torch.relu(Dobs))
+    #Dobs = torch.sqrt(torch.relu(Dobs))
 
     # Filter non-physical ones
     n = X.shape[-1]
     Xl = torch.zeros(3,n,device=X.device)
     Xl[0,:] = 3.8*torch.arange(0,n)
     Dl = torch.sum(Xl**2,dim=0,keepdim=True) + torch.sum(Xl**2,dim=0,keepdim=True).t() - 2*Xl.t()@Xl
-    Dl = M*torch.sqrt(torch.relu(Dl))
-    ML = (Dl-Dobs)>0
+    Dl = torch.sqrt(torch.relu(Dl))
+    ML = (M*Dl  - M*torch.sqrt(torch.relu(Dobs)))>0
 
-    MS = D < 7*3.8
+    MS = torch.sqrt(torch.relu(Dobs)) < 7*3.8
     M  = M > 0
     M  = (M&MS&ML)*1.0
     R  = torch.triu(D-Dobs,2)
