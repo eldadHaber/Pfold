@@ -32,8 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('--lr-scheduler', default='LinearRampUpAndDown', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-2, type=float, metavar='N', help='Learning Rate')
-    parser.add_argument('--max-iter', default=200000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=100, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--max-iter', default=400000, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=1000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=5000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--exp_dist_loss', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-nn-dists', default='./data/nn-distances.npz', type=str, metavar='N', help='Input feature types')
@@ -81,7 +81,7 @@ if __name__ == '__main__':
         args.network_args = {
             'nblocks': 4,
             'nlayers_pr_block': 5,
-            'channels': 80,
+            'channels': 180,
             'stencil_size': 3,
         }
     elif args.network.lower() == 'graph':

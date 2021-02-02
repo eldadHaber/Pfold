@@ -95,7 +95,9 @@ def distConstraint_fast(X,dc=3.79, M_fixed=None, M_padding=None):
         for i in range(nb):
             startpoints = torch.where(M_diff_fixed[i, ...] == -1)[1]
             endpoints = torch.where(M_diff_fixed[i, ...] == 1)[1]
-            if endpoints[0] < startpoints[0]:
+            if len(startpoints) == 0:
+                continue
+            if len(endpoints) > 0 and endpoints[0] < startpoints[0]:
                 endpoints = endpoints[1:]
             if len(endpoints) < len(startpoints):
                 endpoints2 = torch.empty_like(startpoints)
@@ -113,7 +115,9 @@ def distConstraint_fast(X,dc=3.79, M_fixed=None, M_padding=None):
         for i in range(nb):
             startpoints = torch.where(M_diff_fixed[i, ...] == 1)[1]
             endpoints = torch.where(M_diff_fixed[i, ...] == -1)[1]
-            if endpoints[0] < startpoints[0]:
+            if len(startpoints) == 0:
+                continue
+            if len(endpoints) > 0 and endpoints[0] < startpoints[0]:
                 endpoints = endpoints[1:]
             if len(endpoints) < len(startpoints):
                 endpoints2 = torch.empty_like(startpoints)

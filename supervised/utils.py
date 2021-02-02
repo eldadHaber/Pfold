@@ -56,7 +56,7 @@ class LinearRampUpAndDown(torch.nn.Module):
         self.steps_down = steps_down
         self.optimizer = optimizer
         self.curr_step = 0
-        self.nsteps = steps_up + steps_down
+        self.nsteps = steps_up + steps_down+1
         self.lr = 0
 
         self.step()
