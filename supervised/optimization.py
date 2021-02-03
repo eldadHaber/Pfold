@@ -16,7 +16,7 @@ matplotlib.use('TkAgg')
 
 import torch
 
-def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, dl_test=None, ite=0, max_iter=None, report_iter=None, checkpoint=None, scheduler=None, exp_dist_loss=None, result_dir=None, use_loss_coord=None, viz=None, loss_reg_fnc=None):
+def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, dl_test=None, ite=0, max_iter=None, report_iter=None, checkpoint=None, scheduler=None, exp_dist_loss=None, result_dir=None, use_loss_coord=None, viz=None, loss_reg_fnc=None, loss_reg_min_sep_fnc=None):
     '''
     Standard training routine.
     :param net: Network to train
@@ -48,8 +48,6 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     loss_train_nn = 0
     loss_train_min_sep = 0
     loss_train = 0
-    loss_reg_min_sep_fnc = Loss_reg_min_separation(c['data_args']['log_units'])
-    # loss_reg_min_sep_fnc = LossMultiTargets(inner_loss_reg_min_sep_fnc)
     best_v_loss = 9e9
     while True:
         for i, vars in enumerate(dataloader_train):
@@ -65,11 +63,11 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
 
-            mask_inpaint = (features[:,-1,:] != 0).float()
-            mask_inpaint_2d = mask_inpaint.unsqueeze(2) @ mask_inpaint.unsqueeze(1)
-            mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
-
-            dists_select = dists[0]*mask_inpaint_2d
+            # mask_inpaint = (features[:,-1,:] != 0).float()
+            # mask_inpaint_2d = mask_inpaint.unsqueeze(2) @ mask_inpaint.unsqueeze(1)
+            # mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
+            #
+            # dists_select = dists[0]*mask_inpaint_2d
 
             w = ite / max_iter
 
@@ -94,7 +92,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             # plt.colorbar()
             # plt.pause(1)
 
-            loss_d = loss_fnc(dists_pred, (dists_select,))
+            loss_d = loss_fnc(dists_pred, dists)
             loss_train_d += loss_d.cpu().detach()
             if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
                 loss_c = loss_tr_tuples(coords_pred, coords)
@@ -108,7 +106,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                 loss_train_nn += loss_nn.cpu().detach()
                 loss += loss_nn
             if coords_pred is not None and loss_reg_min_sep_fnc:
-                loss_reg_min_sep = 10 * loss_reg_min_sep_fnc(dists_pred,mask)
+                loss_reg_min_sep = 0.1 * loss_reg_min_sep_fnc(dists_pred,mask)
                 loss += loss_reg_min_sep
                 loss_train_min_sep += loss_reg_min_sep.cpu().detach()
 
@@ -191,14 +189,14 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             dists_pred, coords_pred = net(features,mask)
             nb = features.shape[0]
 
-            mask_inpaint = (features[:,-1,:] != 0).float()
-            mask_inpaint_2d = mask_inpaint.unsqueeze(2) @ mask_inpaint.unsqueeze(1)
-            mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
+            # mask_inpaint = (features[:,-1,:] != 0).float()
+            # mask_inpaint_2d = mask_inpaint.unsqueeze(2) @ mask_inpaint.unsqueeze(1)
+            # mask_inpaint_2d = (~ mask_inpaint_2d.bool()).float()
+            #
+            # dists_select = dists[0]*mask_inpaint_2d
 
-            dists_select = dists[0]*mask_inpaint_2d
 
-
-            loss_d = loss_fnc(dists_pred, (dists_select,))
+            loss_d = loss_fnc(dists_pred, dists)
             if coords_pred is not None and use_loss_coord:
                 loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
                 loss = (1 - weight) / 2 * loss_d + (weight + 1) / 2 * loss_c

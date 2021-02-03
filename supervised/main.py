@@ -13,7 +13,7 @@ from supervised import log
 from supervised.IO import load_checkpoint
 from supervised.dataloader import select_dataset
 from supervised.log import log_all_parameters
-from supervised.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg, load_loss_reg
+from supervised.loss import MSELoss, LossMultiTargets, EMSELoss, Loss_reg, load_loss_reg, Loss_reg_min_separation
 from supervised.network import select_network
 from supervised.optimization import eval_net, train
 from supervised.utils import determine_network_param, create_optimizer, create_lr_scheduler
@@ -64,11 +64,13 @@ def main():
     torch.optim.lr_scheduler
     if c['use_loss_reg']:
         loss_reg_fnc = load_loss_reg(c['load_nn_dists'],AA_list=c['data_args']['AA_list'],log_units=c['data_args']['log_units'])
+        loss_reg_min_sep_fnc = Loss_reg_min_separation(c['data_args']['log_units'])
     else:
         loss_reg_fnc = None
+        loss_reg_min_sep_fnc = None
 
     log_all_parameters(LOG, c)
-    net = train(net, optimizer, dl_train, loss_fnc, dl_test=dl_test, scheduler=lr_scheduler,ite=ite_start, loss_reg_fnc=loss_reg_fnc)
+    net = train(net, optimizer, dl_train, loss_fnc, dl_test=dl_test, scheduler=lr_scheduler,ite=ite_start, loss_reg_fnc=loss_reg_fnc, loss_reg_min_sep_fnc=loss_reg_min_sep_fnc)
     torch.save(net, "{:}/network.pt".format(c['result_dir']))
     eval_net(net, dl_test, loss_fnc, device=c['device'], save_results="{:}/".format(c['result_dir']))
     # torch.save(net.state_dict(), "{:}/network.pt".format(c.result_dir))

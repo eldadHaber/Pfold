@@ -66,7 +66,7 @@ class Dataset_npz(data.Dataset):
         return
 
     def __getitem__(self, index):
-        data = np.load(self.files[index])
+        data = np.load(self.files[index], allow_pickle=True)
         AA_list = list(data['AA_LIST'])
         log_units = data['log_units']
         scaling = 10.0 ** (log_units - self.log_units)

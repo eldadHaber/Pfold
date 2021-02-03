@@ -55,7 +55,7 @@ def load_checkpoint(filename,device):
     lr_scheduler_type = f['lr_scheduler_type']
     if lr_scheduler_type != '':
         lr_scheduler = create_lr_scheduler(lr_scheduler_type, opt, lr, max_iter)
-        lr_scheduler.load_state_dict(f['lr_scheduler_state'])
+        # lr_scheduler.load_state_dict(f['lr_scheduler_state'])
     else:
         lr_scheduler = None
 

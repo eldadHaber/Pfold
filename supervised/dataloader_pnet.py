@@ -208,8 +208,8 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
     Furthermore the routine will specify the log_unit you wish the data in default is -9 which is equal to nanometer. (Pnet data is given in picometer = -12 by standard)
     """
     with open(file, 'r') as f:
-        min_acceptable_nn_dist = 300 #picometer
-        max_acceptable_nn_dist = 500 #picometer
+        min_acceptable_nn_dist = 200 #picometer
+        max_acceptable_nn_dist = 1000 #picometer
         min_acceptable_nn_dist_problems = 0
         max_acceptable_nn_dist_problems = 0
         ratio_problems = 0
@@ -304,11 +304,11 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
 
 if __name__ == '__main__':
     pnetfile = './../data/casp11/training_90'
-    output_folder = './../data/casp11_training_90_inpaint/'
+    output_folder = './../data/casp11_training_90_inpaint_fully_mapped/'
     # pnetfile = './../data/casp11/testing'
-    # output_folder = './../data/casp11_testing_inpaint/'
+    # output_folder = './../data/casp11_testing_inpaint_fully_mapped/'
     # pnetfile = './../data/casp11/validation'
-    # output_folder = './../data/casp11_validation_inpaint/'
+    # output_folder = './../data/casp11_validation_inpaint_fully_mapped/'
     min_seq_len = 50
     max_seq_len = 1000
     use_entropy = True
@@ -316,7 +316,7 @@ if __name__ == '__main__':
     use_dssp = False
     use_mask = False
     use_coord = True
-    min_ratio = 0.7
+    min_ratio = 1
     sanitize_data = True
 
     os.makedirs(output_folder, exist_ok=True)
