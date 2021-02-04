@@ -2,6 +2,7 @@ import os
 import time
 
 import numpy as np
+import pylab
 import torch
 import networkx as nx
 from scipy.ndimage import maximum_filter
@@ -15,7 +16,10 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as ip
 from skimage.feature import peak_local_max
 import matplotlib
-matplotlib.use('TkAgg')
+
+from supervised.vizualization_for_print import setup_print_figure
+
+matplotlib.use('Agg')
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation
 from scipy.signal import find_peaks
@@ -138,57 +142,6 @@ def compute_cost_matrix_fast2(iD2,min_subprotein_len):
 
 
 
-
-def cutfullprotein(rCa,cut1,cut2,filename,mask_pred):
-    def rotate(angle):
-        axes.view_init(azim=angle)
-
-    fig = plt.figure(num=2, figsize=[15, 10])
-    plt.clf()
-    axes = plt.axes(projection='3d')
-    axes.set_xlabel("x")
-    axes.set_ylabel("y")
-    axes.set_zlabel("z")
-
-    mask_state=mask_pred[0]
-    protein_state = cut1 == 0
-    segment_start = [0]
-    segment_end = []
-    for i in range(mask_pred.shape[0]):
-        protein = i >= cut1 and i < cut2
-        if mask_pred[i] != mask_state or protein_state != protein:
-            mask_state = mask_pred[i]
-            protein_state = protein
-            segment_end.append(i+1)
-            segment_start.append(i)
-    segment_end.append(mask_pred.shape[0])
-
-    for i, (seg_start,seg_end)  in enumerate(zip(segment_start,segment_end)):
-        if mask_pred[seg_start]:
-            if seg_start >= cut1 and seg_start < cut2:
-                color = 'lightblue'
-            else:
-                color = 'lightpink'
-        else:
-            if seg_start >= cut1 and seg_start < cut2:
-                color = 'blue'
-            else:
-                color = 'red'
-
-        protein0, = axes.plot3D(rCa[0, seg_start:seg_end], rCa[1, seg_start:seg_end], rCa[2, seg_start:seg_end], color, marker='x')
-
-    import matplotlib.patches as mpatches
-
-    red_patch = mpatches.Patch(color='red', label='Remainder')
-    blue_patch = mpatches.Patch(color='blue', label='Target')
-
-    plt.legend(handles=[red_patch, blue_patch])
-
-    angle = 3
-    ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
-    ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
-
-    return
 
 
 
@@ -364,10 +317,10 @@ def predicting_missing_coordinates(seq,r,net):
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 # device = 'cpu'
 inpainter = './../results/pretrained_networks/inpaint_400k.pt'
-pnetfile = './../data/casp11/training_90'
-output_folder = './../results/figures/data_aug/training2/'
-# pnetfile = './../data/casp11/validation'
-# output_folder = './../results/figures/data_aug/validation2/'
+# pnetfile = './../data/casp11/training_90'
+# output_folder = './../results/figures/data_aug/training2/'
+pnetfile = './../data/casp11/validation'
+output_folder = './../results/figures/data_aug/validation3/'
 os.makedirs(output_folder, exist_ok=True)
 min_subprotein_len = 20
 min_ratio = 1
@@ -475,7 +428,67 @@ for ii in range(nb):
     #
     #
     # # constrain_and_find_regional_mins(costM.cpu().numpy(), mindist=2)
-#     M = (~ mask_pred).float()
+    setup_print_figure()
+    font_size = 24  # Adjust as appropriate.
+    fig = plt.figure(1,dpi=200)
+    plt.clf()
+    # pylab.axes([0.125,0.2,0.95-0.125,0.95-0.2])
+    # pylab.plot(x,y1,'g:',label='$\sin(x)$')
+    # pylab.plot(x,y2,'-b',label='$\cos(x)$')
+    plt.imshow((iD2[0,:,:]).cpu())
+    plt.title("Inverse square distance",fontdict={'fontsize': font_size})
+    cb = plt.colorbar()
+
+    # pylab.xlabel('$x$ (radians)')
+    # pylab.ylabel('$y$')
+    # pylab.legend()
+    # plt.savefig("{:}ISD_{:}.eps".format(output_folder,ii))
+    ax = plt.gca()
+    cb.ax.tick_params(labelsize=font_size)
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
+    # ax.tick_params(axis='both', which='minor', labelsize=16)
+    plt.savefig("{:}ISD_{:}.png".format(output_folder,ii), bbox_inches='tight',dpi=600)
+
+    setup_print_figure()
+    fig = plt.figure(1,dpi=200)
+    plt.clf()
+    plt.imshow(costM.cpu())
+    plt.title("Cut cost of subproteins",fontdict={'fontsize': font_size})
+    cb = plt.colorbar()
+    ax = plt.gca()
+    cb.ax.tick_params(labelsize=font_size)
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
+    # plt.savefig("{:}Cost_{:}.eps".format(output_folder,ii))
+    plt.savefig("{:}Cost_{:}.png".format(output_folder,ii), bbox_inches='tight',dpi=600)
+
+    setup_print_figure()
+    fig = plt.figure(1,dpi=200)
+    plt.clf()
+    plt.title("3D view",fontdict={'fontsize': font_size})
+    axes = plt.axes(projection='3d')
+    # axes.set_xlabel("x")
+    # axes.set_ylabel("y")
+    # axes.set_zlabel("z")
+    p = r.cpu().numpy()
+    # axes.tick_params(axis='both', which='major', labelsize=font_size)
+    color = np.zeros((n,3))
+    color[:,0] = np.linspace(0,1,n)
+    color[:,2] = np.linspace(1,0,n)
+    axes.scatter(p[0, :], p[1, :], p[2, :], s=100, c=color, depthshade=True)
+    axes.plot3D(p[0, :], p[1, :], p[2, :], 'gray', marker='')
+    axes.grid(False)
+    axes.set_xticks([])
+    axes.set_yticks([])
+    axes.set_zticks([])
+    axes.set_axis_off()
+    # plt.pause(1)
+    # pylab.title("Cost of subprotein")
+    # pylab.colorbar()
+    # plt.cool()
+    # plt.savefig("{:}3d_view_{:}.eps".format(output_folder,ii))
+    plt.savefig("{:}3d_view_{:}.png".format(output_folder,ii),bbox_inches='tight',dpi=600)
+
+    #     M = (~ mask_pred).float()
 #     MM = M[:,None] @ M[None,:]
 #     plt.clf()
 #     plt.subplot(1,3,1)

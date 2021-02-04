@@ -2,6 +2,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from matplotlib import animation
+
 matplotlib.use('TkAgg') #TkAgg
 
 # from scipy.special import softmax
@@ -101,13 +103,69 @@ def plotsingleprotein(p,plot_results=False, save_results=False,num=2):
         matplotlib.use('TkAgg')
         plt.pause(0.5)
     if save_results:
-        save = "{}.png".format(save_results)
-        fig.savefig(save)
+        filename = "{}.png".format(save_results)
+        fig.savefig(filename)
     return
 
 
 
-def plot_coordcomparison(p,p2,M_fixed,plot_results=False, save_results=False,num=2):
+def cutfullprotein(rCa,cut1,cut2,filename,mask_pred=None):
+    def rotate(angle):
+        axes.view_init(azim=angle)
+
+    fig = plt.figure(num=2, figsize=[15, 10])
+    plt.clf()
+    axes = plt.axes(projection='3d')
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    axes.set_zlabel("z")
+    if mask_pred is None:
+        mask_pred = np.zeros_like(rCa[0,:])
+
+    mask_state=mask_pred[0]
+    protein_state = cut1 == 0
+    segment_start = [0]
+    segment_end = []
+    for i in range(mask_pred.shape[0]):
+        protein = i >= cut1 and i < cut2
+        if mask_pred[i] != mask_state or protein_state != protein:
+            mask_state = mask_pred[i]
+            protein_state = protein
+            segment_end.append(i+1)
+            segment_start.append(i)
+    segment_end.append(mask_pred.shape[0])
+
+    for i, (seg_start,seg_end)  in enumerate(zip(segment_start,segment_end)):
+        if mask_pred[seg_start]:
+            if seg_start >= cut1 and seg_start < cut2:
+                color = 'lightblue'
+            else:
+                color = 'lightpink'
+        else:
+            if seg_start >= cut1 and seg_start < cut2:
+                color = 'blue'
+            else:
+                color = 'red'
+
+        protein0, = axes.plot3D(rCa[0, seg_start:seg_end], rCa[1, seg_start:seg_end], rCa[2, seg_start:seg_end], color, marker='x')
+
+    import matplotlib.patches as mpatches
+
+    red_patch = mpatches.Patch(color='red', label='Remainder')
+    blue_patch = mpatches.Patch(color='blue', label='Target')
+
+    plt.legend(handles=[red_patch, blue_patch])
+
+    angle = 3
+    ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
+    ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
+
+    return
+
+
+def plot_coordcomparison(p,p2,title=None,M_fixed=None,plot_results=False, save_results=False,num=2):
+    def rotate(angle):
+        axes.view_init(azim=angle)
     """
     We assume that p is a protein of shape (3,n), where n is the length of the protein
     """
@@ -117,21 +175,35 @@ def plot_coordcomparison(p,p2,M_fixed,plot_results=False, save_results=False,num
     axes.set_xlabel("x")
     axes.set_ylabel("y")
     axes.set_zlabel("z")
-    M_fixed = M_fixed.bool()
+    if M_fixed is None:
+        M_fixed = np.ones_like(p[0,:],dtype=np.bool)
     n = p.shape[-1] # Number of amino acids in the protein
     target_h, = axes.plot3D(p[0, :], p[1, :], p[2, :], 'lightpink', marker='x')
     target_h, = axes.plot3D(p[0, M_fixed], p[1, M_fixed], p[2, M_fixed], 'red', marker='x')
 
     target_h, = axes.plot3D(p2[0, :], p2[1, :], p2[2, :], 'lightblue', marker='x')
     target_h, = axes.plot3D(p2[0, M_fixed], p2[1, M_fixed], p2[2, M_fixed], 'blue', marker='x')
-
+    if title is not None:
+        plt.title(title)
     if plot_results:
         matplotlib.use('TkAgg')
         plt.pause(0.5)
     if save_results:
-        save = "{}.png".format(save_results)
-        fig.savefig(save)
+        filename = "{}.png".format(save_results)
+        import matplotlib.patches as mpatches
+
+        red_patch = mpatches.Patch(color='red', label='Remainder')
+        blue_patch = mpatches.Patch(color='blue', label='Target')
+
+        plt.legend(handles=[red_patch, blue_patch])
+
+        angle = 3
+        ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
+        ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
+
+        # fig.savefig(filename)
     return
+
 
 
 
