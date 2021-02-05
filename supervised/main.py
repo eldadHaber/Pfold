@@ -59,7 +59,7 @@ def main():
         net = select_network(c['network'],c['feature_dim'],**c['network_args'])
         LOG.info('Initializing Net, which has {} trainable parameters.'.format(determine_network_param(net)))
         net.to(c['device'])
-        optimizer = create_optimizer(c['optimizer'], list(net.parameters()), c['SL_lr'])
+        optimizer = create_optimizer(c['optimizer'], list(net.parameters()), c['SL_lr'], c['weight_decay'])
         lr_scheduler = create_lr_scheduler(c['lr_scheduler'], optimizer, c['SL_lr'], c['max_iter'])
     torch.optim.lr_scheduler
     if c['use_loss_reg']:

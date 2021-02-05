@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def setup_print_figure():
-    fig_width_pt = 246.0  # Get this from LaTeX using \showthecolumnwidth
+    # fig_width_pt = 246.0  # Get this from LaTeX using \showthecolumnwidth
+    fig_width_pt = 1500.0  # Get this from LaTeX using \showthecolumnwidth
     inches_per_pt = 1.0/72.27               # Convert pt to inch
     golden_mean = (np.sqrt(5)-1.0)/2.0         # Aesthetic ratio
     fig_width = fig_width_pt*inches_per_pt  # width in inches
@@ -48,8 +49,8 @@ def save_figures_for_data_aug_paper(iD2,output_folder,ii,costM,r):
     color = np.zeros((n,3))
     color[:,0] = np.linspace(0,1,n)
     color[:,2] = np.linspace(1,0,n)
+    axes.plot3D(p[0, :], p[1, :], p[2, :], 'gray', marker='',linewidth=1)
     axes.scatter(p[0, :], p[1, :], p[2, :], s=100, c=color, depthshade=True)
-    axes.plot3D(p[0, :], p[1, :], p[2, :], 'gray', marker='')
     axes.grid(False)
     axes.set_xticks([])
     axes.set_yticks([])

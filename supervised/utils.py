@@ -27,9 +27,9 @@ def name_log_units(log_units):
 
 
 
-def create_optimizer(opt_type,net_parameters,lr):
+def create_optimizer(opt_type,net_parameters,lr,weight_decay):
     if opt_type.lower() == 'adam':
-        opt = torch.optim.Adam(net_parameters, lr=lr)
+        opt = torch.optim.Adam(net_parameters, lr=lr, weight_decay=weight_decay)
     else:
         raise NotImplementedError("The optimizer you have selected ({:}), has not been implemented.".format(opt_type))
     return opt
@@ -192,6 +192,17 @@ def compare_coords_under_rot_and_trans(r1,r2):
 
     return dist, r1cr[0,:,:], r2c[0,:,:]
 
+
+def add_weight_decay(net, l2_value, skip_list=()):
+    decay, no_decay = [], []
+    for name, param in net.named_parameters():
+        if not param.requires_grad:
+            continue # frozen weights
+        if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
+            no_decay.append(param)
+        else:
+            decay.append(param)
+    return [{'params': no_decay, 'weight_decay': 0.}, {'params': decay, 'weight_decay': l2_value}]
 
 
 if __name__ == '__main__':

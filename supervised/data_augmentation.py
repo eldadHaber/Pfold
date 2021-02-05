@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 from supervised.visualization import cutfullprotein_simple
+from supervised.vizualization_for_print import save_figures_for_data_aug_paper
 
 matplotlib.use('Agg')
 
@@ -153,8 +154,9 @@ if __name__ == '__main__':
     # pnetfile = './../data/casp11/training_90'
     # output_folder = './../results/figures/data_aug/training2/'
     # pnetfile = './../data/casp11/validation'
-    # output_folder = './../results/figures/data_aug/val1.5/'
-    output_folder = './../data/casp11_training_90_fully_mapped_no_sub_augmented/'
+    output_folder = './../results/figures/data_aug/val2.5/'
+    inputfolder = './../data/casp11_validation_inpaint_fully_mapped/'
+    # output_folder = './../data/casp11_training_90_fully_mapped_no_sub_augmented/'
     os.makedirs(output_folder, exist_ok=True)
     min_subprotein_len = 20
     # max_seq_len = 1000
@@ -168,8 +170,9 @@ if __name__ == '__main__':
     # cost_adjustment_constant2 = np.exp(-1.995)
     # _, net, _, _ =load_checkpoint(inpainter,device=device)
     # net.eval()
-    save_3d_figures = False
+    save_3d_figures = True
     save_cost_matrix = False
+    save_figures_for_print = True
 
 
     # args, log_units, AA_DICT, _,_,_,_ = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=True, use_pssm=True,
@@ -191,14 +194,15 @@ if __name__ == '__main__':
     # cost_all = []
 
     t0 = time.time()
-    folder = './../data/casp11_training_90_fully_mapped_no_sub/'
-    search_command = folder + "*.npz"
+    search_command = inputfolder + "*.npz"
     files = [f for f in glob.glob(search_command)]
 
     nfiles = len(files)
     nsubs = 0
 
     for ii in range(nfiles):
+        if ii != 16:
+            continue
         t1 = time.time()
         dat = np.load(files[ii])
         seq_id = dat['id']
@@ -226,6 +230,9 @@ if __name__ == '__main__':
         t4 = time.time()
         peaks_idx = find_minima(costM.cpu().numpy(), max_peak_cost, min_peak_dist)
         t5 =time.time()
+
+        if save_figures_for_print:
+            save_figures_for_data_aug_paper(iD2, output_folder, ii, costM, r)
         if save_cost_matrix:
             costM_adj = costM.cpu() - max_peak_cost
             m = costM.cpu() == 0
@@ -249,7 +256,7 @@ if __name__ == '__main__':
         t6 = time.time()
         if save_3d_figures:
             for i in range(min(npeaks,500)):
-                cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i))
+                cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i),save_animation=False)
         t7 = time.time()
         # print("{:}, length={:}, n_peaks={:} time taken={:2.2f}s, total time = {:2.2f}h, eta={:2.2f}h".format(ii,n,npeaks,t7-t1,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
         # print("{:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s".format(t2-t1,t3-t2,t4-t3,t5-t4,t6-t5,t7-t6))

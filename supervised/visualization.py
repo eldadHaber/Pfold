@@ -4,6 +4,8 @@ import numpy as np
 import torch
 from matplotlib import animation
 
+from supervised.vizualization_for_print import setup_print_figure
+
 matplotlib.use('TkAgg') #TkAgg
 
 # from scipy.special import softmax
@@ -108,11 +110,12 @@ def plotsingleprotein(p,plot_results=False, save_results=False,num=2):
     return
 
 
-def cutfullprotein_simple(rCa,cut1,cut2,filename):
+def cutfullprotein_simple(rCa,cut1,cut2,filename,save_animation=True):
+    import matplotlib.patches as mpatches
     def rotate(angle):
         axes.view_init(azim=angle)
     n = rCa.shape[-1]
-    fig = plt.figure(num=2, figsize=[15, 10])
+    fig = plt.figure(num=2, dpi=200)
     plt.clf()
     axes = plt.axes(projection='3d')
     axes.set_xlabel("x")
@@ -126,18 +129,22 @@ def cutfullprotein_simple(rCa,cut1,cut2,filename):
     axes.plot3D(rCa[0, :], rCa[1, :], rCa[2, :], 'gray', marker='')
     axes.scatter(rCa[0, m], rCa[1, m], rCa[2, m], s=100, c='blue', depthshade=True)
     axes.scatter(rCa[0, ~m], rCa[1, ~m], rCa[2, ~m], s=100, c='red', depthshade=True)
-
-
-    import matplotlib.patches as mpatches
-
     red_patch = mpatches.Patch(color='red', label='Remainder')
     blue_patch = mpatches.Patch(color='blue', label='Target')
-
     plt.legend(handles=[red_patch, blue_patch])
 
-    angle = 3
-    ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
-    ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
+    if save_animation:
+        angle = 3
+        ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
+        ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
+    else:
+        setup_print_figure()
+        axes.grid(False)
+        axes.set_xticks([])
+        axes.set_yticks([])
+        axes.set_zticks([])
+        axes.set_axis_off()
+        plt.savefig(filename, bbox_inches='tight', dpi=600)
 
     return
 

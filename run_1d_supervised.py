@@ -29,6 +29,7 @@ if __name__ == '__main__':
     # Learning
     parser.add_argument('--network', default='vnet', type=str, metavar='N', help='network to use')
     parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
+    parser.add_argument('--weight-decay', default=1e-3, type=float, metavar='N', help='network to use')
     parser.add_argument('--lr-scheduler', default='LinearRampUpAndDown', type=str, metavar='N', help='network to use')
     parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-2, type=float, metavar='N', help='Learning Rate')
@@ -76,6 +77,7 @@ if __name__ == '__main__':
         'nlayers_pr_block': 5,
         'channels': 80,
         'stencil_size': 3,
+        'dropout_p': 0.2,
         }
     elif args.network.lower() == 'vnet_inpaint':
         args.network_args = {
