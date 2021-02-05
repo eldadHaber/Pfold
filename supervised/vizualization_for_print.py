@@ -17,6 +17,49 @@ def setup_print_figure():
     plt.rcParams.update(params)
     return
 
+def save_figures_for_data_aug_paper(iD2,output_folder,ii,costM,r):
+    n = r.shape[-1]
+    setup_print_figure()
+    font_size = 24  # Adjust as appropriate.
+    fig = plt.figure(1,dpi=200)
+    plt.clf()
+    plt.imshow((iD2[0,:,:]).cpu())
+    cb = plt.colorbar()
+    ax = plt.gca()
+    cb.ax.tick_params(labelsize=font_size)
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
+    plt.savefig("{:}ISD_{:}.png".format(output_folder,ii), bbox_inches='tight',dpi=600)
+
+    setup_print_figure()
+    fig = plt.figure(1,dpi=200)
+    plt.clf()
+    plt.imshow(costM.cpu())
+    cb = plt.colorbar()
+    ax = plt.gca()
+    cb.ax.tick_params(labelsize=font_size)
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
+    plt.savefig("{:}Cost_{:}.png".format(output_folder,ii), bbox_inches='tight',dpi=600)
+
+    setup_print_figure()
+    fig = plt.figure(1,dpi=200)
+    plt.clf()
+    axes = plt.axes(projection='3d')
+    p = r.cpu().numpy()
+    color = np.zeros((n,3))
+    color[:,0] = np.linspace(0,1,n)
+    color[:,2] = np.linspace(1,0,n)
+    axes.scatter(p[0, :], p[1, :], p[2, :], s=100, c=color, depthshade=True)
+    axes.plot3D(p[0, :], p[1, :], p[2, :], 'gray', marker='')
+    axes.grid(False)
+    axes.set_xticks([])
+    axes.set_yticks([])
+    axes.set_zticks([])
+    axes.set_axis_off()
+    plt.savefig("{:}3d_view_{:}.png".format(output_folder,ii),bbox_inches='tight',dpi=600)
+
+    return
+
+
 
 if __name__ == '__main__':
     # Generate data

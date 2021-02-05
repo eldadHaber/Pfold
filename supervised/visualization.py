@@ -108,6 +108,41 @@ def plotsingleprotein(p,plot_results=False, save_results=False,num=2):
     return
 
 
+def cutfullprotein_simple(rCa,cut1,cut2,filename):
+    def rotate(angle):
+        axes.view_init(azim=angle)
+    n = rCa.shape[-1]
+    fig = plt.figure(num=2, figsize=[15, 10])
+    plt.clf()
+    axes = plt.axes(projection='3d')
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    axes.set_zlabel("z")
+    # color = np.zeros((n,3))
+    # color[:,0] = np.linspace(0,1,n)
+    # color[:,2] = np.linspace(1,0,n)
+    m = np.zeros((n),dtype=np.bool)
+    m[cut1:cut2+1] = True
+    axes.plot3D(rCa[0, :], rCa[1, :], rCa[2, :], 'gray', marker='')
+    axes.scatter(rCa[0, m], rCa[1, m], rCa[2, m], s=100, c='blue', depthshade=True)
+    axes.scatter(rCa[0, ~m], rCa[1, ~m], rCa[2, ~m], s=100, c='red', depthshade=True)
+
+
+    import matplotlib.patches as mpatches
+
+    red_patch = mpatches.Patch(color='red', label='Remainder')
+    blue_patch = mpatches.Patch(color='blue', label='Target')
+
+    plt.legend(handles=[red_patch, blue_patch])
+
+    angle = 3
+    ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
+    ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
+
+    return
+
+
+
 
 def cutfullprotein(rCa,cut1,cut2,filename,mask_pred=None):
     def rotate(angle):
