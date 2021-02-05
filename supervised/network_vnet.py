@@ -510,10 +510,11 @@ class vnet1D(nn.Module):
         return dists, x
 
     def NNreg(self):
-
-        dWdt = self.W[1:] - self.W[:-1]
-        RW   = torch.sum(torch.abs(dWdt))/dWdt.numel()
-        RK  = torch.norm(self.K)**2/2/self.K.numel()
+        RW  = torch.norm(self.W)**2/2/self.W.numel()
+        RK = 0
+        for i in range(len(self.K)-1):
+            dKdt = self.K[i+1] - self.K[i]
+            RK += torch.sum(torch.abs(dKdt))/dKdt.numel()
         return RW + RK
 
 
