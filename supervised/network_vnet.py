@@ -512,9 +512,11 @@ class vnet1D(nn.Module):
     def NNreg(self):
         RW  = torch.norm(self.W)**2/2/self.W.numel()
         RK = 0
-        for i in range(len(self.K)-1):
-            dKdt = self.K[i+1] - self.K[i]
-            RK += torch.sum(torch.abs(dKdt))/dKdt.numel()
+        # for i in range(len(self.K)-1): #TV REG
+        #     dKdt = self.K[i+1] - self.K[i]
+        #     RK += torch.sum(torch.abs(dKdt))/dKdt.numel()
+        for i in range(len(self.K)):
+            RK += torch.norm(self.K[i])**2/2/self.K[i].numel()
         return RW + RK
 
 
