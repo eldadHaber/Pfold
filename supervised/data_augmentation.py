@@ -160,16 +160,17 @@ def predicting_missing_coordinates(seq,r,net):
 if __name__ == '__main__':
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     # device = 'cpu'
-    inpainter = './../results/pretrained_networks/inpaint_400k.pt'
+    # inpainter = './../results/pretrained_networks/inpaint_400k.pt'
     # pnetfile = './../data/casp11/training_90'
     # output_folder = './../results/figures/data_aug/training2/'
-    pnetfile = './../data/casp11/validation'
-    output_folder = './../results/figures/data_aug/val1.5/'
+    # pnetfile = './../data/casp11/validation'
+    # output_folder = './../results/figures/data_aug/val1.5/'
+    output_folder = './../data/casp11_training_90_fully_mapped_no_sub_augmented/'
     os.makedirs(output_folder, exist_ok=True)
     min_subprotein_len = 20
-    max_seq_len = 1000
-    min_seq_len = 50
-    min_ratio = 1
+    # max_seq_len = 1000
+    # min_seq_len = 20
+    # min_ratio = 1
     min_peak_dist = 5
     cost_len_adjustment_slope = -0.6053
     # cost_len_adjustment_slope2 = -0.5872
@@ -177,6 +178,9 @@ if __name__ == '__main__':
     # cost_adjustment_constant2 = np.exp(-1.995)
     # _, net, _, _ =load_checkpoint(inpainter,device=device)
     # net.eval()
+    save_3d_figures = False
+    save_cost_matrix = False
+
 
     # args, log_units, AA_DICT, _,_,_,_ = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=True, use_pssm=True,
     #                                       use_dssp=False, use_mask=False, use_coord=True, min_ratio=1)
@@ -197,7 +201,7 @@ if __name__ == '__main__':
     # cost_all = []
 
     t0 = time.time()
-    folder = './../data/casp11_validation_inpaint_fully_mapped/'
+    folder = './../data/casp11_training_90_fully_mapped_no_sub/'
     search_command = folder + "*.npz"
     files = [f for f in glob.glob(search_command)]
 
@@ -231,27 +235,29 @@ if __name__ == '__main__':
         t4 = time.time()
         peaks_idx = find_minima(costM.cpu().numpy(), max_peak_cost, min_peak_dist)
         t5 =time.time()
-        costM_adj = costM.cpu() - max_peak_cost
-        m = costM.cpu() == 0
-        costM_adj = costM.cpu() - max_peak_cost
-        costM_adj[m] = 0
-        costM_adj[0,-1] = torch.min(costM_adj)
+        if save_cost_matrix:
+            costM_adj = costM.cpu() - max_peak_cost
+            m = costM.cpu() == 0
+            costM_adj = costM.cpu() - max_peak_cost
+            costM_adj[m] = 0
+            costM_adj[0,-1] = torch.min(costM_adj)
 
-        plt.clf()
-        plt.subplot(1,2,1)
-        plt.imshow((iD2[0,:,:]).cpu())
-        plt.title("Inverse square distance")
-        plt.colorbar()
+            plt.clf()
+            plt.subplot(1,2,1)
+            plt.imshow((iD2[0,:,:]).cpu())
+            plt.title("Inverse square distance")
+            plt.colorbar()
 
-        plt.subplot(1,2,2)
-        plt.imshow(costM_adj)
-        plt.title("Cost of subprotein")
-        plt.colorbar()
-        plt.savefig("{:}{:}".format(output_folder,ii))
+            plt.subplot(1,2,2)
+            plt.imshow(costM_adj)
+            plt.title("Cost of subprotein")
+            plt.colorbar()
+            plt.savefig("{:}{:}".format(output_folder,ii))
         npeaks = peaks_idx.shape[-1]
         t6 = time.time()
-        for i in range(min(npeaks,500)):
-            cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i))
+        if save_3d_figures:
+            for i in range(min(npeaks,500)):
+                cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i))
         t7 = time.time()
         print("{:}, length={:}, n_peaks={:} time taken={:2.2f}s, total time = {:2.2f}h, eta={:2.2f}h".format(ii,n,npeaks,t7-t1,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
         print("{:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s".format(t2-t1,t3-t2,t4-t3,t5-t4,t6-t5,t7-t6))
@@ -261,10 +267,10 @@ if __name__ == '__main__':
         for i in range(1,npeaks):
             idx0 = peaks_idx[0,i]
             idx1 = peaks_idx[1,i]
-            seq_numpy = seq[idx0:idx1].cpu().numpy()
-            coords = (r_numpy)[:,idx0:idx1]
+            seqi = seq_numpy[idx0:idx1]
+            coords = r_numpy[:,idx0:idx1]
             filename = "{:}{:}_sub{:}".format(output_folder,seq_id,i)
-            np.savez(file=filename, seq=seq_numpy, rCa=coords, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=weight)
+            np.savez(file=filename, seq=seqi, rCa=coords, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=weight)
 
     # np.savez("{:}costmatrices".format(output_folder), seqs_len=seqs_len, cost_all=cost_all)
 

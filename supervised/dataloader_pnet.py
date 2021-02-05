@@ -220,7 +220,7 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
         scaling = 10.0 ** (pnet_log_unit - log_unit)
         min_acceptable_nn_dist *= scaling
         max_acceptable_nn_dist *= scaling
-        plot_sub_protein_comparison = True
+        plot_sub_protein_comparison = False
         dist = 0
 
         t0 = time.time()
@@ -291,7 +291,7 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
                 return result,idx
             tt0 = time.time()
             for i in range(len(rCa)):
-                if (i+1 % 1000) == 0:
+                if (i+1) % 1000 == 0:
                     print("{:} examples took {:2.2f}".format(i+1,time.time()-tt0))
                 if idx_to_keep[i]:
                     seqi = seq[i]
@@ -309,7 +309,7 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
                                     cutfullprotein(rCa[j].T,idx,idx+ni, filename="./../results/figures/cut_in_protein_{:}_{:}".format(i,j))
                                     dist, r1cr, r2c = compare_coords_under_rot_and_trans(r1, r2)
                                     plot_coordcomparison(r1cr.numpy(), r2c.numpy(), save_results="./../results/figures/comparison_{:}_{:}".format(i,j), num=2,title="distance = {:2.2f}".format(dist))
-                                print("Subprotein found! {:} is a subprotein of {:}, distance={:2.2f}".format(i,j,dist))
+                                    print("Subprotein found! {:} is a subprotein of {:}, distance={:2.2f}".format(i,j,dist))
 
 
         n_removed = np.sum(idx_to_keep == False)
@@ -356,12 +356,12 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
 
 if __name__ == '__main__':
     pnetfile = './../data/casp11/training_90'
-    # output_folder = './../data/casp11_training_90_inpaint_fully_mapped/'
+    output_folder = './../data/casp11_training_90_fully_mapped_no_sub_20/'
     # pnetfile = './../data/casp11/testing'
     # output_folder = './../data/casp11_testing_inpaint_fully_mapped/'
     # pnetfile = './../data/casp11/validation'
-    output_folder = './../data/test/'
-    min_seq_len = 50
+    # output_folder = './../data/test/'
+    min_seq_len = 20
     max_seq_len = 1000
     use_entropy = True
     use_pssm = True
