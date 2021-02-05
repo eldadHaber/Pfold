@@ -3,28 +3,17 @@ import os
 import time
 
 import numpy as np
-import pylab
 import torch
-import networkx as nx
 from scipy.ndimage import maximum_filter
 
-from supervised.IO import load_checkpoint
-from supervised.dataloader_pnet import parse_pnet
 from supervised.dataloader_utils import ConvertCoordToDists, convert_seq_to_onehot, convert_seq_to_onehot_torch
-from supervised.loss import Loss_reg_min_separation
 from supervised.network_transformer import tr2DistSmall
 import matplotlib.pyplot as plt
-import scipy.ndimage as ip
-from skimage.feature import peak_local_max
 import matplotlib
 
-from supervised.visualization import cutfullprotein, cutfullprotein_simple
-from supervised.vizualization_for_print import setup_print_figure, save_figures_for_data_aug_paper
+from supervised.visualization import cutfullprotein_simple
 
 matplotlib.use('Agg')
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import animation
-from scipy.signal import find_peaks
 
 def distPenality(D,dc=0.379,M=torch.ones(1)):
     U = torch.triu(D,2)
@@ -65,7 +54,7 @@ def find_minima(A,max_cost,min_peak_dist):
     This is done by subtracting the max_cost from the matrix and finding all minima with a value below 0.
     """
     n = A.shape[-1]
-    idx = np.triu_indices(n, k=min_subprotein_len)
+    idx = np.triu_indices(n, k=min_subprotein_len-1)
     m2 = np.zeros((n,n),dtype=np.bool)
     m2[idx] = True
 
@@ -175,6 +164,7 @@ if __name__ == '__main__':
     cost_len_adjustment_slope = -0.6053
     # cost_len_adjustment_slope2 = -0.5872
     cost_adjustment_constant = np.exp(-1.881)
+    cost_unit_scale = -10
     # cost_adjustment_constant2 = np.exp(-1.995)
     # _, net, _, _ =load_checkpoint(inpainter,device=device)
     # net.eval()
@@ -206,7 +196,7 @@ if __name__ == '__main__':
     files = [f for f in glob.glob(search_command)]
 
     nfiles = len(files)
-
+    nsubs = 0
 
     for ii in range(nfiles):
         t1 = time.time()
@@ -222,7 +212,8 @@ if __name__ == '__main__':
         # r, mask_pred = predicting_missing_coordinates(seq, r, net)
         t2 = time.time()
         n = r.shape[-1]
-        max_peak_cost = 0.5 * n**cost_len_adjustment_slope * cost_adjustment_constant
+        scaling = 10.0 ** (log_units-cost_unit_scale)
+        max_peak_cost = 0.5 * n**cost_len_adjustment_slope * cost_adjustment_constant * scaling**2
 
         D = tr2DistSmall(r[None,:,:])
         D2 = D**2
@@ -254,13 +245,14 @@ if __name__ == '__main__':
             plt.colorbar()
             plt.savefig("{:}{:}".format(output_folder,ii))
         npeaks = peaks_idx.shape[-1]
+        nsubs += npeaks - 1
         t6 = time.time()
         if save_3d_figures:
             for i in range(min(npeaks,500)):
                 cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i))
         t7 = time.time()
-        print("{:}, length={:}, n_peaks={:} time taken={:2.2f}s, total time = {:2.2f}h, eta={:2.2f}h".format(ii,n,npeaks,t7-t1,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
-        print("{:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s".format(t2-t1,t3-t2,t4-t3,t5-t4,t6-t5,t7-t6))
+        # print("{:}, length={:}, n_peaks={:} time taken={:2.2f}s, total time = {:2.2f}h, eta={:2.2f}h".format(ii,n,npeaks,t7-t1,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
+        # print("{:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s".format(t2-t1,t3-t2,t4-t3,t5-t4,t6-t5,t7-t6))
         filename = "{:}{:}".format(output_folder,seq_id)
         np.savez(file=filename, seq=seq_numpy, rCa=r_numpy, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=1)
         weight = 1/npeaks
@@ -271,6 +263,7 @@ if __name__ == '__main__':
             coords = r_numpy[:,idx0:idx1]
             filename = "{:}{:}_sub{:}".format(output_folder,seq_id,i)
             np.savez(file=filename, seq=seqi, rCa=coords, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=weight)
+        print("{:}, subproteins={:} total time = {:2.2f}h, eta={:2.2f}h".format(ii,nsubs,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
 
     # np.savez("{:}costmatrices".format(output_folder), seqs_len=seqs_len, cost_all=cost_all)
 
