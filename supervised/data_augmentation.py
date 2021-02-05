@@ -26,80 +26,13 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation
 from scipy.signal import find_peaks
 
-a = torch.zeros((3,3))
-for i in range(3):
-    for j in range(3):
-        a[i,j] = i*3+j+1
-
-
 def distPenality(D,dc=0.379,M=torch.ones(1)):
     U = torch.triu(D,2)
     p2 = torch.norm(M*torch.relu(2*dc - U))**2
 
     return p2
 
-
-
-print("here")
-a1 = torch.cumsum(a,dim=1)
-
-a2 = torch.cumsum(a1,dim=0)
-
-def compute_cost_matrix(iD2,Mblock,min_subprotein_len):
-    n = iD2.shape[-1]
-    costM = torch.zeros((n,n),device=device)
-    for i in range(n):
-        Mblock[:] = 0
-        for j in range(i+min_subprotein_len,n): # We calculate proteins one shorter than acceptable, because we don't want to end with a lot of border cases in the peakfinder (here we mask them anyway)
-            Mblock[i:j] = 1
-            nMblock = (Mblock == 0).float()
-            Mblock2 = mask_to_2d(Mblock)
-            nMblock2 = mask_to_2d(nMblock)
-
-            nnMblock2 = (nMblock2 == 0).int()
-            BB = nnMblock2-Mblock2
-            cost = torch.sum(iD2 * BB)
-            costM[i,j] = cost
-    return costM
-
-#
-# def compute_cost_matrix(iD2,Mblock,min_subprotein_len):
-#     n = iD2.shape[-1]
-#     costM = torch.zeros((n,n),device=device)
-#     for i in range(n):
-#         Mblock[:] = 0
-#         for j in range(i+min_subprotein_len-1,n): # We calculate proteins one shorter than acceptable, because we don't want to end with a lot of border cases in the peakfinder (here we mask them anyway)
-#             Mblock[i:j] = 1
-#             nMblock = (Mblock == 0).float()
-#             Mblock2 = mask_to_2d(Mblock)
-#             nMblock2 = mask_to_2d(nMblock)
-#
-#             nnMblock2 = (nMblock2 == 0).int()
-#             BB = nnMblock2-Mblock2
-#             cost = torch.sum(iD2 * BB) / ((j-i)*(n-(j-i)))
-#             costM[i,j] = cost
-#     return costM
-#
-#
-
-
-def compute_cost_matrix_fast(iD2,min_subprotein_len):
-    a = torch.cumsum(torch.cumsum(iD2[0,:,:], dim=1),dim=0)
-    n = iD2.shape[-1]
-    costM = torch.zeros((n,n),device=device)
-    for i in range(n):
-        for j in range(i+min_subprotein_len,n):
-            if i != 0:
-                k = i-1
-                costM[i,j] = a[j,-1] - a[j,j] - (a[k,-1] - a[k,j]) + \
-                    a[-1,j] - a[j,j] - (a[-1,k] - a[j,k]) + \
-                    a[j,k] - a[k,k] + \
-                    a[k,j] - a[k,k]
-            else:
-                costM[i,j] = a[j,-1] - a[j,j] + a[-1,j] - a[j,j]
-    return costM
-
-def compute_cost_matrix_fast2(iD2,min_subprotein_len):
+def compute_cost_matrix(iD2,min_subprotein_len):
     a = torch.cumsum(torch.cumsum(iD2[0,:,:], dim=1),dim=0)
     n = iD2.shape[-1]
     costM = torch.zeros((n,n),device=iD2.device)
@@ -116,22 +49,6 @@ def compute_cost_matrix_fast2(iD2,min_subprotein_len):
             costM[i,:] = a[:,-1] + a[-1,:] - 2 * torch.diagonal(a,0)
         denom[i, :] = (j - (i - 1)) * (-j + (n + i - 1))
 
-    # A = costM.cpu().numpy()
-    # local_max = maximum_filter(-A, size=3) == -A
-    #
-    # fig = plt.figure(1, figsize=[20, 10])
-    # plt.imshow(A)
-    # plt.colorbar()
-    # plt.savefig("test")
-    #
-    # plt.clf()
-    # plt.imshow(local_max)
-    # plt.colorbar()
-    # plt.savefig("peaks")
-
-        # for j in range(n):
-        #     a[i,j] = (j-i+1)*(n-(j-i+1))
-
     costM /= denom
     idx = torch.triu_indices(n,n, offset=min_subprotein_len)
     m2 = torch.zeros((n,n),dtype=torch.float32,device=costM.device)
@@ -140,111 +57,6 @@ def compute_cost_matrix_fast2(iD2,min_subprotein_len):
     costM[tmp] = 0
     costM = costM * m2
     return costM
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#
-#
-#
-#
-# def cutfullprotein(rCa,cut1,cut2,filename,mask_pred):
-#     def rotate(angle):
-#         axes.view_init(azim=angle)
-#
-#     fig = plt.figure(num=2, figsize=[15, 10])
-#     plt.clf()
-#     axes = plt.axes(projection='3d')
-#     axes.set_xlabel("x")
-#     axes.set_ylabel("y")
-#     axes.set_zlabel("z")
-#
-#     cut1 = 15
-#     mask_pred [10] = True
-#     cut2 = 35
-#     mask_pred_ext = np.zeros_like(mask_pred)  #This is an ugly hack, to make sure the different parts are actually connected
-#     # Just make sure to plot the unknown before the known if this is used.
-#     for i in range(mask_pred.shape[0]):
-#         if i == 0:
-#             mask_pred_ext[i] = mask_pred[i] or mask_pred[i+1]
-#         elif i == mask_pred.shape[0]-1:
-#             mask_pred_ext[i] = mask_pred[i] or mask_pred[i-1]
-#         else:
-#             mask_pred_ext[i] = mask_pred[i-1] or mask_pred[i] or mask_pred[i+1]
-#
-#
-#     n = rCa.shape[-1] # Number of amino acids in the protein
-#     rest_known1 = ~mask_pred.copy()
-#     rest_known1[cut1+1:] = False
-#
-#     rest_known2 = ~mask_pred.copy()
-#     rest_known2[:cut2-1] = False
-#
-#     rest_unknown1 = mask_pred_ext.copy()
-#     rest_unknown1[cut1+1:] = False
-#
-#     rest_unknown2 = mask_pred_ext.copy()
-#     rest_unknown2[:cut2-1] = False
-#
-#     target_known = ~mask_pred.copy()
-#     target_known[:cut1] = False
-#     target_known[cut2:] = False
-#
-#     target_unknown = mask_pred_ext.copy()
-#     target_unknown[:cut1] = False
-#     target_unknown[cut2:] = False
-#
-#     # We start by plotting the target protein
-#     protein0_ukn, = axes.plot3D(rCa[0, rest_unknown], rCa[1, rest_unknown], rCa[2, rest_unknown], 'salmon', marker='x')
-#     protein0_kn, = axes.plot3D(rCa[0, rest_known], rCa[1, rest_known], rCa[2, rest_known], 'red', marker='x')
-#     protein1_ukn, = axes.plot3D(rCa[0, target_unknown], rCa[1, target_unknown], rCa[2, target_unknown], 'lightblue', marker='x')
-#     protein1_kn, = axes.plot3D(rCa[0, target_known], rCa[1, target_known], rCa[2, target_known], 'blue', marker='x')
-#
-#     plt.legend((protein0_kn, protein1_kn), ('Remainder', 'Target'))
-#     angle = 3
-#     ani = animation.FuncAnimation(fig, rotate, frames=np.arange(0, 360, angle), interval=50)
-#     ani.save('{:}.gif'.format(filename), writer=animation.PillowWriter(fps=20))
-#
-#     # elev = 90
-#     # azim = 0
-#     # axes.view_init(elev=elev, azim=azim)
-#     # save = "{}elev{}_azim{}.png".format(filename,elev,azim)
-#     # fig.savefig(save)
-#     #
-#     # elev = 60
-#     # azim = 20
-#     # axes.view_init(elev=elev, azim=azim)
-#     # save = "{}elev{}_azim{}.png".format(filename,elev,azim)
-#     # fig.savefig(save)
-#     #
-#     # elev = 45
-#     # azim = 40
-#     # axes.view_init(elev=elev, azim=azim)
-#     # save = "{}elev{}_azim{}.png".format(filename,elev,azim)
-#     # fig.savefig(save)
-#     #
-#     # elev = 5
-#     # azim = 85
-#     # axes.view_init(elev=elev, azim=azim)
-#     # save = "{}elev{}_azim{}.png".format(filename,elev,azim)
-#     # fig.savefig(save)
-#
-#     return
 
 
 def find_minima(A,max_cost,min_peak_dist):
@@ -338,124 +150,122 @@ def predicting_missing_coordinates(seq,r,net):
 
         r[:,mask_pred] = coords_pred[:,mask_pred].to(dtype=r.dtype)
 
-        dX = r[:, 1:] - r[:, :-1]
-        d = torch.sqrt(torch.sum(dX**2,dim=0,keepdim=True))
-
-
-
+        # dX = r[:, 1:] - r[:, :-1]
+        # d = torch.sqrt(torch.sum(dX**2,dim=0,keepdim=True))
     else:
         pass
     return r, mask_pred
 
 
-device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-# device = 'cpu'
-inpainter = './../results/pretrained_networks/inpaint_400k.pt'
-# pnetfile = './../data/casp11/training_90'
-# output_folder = './../results/figures/data_aug/training2/'
-pnetfile = './../data/casp11/validation'
-output_folder = './../results/figures/data_aug/val1.5/'
-os.makedirs(output_folder, exist_ok=True)
-min_subprotein_len = 20
-max_seq_len = 1000
-min_seq_len = 50
-min_ratio = 1
-min_peak_dist = 5
-cost_len_adjustment_slope = -0.6053
-# cost_len_adjustment_slope2 = -0.5872
-cost_adjustment_constant = np.exp(-1.881)
-# cost_adjustment_constant2 = np.exp(-1.995)
-# _, net, _, _ =load_checkpoint(inpainter,device=device)
-# net.eval()
+if __name__ == '__main__':
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    # device = 'cpu'
+    inpainter = './../results/pretrained_networks/inpaint_400k.pt'
+    # pnetfile = './../data/casp11/training_90'
+    # output_folder = './../results/figures/data_aug/training2/'
+    pnetfile = './../data/casp11/validation'
+    output_folder = './../results/figures/data_aug/val1.5/'
+    os.makedirs(output_folder, exist_ok=True)
+    min_subprotein_len = 20
+    max_seq_len = 1000
+    min_seq_len = 50
+    min_ratio = 1
+    min_peak_dist = 5
+    cost_len_adjustment_slope = -0.6053
+    # cost_len_adjustment_slope2 = -0.5872
+    cost_adjustment_constant = np.exp(-1.881)
+    # cost_adjustment_constant2 = np.exp(-1.995)
+    # _, net, _, _ =load_checkpoint(inpainter,device=device)
+    # net.eval()
 
-# args, log_units, AA_DICT, _,_,_,_ = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=True, use_pssm=True,
-#                                       use_dssp=False, use_mask=False, use_coord=True, min_ratio=1)
-# minsep = Loss_reg_min_separation(-10)
-# ids = args['id']
-# rCas = args['rCa']
-# rCbs = args['rCb']
-# rNs = args['rN']
-#
-# pssms = args['pssm']
-# entropys = args['entropy']
-# seqs = args['seq']
-# seqs_len = args['seq_len']
-# nb = len(rCas)
-# fig = plt.figure(1, figsize=[20, 10])
-# AA_LIST = list(AA_DICT)
-#
-# cost_all = []
+    # args, log_units, AA_DICT, _,_,_,_ = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=True, use_pssm=True,
+    #                                       use_dssp=False, use_mask=False, use_coord=True, min_ratio=1)
+    # minsep = Loss_reg_min_separation(-10)
+    # ids = args['id']
+    # rCas = args['rCa']
+    # rCbs = args['rCb']
+    # rNs = args['rN']
+    #
+    # pssms = args['pssm']
+    # entropys = args['entropy']
+    # seqs = args['seq']
+    # seqs_len = args['seq_len']
+    # nb = len(rCas)
+    # fig = plt.figure(1, figsize=[20, 10])
+    # AA_LIST = list(AA_DICT)
+    #
+    # cost_all = []
 
-t0 = time.time()
-folder = './../data/casp11_validation_inpaint_fully_mapped/'
-search_command = folder + "*.npz"
-files = [f for f in glob.glob(search_command)]
+    t0 = time.time()
+    folder = './../data/casp11_validation_inpaint_fully_mapped/'
+    search_command = folder + "*.npz"
+    files = [f for f in glob.glob(search_command)]
 
-nfiles = len(files)
+    nfiles = len(files)
 
 
-for ii in range(nfiles):
-    t1 = time.time()
-    dat = np.load(files[ii])
-    seq_id = dat['id']
-    seq_numpy = dat['seq']
-    seq = torch.from_numpy(seq_numpy).to(device,dtype=torch.int64)
-    r_numpy = dat['rCa']
-    r = torch.from_numpy(r_numpy).to(device,dtype=torch.float64)
-    log_units = dat['log_units']
-    AA_LIST = dat['AA_LIST']
+    for ii in range(nfiles):
+        t1 = time.time()
+        dat = np.load(files[ii])
+        seq_id = dat['id']
+        seq_numpy = dat['seq']
+        seq = torch.from_numpy(seq_numpy).to(device,dtype=torch.int64)
+        r_numpy = dat['rCa']
+        r = torch.from_numpy(r_numpy).to(device,dtype=torch.float64)
+        log_units = dat['log_units']
+        AA_LIST = dat['AA_LIST']
 
-    # r, mask_pred = predicting_missing_coordinates(seq, r, net)
-    t2 = time.time()
-    n = r.shape[-1]
-    max_peak_cost = 0.5 * n**cost_len_adjustment_slope * cost_adjustment_constant
+        # r, mask_pred = predicting_missing_coordinates(seq, r, net)
+        t2 = time.time()
+        n = r.shape[-1]
+        max_peak_cost = 0.5 * n**cost_len_adjustment_slope * cost_adjustment_constant
 
-    D = tr2DistSmall(r[None,:,:])
-    D2 = D**2
-    iD2 = 1/D2
-    idx = D == 0
-    iD2[idx] = 0
+        D = tr2DistSmall(r[None,:,:])
+        D2 = D**2
+        iD2 = 1/D2
+        idx = D == 0
+        iD2[idx] = 0
 
-    t3 = time.time()
-    costM = compute_cost_matrix_fast2(iD2, 0)
-    t4 = time.time()
-    peaks_idx = find_minima(costM.cpu().numpy(), max_peak_cost, min_peak_dist)
-    t5 =time.time()
-    costM_adj = costM.cpu() - max_peak_cost
-    m = costM.cpu() == 0
-    costM_adj = costM.cpu() - max_peak_cost
-    costM_adj[m] = 0
-    costM_adj[0,-1] = torch.min(costM_adj)
+        t3 = time.time()
+        costM = compute_cost_matrix(iD2, 0)
+        t4 = time.time()
+        peaks_idx = find_minima(costM.cpu().numpy(), max_peak_cost, min_peak_dist)
+        t5 =time.time()
+        costM_adj = costM.cpu() - max_peak_cost
+        m = costM.cpu() == 0
+        costM_adj = costM.cpu() - max_peak_cost
+        costM_adj[m] = 0
+        costM_adj[0,-1] = torch.min(costM_adj)
 
-    plt.clf()
-    plt.subplot(1,2,1)
-    plt.imshow((iD2[0,:,:]).cpu())
-    plt.title("Inverse square distance")
-    plt.colorbar()
+        plt.clf()
+        plt.subplot(1,2,1)
+        plt.imshow((iD2[0,:,:]).cpu())
+        plt.title("Inverse square distance")
+        plt.colorbar()
 
-    plt.subplot(1,2,2)
-    plt.imshow(costM_adj)
-    plt.title("Cost of subprotein")
-    plt.colorbar()
-    plt.savefig("{:}{:}".format(output_folder,ii))
-    npeaks = peaks_idx.shape[-1]
-    t6 = time.time()
-    for i in range(min(npeaks,500)):
-        cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i))
-    t7 = time.time()
-    print("{:}, length={:}, n_peaks={:} time taken={:2.2f}s, total time = {:2.2f}h, eta={:2.2f}h".format(ii,n,npeaks,t7-t1,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
-    print("{:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s".format(t2-t1,t3-t2,t4-t3,t5-t4,t6-t5,t7-t6))
-    filename = "{:}{:}".format(output_folder,seq_id)
-    np.savez(file=filename, seq=seq_numpy, rCa=r_numpy, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=1)
-    weight = 1/npeaks
-    for i in range(1,npeaks):
-        idx0 = peaks_idx[0,i]
-        idx1 = peaks_idx[1,i]
-        seq_numpy = seq[idx0:idx1].cpu().numpy()
-        coords = (r_numpy)[:,idx0:idx1]
-        filename = "{:}{:}_sub{:}".format(output_folder,seq_id,i)
-        np.savez(file=filename, seq=seq_numpy, rCa=coords, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=weight)
+        plt.subplot(1,2,2)
+        plt.imshow(costM_adj)
+        plt.title("Cost of subprotein")
+        plt.colorbar()
+        plt.savefig("{:}{:}".format(output_folder,ii))
+        npeaks = peaks_idx.shape[-1]
+        t6 = time.time()
+        for i in range(min(npeaks,500)):
+            cutfullprotein_simple(r.cpu().numpy(),peaks_idx[0,i],peaks_idx[1,i],"{:}{:}_cut{:}".format(output_folder,ii,i))
+        t7 = time.time()
+        print("{:}, length={:}, n_peaks={:} time taken={:2.2f}s, total time = {:2.2f}h, eta={:2.2f}h".format(ii,n,npeaks,t7-t1,(t7-t0)/3600,(t7-t0)/(ii+1)*(nfiles-(ii+1))/3600))
+        print("{:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s  {:2.2f}s".format(t2-t1,t3-t2,t4-t3,t5-t4,t6-t5,t7-t6))
+        filename = "{:}{:}".format(output_folder,seq_id)
+        np.savez(file=filename, seq=seq_numpy, rCa=r_numpy, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=1)
+        weight = 1/npeaks
+        for i in range(1,npeaks):
+            idx0 = peaks_idx[0,i]
+            idx1 = peaks_idx[1,i]
+            seq_numpy = seq[idx0:idx1].cpu().numpy()
+            coords = (r_numpy)[:,idx0:idx1]
+            filename = "{:}{:}_sub{:}".format(output_folder,seq_id,i)
+            np.savez(file=filename, seq=seq_numpy, rCa=coords, id=seq_id, log_units=log_units, AA_LIST=AA_LIST, weight=weight)
 
-# np.savez("{:}costmatrices".format(output_folder), seqs_len=seqs_len, cost_all=cost_all)
+    # np.savez("{:}costmatrices".format(output_folder), seqs_len=seqs_len, cost_all=cost_all)
 
-print("End")
+    print("End")
