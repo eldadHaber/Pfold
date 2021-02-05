@@ -47,6 +47,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     loss_train_c = 0
     loss_train_nn = 0
     loss_train_min_sep = 0
+    loss_train_R = 0
     loss_train = 0
     best_v_loss = 9e9
     while True:
@@ -73,6 +74,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
 
             optimizer.zero_grad()
             dists_pred, coords_pred = net(features,mask)
+
             if torch.isnan(coords_pred).any():
                 print("Iter: {:} nan".format(ite))
 
@@ -94,6 +96,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
 
             loss_d = loss_fnc(dists_pred, dists)
             loss_train_d += loss_d.cpu().detach()
+
             if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
                 loss_c = loss_tr_tuples(coords_pred, coords)
                 loss_train_c += loss_c.cpu().detach()
@@ -109,6 +112,10 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                 loss_reg_min_sep = 0.1 * loss_reg_min_sep_fnc(dists_pred,mask)
                 loss += loss_reg_min_sep
                 loss_train_min_sep += loss_reg_min_sep.cpu().detach()
+
+            R = net.NNreg()
+            loss_train_R += R.cpu().detach()
+            loss += R
 
             loss.backward()
             optimizer.step()
@@ -127,13 +134,14 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
                     else:
                         lr = scheduler.get_last_lr()[0]
                     LOG.info(
-                        '{:6d}/{:6d}  Loss(training): {:6.4f}  Loss(test): {:6.4f}  Loss(dist): {:6.4f}  Loss(coord): {:6.4f}  Loss(nn): {:6.4f}  Loss(min sep): {:6.4f}  Dist_err({:}): {:2.6f}  LR: {:.8}  Time(train): {:.2f}s  Time(test): {:.2f}s  Time(total): {:.2f}h  ETA: {:.2f}h'.format(
-                            ite + 1,int(max_iter), loss_train/report_iter, loss_v, loss_train_d/report_iter, loss_train_c/report_iter, loss_train_nn/report_iter, loss_train_min_sep/report_iter, c['units'], dist_err_mean, lr, t2-t1, t3 - t2, (t3 - t0)/3600,(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
+                        '{curr_ite:6d}/{max_iter:6d}  Loss(training): {loss_train:6.4f}  Loss(test): {loss_test:6.4f}  Loss(dist): {loss_dist:6.4f}  Loss(coord): {loss_coord:6.4f}  Loss(nn): {loss_nn:6.4f}  Loss(min sep): {loss_min_sep:6.4f}  Loss(R): {loss_r:6.4f}  Dist_err({units:}): {err_dist:2.6f}  LR: {lr:.8}  Time(train): {time_train:.2f}s  Time(test): {time_test:.2f}s  Time(total): {time_total:.2f}h  ETA: {eta:.2f}h'.format(
+                            curr_ite=ite + 1,max_iter=int(max_iter), loss_train=loss_train/report_iter, loss_test=loss_v, loss_dist=loss_train_d/report_iter, loss_coord=loss_train_c/report_iter, loss_nn=loss_train_nn/report_iter, loss_min_sep=loss_train_min_sep/report_iter, units=c['units'], err_dist=dist_err_mean, lr=lr, time_train=t2-t1, time_test=t3 - t2, time_total=(t3 - t0)/3600,eta=(max_iter-ite+1)/(ite+1)*(t3-t0)/3600))
                     t1 = time.time()
                     loss_train_d = 0
                     loss_train_c = 0
                     loss_train_nn = 0
                     loss_train_min_sep = 0
+                    loss_train_R = 0
                     loss_train = 0
                     if loss_v < best_v_loss:
                         filename = "{:}/best_model_state.pt".format(result_dir)

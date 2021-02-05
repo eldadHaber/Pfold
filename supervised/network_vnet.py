@@ -509,6 +509,14 @@ class vnet1D(nn.Module):
 
         return dists, x
 
+    def NNreg(self):
+
+        dWdt = self.W[1:] - self.W[:-1]
+        RW   = torch.sum(torch.abs(dWdt))/dWdt.numel()
+        RK  = torch.norm(self.K)**2/2/self.K.numel()
+        return RW + RK
+
+
 def masked_instance_norm(x, mask, eps = 1e-5):
     # ins_norm = F.instance_norm(x)
     mean = torch.sum(x * mask, dim=2) / torch.sum(mask, dim=2)
