@@ -17,14 +17,14 @@ class LossMultiTargets(nn.Module):
         super(LossMultiTargets, self).__init__()
         self.loss = loss_fnc
 
-    def forward(self, inputs,targets):
+    def forward(self, inputs,targets, weight):
         # loss = []
         # for (input,target) in zip(inputs,targets):
         #     loss.append(self.loss(input,target))
         loss = 0
         nb = len(targets)
         for (input,target) in zip(inputs,targets):
-            loss += self.loss(input,target)
+            loss += self.loss(input,target,weight)
         loss /= nb
         return loss
 
@@ -32,7 +32,7 @@ class MSELoss(torch.nn.Module):
     def __init__(self):
         super(MSELoss,self).__init__()
 
-    def forward(self, input, target, safeversion=True):
+    def forward(self, input, target, weight, safeversion=True):
         #We only want places where the target is larger than zero (remember this is for distances)
         mask = target > 0
 
@@ -67,10 +67,10 @@ class MSELoss(torch.nn.Module):
                 targeti = target[i,...]
                 maski = mask[i,...]
                 # result += torch.sum(torch.norm(inputi[maski] - targeti[maski]) ** 2 / torch.norm(targeti[maski]) ** 2)
-                result += F.mse_loss(inputi[maski],targeti[maski],reduction='sum') / torch.sum(targeti ** 2)
+                result += F.mse_loss(inputi[maski],targeti[maski],reduction='sum') / torch.sum(targeti ** 2) * weight[i][0]
         else:
             # ((input - target) ** 2)
-            result = torch.sum(torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2)
+            result = torch.sum((torch.norm(input * mask - target * mask,dim=(1,2)) ** 2 / torch.norm(target * mask,dim=(1,2)) ** 2) * weight)
 
         if nb == 0:
             return result

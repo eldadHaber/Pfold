@@ -52,14 +52,13 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
     best_v_loss = 9e9
     while True:
         for i, vars in enumerate(dataloader_train):
-            if ite == 655:
-                print('problem next iter')
-
             features = vars[0][0]
             dists = vars[1]
             coords = vars[2]
+            w_data = vars[4][0]
             mask = vars[-1]
             features = features.to(device, non_blocking=True)
+            w_data = w_data.to(device, non_blocking=True)
             mask = mask.to(device, non_blocking=True) # Note that this is the padding mask, and not the mask for targets that are not available.
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
@@ -94,7 +93,7 @@ def train(net, optimizer, dataloader_train, loss_fnc, LOG=logger, device=None, d
             # plt.colorbar()
             # plt.pause(1)
 
-            loss_d = loss_fnc(dists_pred, dists)
+            loss_d = loss_fnc(dists_pred, dists, w_data)
             loss_train_d += loss_d.cpu().detach()
 
             if coords_pred is not None and exp_dist_loss<0 and use_loss_coord:
@@ -189,8 +188,10 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             features = vars[0][0]
             dists = vars[1]
             coords = vars[2]
+            w_data = vars[4][0]
             mask = vars[-1]
             features = features.to(device, non_blocking=True)
+            w_data = w_data.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
@@ -204,7 +205,7 @@ def eval_net(net, dl, loss_fnc, device='cpu', plot_results=False, save_results=F
             # dists_select = dists[0]*mask_inpaint_2d
 
 
-            loss_d = loss_fnc(dists_pred, dists)
+            loss_d = loss_fnc(dists_pred, dists, w_data)
             if coords_pred is not None and use_loss_coord:
                 loss_c, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
                 loss = (1 - weight) / 2 * loss_d + (weight + 1) / 2 * loss_c

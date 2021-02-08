@@ -154,9 +154,10 @@ if __name__ == '__main__':
     # pnetfile = './../data/casp11/training_90'
     # output_folder = './../results/figures/data_aug/training2/'
     # pnetfile = './../data/casp11/validation'
-    output_folder = './../results/figures/data_aug/val2.5/'
+    # output_folder = './../results/figures/data_aug/val2.5/'
     inputfolder = './../data/casp11_validation_inpaint_fully_mapped/'
     # output_folder = './../data/casp11_training_90_fully_mapped_no_sub_augmented/'
+    output_folder = './../data/casp11_validation_fully_mapped_augmented/'
     os.makedirs(output_folder, exist_ok=True)
     min_subprotein_len = 20
     # max_seq_len = 1000
@@ -170,9 +171,9 @@ if __name__ == '__main__':
     # cost_adjustment_constant2 = np.exp(-1.995)
     # _, net, _, _ =load_checkpoint(inpainter,device=device)
     # net.eval()
-    save_3d_figures = True
+    save_3d_figures = False
     save_cost_matrix = False
-    save_figures_for_print = True
+    save_figures_for_print = False
 
 
     # args, log_units, AA_DICT, _,_,_,_ = parse_pnet(pnetfile, min_seq_len=min_seq_len, max_seq_len=max_seq_len, use_entropy=True, use_pssm=True,
@@ -201,8 +202,8 @@ if __name__ == '__main__':
     nsubs = 0
 
     for ii in range(nfiles):
-        if ii != 16:
-            continue
+        # if ii != 16:
+        #     continue
         t1 = time.time()
         dat = np.load(files[ii])
         seq_id = dat['id']

@@ -17,7 +17,7 @@ if __name__ == '__main__':
     # data
     # parser.add_argument('--dataset-train', default='./data/train_npz/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='./data/casp11_training_90_fully_mapped_no_sub_augmented/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/casp11_validation_fully_mapped_augmented/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-test', default='./data/casp11_validation_fully_mapped/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
     parser.add_argument('--weight-decay', default=0, type=float, metavar='N', help='network to use')
     parser.add_argument('--lr-scheduler', default='LinearRampUpAndDown', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=2, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-2, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=100000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--report-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
@@ -57,7 +57,8 @@ if __name__ == '__main__':
         'o_dist': True,
         'log_units': -10,
         'flip_protein': 0.0,
-        'AA_list': 'ACDEFGHIKLMNPQRSTVWY-'
+        'AA_list': 'ACDEFGHIKLMNPQRSTVWY-',
+        'use_weight': True
     }
 
 
@@ -77,7 +78,7 @@ if __name__ == '__main__':
         'nlayers_pr_block': 5,
         'channels': 80,
         'stencil_size': 3,
-        'dropout_p': 0.0,
+        'dropout_p': 0.2,
         }
     elif args.network.lower() == 'vnet_inpaint':
         args.network_args = {

@@ -27,7 +27,7 @@ class Dataset_npz(data.Dataset):
 
 
     '''
-    def __init__(self, folder,  flip_protein, i_seq, i_pssm, i_entropy, i_inpaint, i_cov, i_contact, o_rCa,o_rCb, o_rN, o_dist, AA_list, log_units):
+    def __init__(self, folder,  flip_protein, i_seq, i_pssm, i_entropy, i_inpaint, i_cov, i_contact, o_rCa,o_rCb, o_rN, o_dist, AA_list, log_units, use_weight):
         """
         log_units[int]: Gives the log10 units that coordinates/distances should be returned in. (picometer = -12, nanometer = -9...)
 
@@ -44,6 +44,7 @@ class Dataset_npz(data.Dataset):
         self.i_inpaint = i_inpaint
         self.i_cov = i_cov
         self.i_contact = i_contact
+        self.use_weight = use_weight
         self.o_rCa = o_rCa
         self.o_rCb = o_rCb
         self.o_rN = o_rN
@@ -71,6 +72,12 @@ class Dataset_npz(data.Dataset):
         log_units = data['log_units']
         scaling = 10.0 ** (log_units - self.log_units)
         assert AA_list == self.AA_list, "The data was saved with a different amino acid list than the one you are currently using."
+
+        w = np.empty((1,1),dtype=np.float32)
+        if self.use_weight:
+            w[0] = data['weight']
+        else:
+            w[0] = 1
 
         coords = ()
         if self.o_rCa:
@@ -105,11 +112,14 @@ class Dataset_npz(data.Dataset):
         coords = self.Flip(coords)
         protein_id = data['id']
 
+
+
+
         if self.o_dist:
             distances = self.coord_to_dist(coords)
-            return (features,), distances, coords, (protein_id,)
+            return (features,), distances, coords, (protein_id,), w
         else:
-            return (features,), coords, (protein_id,)
+            return (features,), coords, (protein_id,), w
 
 
 
