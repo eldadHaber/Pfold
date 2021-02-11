@@ -19,47 +19,59 @@ np.set_printoptions(linewidth=desired_width)
 
 if __name__ == '__main__':
     # network_path = 'D:/Pytorch/Pfold/pretrained_networks/2020-11-26_17_30_02/network.pt'
-    network_path = 'D:/Pytorch/run_amazon/2020-12-09_22_45_12/network.pt'
+    # network_path = 'D:/Pytorch/run_amazon/2020-12-09_22_45_12/network.pt'
+    # network_path = 'D:/Dropbox/ComputationalGenetics/results/data augmentation/no augmentation/2021-02-06_02_20_34/best_model_state.pt'
+    # network_path = 'D:/Dropbox/ComputationalGenetics/results/data augmentation/no augmentation/2021-02-06_11_08_42/best_model_state.pt'
+    # network_path = 'D:/Dropbox/ComputationalGenetics/results/data augmentation/no augmentation/2021-02-07_09_06_53/best_model_state.pt'
+    network_path = 'D:/Dropbox/ComputationalGenetics/results/data augmentation/no_weight/2021-02-05_15_39_25/best_model_state.pt'
     # dataset = './data/casp11_validation/'
     # dataset = './data/casp11_test_TBM/'
-    dataset = './data/casp11_test_FM/'
+    dataset = './data/casp11_testing/'
     dataset_out = './results/figures/'
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     batch_size = 1
 
-    i_entropy = True
+    i_entropy = False
     feature_dim = 1
     i_seq = True
-    i_pssm = True
+    i_pssm = False
     i_cov = False
     i_cov_all = False
     i_contact = False
-    inpainting = False
+    i_inpaint = False
+    o_rCa = True
+    o_rCb = False
+    o_rN = False
+    o_dist = True
+    log_units = -10
+    AA_list = 'ACDEFGHIKLMNPQRSTVWY-'
+    # network = 'vnet'
+    # feature_dim = 1
+    # network_args = {
+    #     'nblocks': 4,
+    #     'nlayers_pr_block': 5,
+    #     'channels': 280,
+    #     'chan_out': 3,
+    #     'stencil_size': 3,
+    #     }
+    # network_args['chan_in'] = 41
 
-    network = 'vnet'
-    feature_dim = 1
-    network_args = {
-        'nblocks': 4,
-        'nlayers_pr_block': 5,
-        'channels': 280,
-        'chan_out': 3,
-        'stencil_size': 3,
-        }
-    network_args['chan_in'] = 41
-
-    dataset_test = Dataset_npz(dataset, feature_dim=feature_dim, seq_flip_prop=0, i_seq=i_seq, i_pssm=i_pssm,
-                               i_entropy=i_entropy, i_cov=i_cov, i_cov_all=i_cov_all, i_contact=i_contact,
-                               inpainting=inpainting)
-
+    dataset_test = Dataset_npz(dataset, flip_protein=0, i_seq=i_seq, i_pssm=i_pssm, i_entropy=i_entropy, i_cov=i_cov, i_contact=i_contact, o_rCa=o_rCa, o_rCb=o_rCb, o_rN=o_rN, o_dist=o_dist, i_inpaint=i_inpaint, AA_list=AA_list, log_units=log_units, use_weight=False)
     pad_modulo = 8
+    if o_dist:
+        pad_var_list = list([[0, 1],[1,1],[0,1],[0],[0]])
+    else:
+        pad_var_list = list([[0, 1],[0,1],[0],[0]])
 
-    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo),
-                                           drop_last=False)
 
+
+    dl_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=0, collate_fn=PadCollate(pad_modulo=pad_modulo,pad_var_list=pad_var_list), drop_last=False)
+
+    ite_start, net, opt, lr_scheduler = load_checkpoint(network_path,device=device)
 
     # Load network and set it in evaluate mode
-    net = torch.load(network_path)
+    # net = torch.load(network_path)
     # net = select_network(network,network_args,feature_dim,cross_dist=False)
     optimizer = optim.Adam(list(net.parameters()), lr=1e-2)
     scheduler = OneCycleLR(optimizer, 1e-2, total_steps=2000000, pct_start=0.3, anneal_strategy='cos', cycle_momentum=True, base_momentum=0.85,

@@ -27,7 +27,7 @@ def name_log_units(log_units):
 
 
 
-def create_optimizer(opt_type,net_parameters,lr,weight_decay):
+def create_optimizer(opt_type,net_parameters,lr,weight_decay=0):
     if opt_type.lower() == 'adam':
         opt = torch.optim.Adam(net_parameters, lr=lr, weight_decay=weight_decay)
     else:

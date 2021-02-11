@@ -204,160 +204,214 @@ def read_record(file_, num_evo_entries, use_entropy, use_pssm, use_dssp, use_mas
             elif case(''):
                 return id,seq,pssm,entropy,dssp,coord,mask,seq_len
 
+
 def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entropy=True, use_pssm=True, use_dssp=False, use_mask=True, use_coord=True, AA_DICT=AA_DICT, min_ratio=0, sanitize_data=True,remove_subproteins=True):
     """
     This is a wrapper for the read_record routine, which reads a pnet-file into memory.
     This routine will convert the lists to numpy arrays, and flip their dimensions to be consistent with how data is normally used in a deep neural network.
     Furthermore the routine will specify the log_unit you wish the data in default is -9 which is equal to nanometer. (Pnet data is given in picometer = -12 by standard)
     """
-    with open(file, 'r') as f:
-        min_acceptable_nn_dist = 200 #picometer
-        max_acceptable_nn_dist = 1000 #picometer
-        min_acceptable_nn_dist_problems = 0
-        max_acceptable_nn_dist_problems = 0
-        ratio_problems = 0
-        pnet_log_unit = -12
-        scaling = 10.0 ** (pnet_log_unit - log_unit)
-        min_acceptable_nn_dist *= scaling
-        max_acceptable_nn_dist *= scaling
-        plot_sub_protein_comparison = False
-        dist = 0
-
-        t0 = time.time()
-        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
-        print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
-        rCa = []
-        rCb = []
-        rN = []
-
-        for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
-            #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
-            rCa.append((separate_coords(coords[i], 1)))
-            rCb.append((separate_coords(coords[i], 2)))
-            rN.append((separate_coords(coords[i], 0)))
-        convert = ListToNumpy()
-        rCa = convert(rCa)
-        rCb = convert(rCb)
-        rN = convert(rN)
-        seq = convert(seq)
-        seq_len = np.array(seq_len)
-        sort_idx = np.argsort(seq_len)
-
+    def sort_samples_according_to_idx(sort_idx,use_entropy, use_pssm, use_dssp, use_mask, use_coord,rCa,rCb,rN,seq,seq_len,id,entropy,dssp,pssm,mask):
         seq_len = seq_len[sort_idx]
-
         seq = [seq[i] for i in sort_idx]
         id = [id[i] for i in sort_idx]
-        rCa = [rCa[i] for i in sort_idx]
-        rCb = [rCb[i] for i in sort_idx]
-        rN = [rN[i] for i in sort_idx]
-        nrCa = len(rCa)
-        idx_to_keep = np.ones(nrCa, dtype=np.bool)
-        if min_ratio > 0:
-            for i in range(len(rCa)):
-                n = rCa[i].shape[0]
-                m = np.sum(rCa[i][:,0] != 0)
-                ratio = m/n
-                if ratio < min_ratio:
-                    ratio_problems += 1
-                idx_to_keep[i] = ratio >= min_ratio
-        if sanitize_data:
-            # We want to remove suspicious datapoints, that include datapoints where the same coordinate have been repeat multiple times, or where datapoints are suspiciously close or far away from their neighbours
-            for i in range(len(rCa)):
-                if idx_to_keep[i]:
-                    rCai = rCa[i]
-                    m = (rCai[:,0] != 0).astype(np.float32)
-                    m2 = np.floor((m[1:] + m[:-1]) / 2.0) < 0.5
-                    m3 = ~ m2
-                    drCai = rCai[1:,:] - rCai[:-1,:]
-                    d = np.sqrt(np.sum(drCai**2,axis=1))
-                    dmin = np.min(d[m3])
-                    dmax = np.max(d[m3])
-                    if dmin < min_acceptable_nn_dist:
-                        min_acceptable_nn_dist_problems += 1
-                        idx_to_keep[i] = False
-                    if dmax > max_acceptable_nn_dist:
-                        max_acceptable_nn_dist_problems += 1
-                        idx_to_keep[i] = False
 
-        if remove_subproteins:
-            def array_in(arr, sub_arr):
-                comparison = (arr[np.arange(len(arr) - len(sub_arr))[:, None] +
-                     np.arange(len(sub_arr))] == sub_arr).all(axis=1)
-                result = comparison.any()
-                if result:
-                    idx = np.where(comparison == True)[0][0]
-                else:
-                    idx = -1
-                return result,idx
-            tt0 = time.time()
-            for i in range(len(rCa)):
-                if (i+1) % 1000 == 0:
-                    print("{:} examples took {:2.2f}".format(i+1,time.time()-tt0))
-                if idx_to_keep[i]:
-                    seqi = seq[i]
-                    for j in range(i+1,len(rCa)):
-                        if idx_to_keep[j]:
-                            result, idx = array_in(seq[j],seqi)
-                            if result:
-                                idx_to_keep[i] = False
-                                if plot_sub_protein_comparison:
-                                # if True:
-                                    ni = len(seqi)
-                                    r1 = torch.from_numpy(rCa[i].T)
-                                    # r2 = torch.from_numpy(rCa[j][0:0+ni].T)
-                                    r2 = torch.from_numpy(rCa[j][idx:idx+ni].T)
-                                    cutfullprotein(rCa[j].T,idx,idx+ni, filename="./../results/figures/cut_in_protein_{:}_{:}".format(i,j))
-                                    dist, r1cr, r2c = compare_coords_under_rot_and_trans(r1, r2)
-                                    plot_coordcomparison(r1cr.numpy(), r2c.numpy(), save_results="./../results/figures/comparison_{:}_{:}".format(i,j), num=2,title="distance = {:2.2f}".format(dist))
-                                    print("Subprotein found! {:} is a subprotein of {:}, distance={:2.2f}".format(i,j,dist))
+        if use_coord:
+            rCa = [rCa[i] for i in sort_idx]
+            rCb = [rCb[i] for i in sort_idx]
+            rN = [rN[i] for i in sort_idx]
+        if use_entropy:
+            entropy = [entropy[i] for i in sort_idx]
+        if use_pssm:
+            pssm = [pssm[i] for i in sort_idx]
+        if use_dssp:
+            dssp = [dssp[i] for i in sort_idx]
+        if use_mask:
+            mask = [mask[i] for i in sort_idx]
+        return rCa,rCb,rN,seq,seq_len,id,entropy,dssp,pssm,mask
 
-
-        n_removed = np.sum(idx_to_keep == False)
+    def keep_samples_according_to_idx(idx_to_keep, use_entropy, use_pssm, use_dssp, use_mask, use_coord, rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask):
         indices = np.where(idx_to_keep == True)[0]
-        id = [id[index] for index in indices]
+
         seq = [seq[index] for index in indices]
-        args = {'id': id,
-                'seq': seq,
-                'seq_len': seq_len[idx_to_keep],
-                }
+        seq_len = seq_len[indices]
+        id = [id[index] for index in indices]
+
         if use_coord:
             rCa = [rCa[index] for index in indices]
             rCb = [rCb[index] for index in indices]
             rN = [rN[index] for index in indices]
-
-            args['rCa'] = rCa
-            args['rCb'] = rCb
-            args['rN'] = rN
         if use_entropy:
-            entropy = convert(entropy)
-            entropy = [entropy[i] for i in sort_idx]
             entropy = [entropy[index] for index in indices]
-            args['entropy'] = entropy
         if use_pssm:
-            pssm = convert(pssm)
-            pssm = [pssm[i] for i in sort_idx]
             pssm = [pssm[index] for index in indices]
-            args['pssm'] = pssm
         if use_dssp:
-            dssp = convert(dssp)
-            dssp = [dssp[i] for i in sort_idx]
             dssp = [dssp[index] for index in indices]
-            args['dssp'] = dssp
         if use_mask:
-            mask = convert(mask)
-            mask = [mask[i] for i in sort_idx]
             mask = [mask[index] for index in indices]
-            args['mask'] = mask
+        return rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask
 
-        print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
+    def array_in(arr, sub_arr):
+        """
+        We wish to do subarray comparison in numpy.
+        Let arr be an array of length n
+        and subarr an array of length k < n
+        We compare to see whether subarr exist contigious anywhere in arr
+        """
+        n = len(arr)
+        k = len(sub_arr)
+        idx = np.arange(n - k+1)[:, None] + np.arange(k)
+
+        comparison = (arr[idx] == sub_arr).all(axis=1)
+        result = comparison.any()
+        if result:
+            idx = np.where(comparison == True)[0][0]
+        else:
+            idx = -1
+        return result,idx
+
+
+    assert use_coord == sanitize_data, "Sanitizing data requires coordinate information"
+    save_parents = True
+    min_acceptable_nn_dist = 200  # picometer
+    max_acceptable_nn_dist = 1000  # picometer
+    min_acceptable_nn_dist_problems = 0
+    max_acceptable_nn_dist_problems = 0
+    ratio_problems = 0
+    pnet_log_unit = -12
+    scaling = 10.0 ** (pnet_log_unit - log_unit)
+    min_acceptable_nn_dist *= scaling
+    max_acceptable_nn_dist *= scaling
+    plot_sub_protein_comparison = False
+    t0 = time.time()
+    with open(file, 'r') as f:
+        id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
+    print("loading data complete! Took: {:2.2f}".format(time.time() - t0))
+    n_org = len(seq)
+    rCa = []
+    rCb = []
+    rN = []
+
+    for i in range(len(coords)):  # We transform each of these, since they are inconveniently stored
+        #     # Note that we are changing the order of the coordinates, as well as which one is first, since we want Carbon alpha to be the first, Carbon beta to be the second and Nitrogen to be the third
+        rCa.append((separate_coords(coords[i], 1)))
+        rCb.append((separate_coords(coords[i], 2)))
+        rN.append((separate_coords(coords[i], 0)))
+    convert = ListToNumpy()
+    rCa = convert(rCa)
+    rCb = convert(rCb)
+    rN = convert(rN)
+    seq = convert(seq)
+    entropy = convert(entropy)
+    pssm = convert(pssm)
+    dssp = convert(dssp)
+    mask = convert(mask)
+
+    seq_len = np.array(seq_len)
+
+    sort_idx = np.argsort(seq_len)
+
+    rCa,rCb,rN,seq,seq_len,id,entropy,dssp,pssm,mask = sort_samples_according_to_idx(sort_idx,use_entropy, use_pssm, use_dssp, use_mask, use_coord,rCa,rCb,rN,seq,seq_len,id,entropy,dssp,pssm,mask)
+
+    if min_ratio > 0:
+        assert use_coord, "coordinates are required to have min_ratio larger than zero"
+        idx_to_keep = np.ones(len(seq), dtype=np.bool)
+        for i in range(len(rCa)):
+            n = rCa[i].shape[0]
+            m = np.sum(rCa[i][:,0] != 0)
+            ratio = m/n
+            if ratio < min_ratio:
+                ratio_problems += 1
+            idx_to_keep[i] = ratio >= min_ratio
+        rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask = keep_samples_according_to_idx(idx_to_keep, use_entropy, use_pssm, use_dssp, use_mask, use_coord, rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask)
+
+    if sanitize_data:
+        # We want to remove suspicious datapoints, that include datapoints where the same coordinate have been repeat multiple times, or where datapoints are suspiciously close or far away from their neighbours
+        idx_to_keep = np.ones(len(seq), dtype=np.bool)
+        for i in range(len(rCa)):
+            if idx_to_keep[i]:
+                rCai = rCa[i]
+                m = (rCai[:,0] != 0).astype(np.float32)
+                m2 = np.floor((m[1:] + m[:-1]) / 2.0) < 0.5
+                m3 = ~ m2
+                drCai = rCai[1:,:] - rCai[:-1,:]
+                d = np.sqrt(np.sum(drCai**2,axis=1))
+                dmin = np.min(d[m3])
+                dmax = np.max(d[m3])
+                if dmin < min_acceptable_nn_dist:
+                    min_acceptable_nn_dist_problems += 1
+                    idx_to_keep[i] = False
+                if dmax > max_acceptable_nn_dist:
+                    max_acceptable_nn_dist_problems += 1
+                    idx_to_keep[i] = False
+        rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask = keep_samples_according_to_idx(idx_to_keep, use_entropy, use_pssm, use_dssp, use_mask, use_coord, rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask)
+
+
+    if remove_subproteins:
+        # Note we assume that the proteins have been sorted
+        tt0 = time.time()
+        n = len(seq)
+        idx_to_keep = np.ones(n, dtype=np.bool)
+        parent_proteins = [[] for _ in range(n)]
+
+        for i in range(n):
+            if (i+1) % 1000 == 0:
+                print("{:} examples took {:2.2f}".format(i+1,time.time()-tt0))
+            seqi = seq[i]
+            for j in reversed(range(i+1,n)): #We do it reversed in order to find the largest parent protein for each one
+                result, idx = array_in(seq[j],seqi)
+                if result:
+                    idx_to_keep[i] = False
+                    if plot_sub_protein_comparison:
+                    # if True:
+                        ni = len(seqi)
+                        r1 = torch.from_numpy(rCa[i].T)
+                        # r2 = torch.from_numpy(rCa[j][0:0+ni].T)
+                        r2 = torch.from_numpy(rCa[j][idx:idx+ni].T)
+                        cutfullprotein(rCa[j].T,idx,idx+ni, filename="./../results/figures/cut_in_protein_{:}_{:}".format(i,j))
+                        dist, r1cr, r2c = compare_coords_under_rot_and_trans(r1, r2)
+                        plot_coordcomparison(r1cr.numpy(), r2c.numpy(), save_results="./../results/figures/comparison_{:}_{:}".format(i,j), num=2,title="distance = {:2.2f}".format(dist))
+                        print("Subprotein found! {:} is a subprotein of {:}, distance={:2.2f}".format(i,j,dist))
+                    parent_proteins[j].append([idx, idx+len(seqi)])
+                    break
+        if save_parents:
+            AA_LIST = list(AA_DICT)
+            for i in range(n):
+                if len(parent_proteins[i]) > 0:
+                    sub_proteins = np.asarray(parent_proteins[i])
+                    idi = id[i]
+                    filename = "{:}parent_protein_{:}.npz".format("./../data/temp/", idi)
+                    np.savez(file=filename, seq=seq[i], rCa=rCa[i].T, rCb=rCb[i].T, rN=rN[i].T, id=id, log_units=log_unit, AA_LIST=AA_LIST, subproteins=sub_proteins)
+
+        rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask = keep_samples_according_to_idx(idx_to_keep, use_entropy, use_pssm, use_dssp, use_mask, use_coord, rCa, rCb, rN, seq, seq_len, id, entropy, dssp, pssm, mask)
+
+    n_removed = n_org - len(seq)
+    args = {'id': id,
+            'seq': seq,
+            'seq_len': seq_len,
+            }
+    if use_coord:
+        args['rCa'] = rCa
+        args['rCb'] = rCb
+        args['rN'] = rN
+    if use_entropy:
+        args['entropy'] = entropy
+    if use_pssm:
+        args['pssm'] = pssm
+    if use_dssp:
+        args['dssp'] = dssp
+    if use_mask:
+        args['mask'] = mask
+
+    print("parsing pnet complete! Took: {:2.2f}".format(time.time() - t0))
 
 
     return args, log_unit, AA_DICT, n_removed, min_acceptable_nn_dist_problems, max_acceptable_nn_dist_problems, ratio_problems
 
 if __name__ == '__main__':
     pnetfile = './../data/casp11/training_90'
-    output_folder = './../data/casp11_training_90_fully_mapped_no_sub_20/'
-    # pnetfile = './../data/casp11/testing'
+    output_folder = './../data/casp11_training_90_fully_mapped_no_sub_20_v2/'
+    # pnetfile = './../data/casp11/testing_fake_with_sub'
     # output_folder = './../data/casp11_testing_inpaint_fully_mapped/'
     # pnetfile = './../data/casp11/validation'
     # output_folder = './../data/test/'

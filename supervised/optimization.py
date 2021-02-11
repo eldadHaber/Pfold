@@ -255,19 +255,22 @@ def net_prediction(net, dl, device='cpu', plot_results=False, save_results=False
         dist_err_RMSD_mean = 0
         dist_err_RMSD2_mean = 0
         dist_err_mean_alq = 0
-        for i,(seq, dists,mask, coords,ids) in enumerate(dl):
-            # if i!=23:
-            #     continue
-            seq = seq.to(device, non_blocking=True)
+        for i, vars in enumerate(dl):
+            features = vars[0][0]
+            dists = vars[1]
+            coords = vars[2]
+            w_data = vars[4][0]
+            mask = vars[-1]
+            features = features.to(device, non_blocking=True)
+            w_data = w_data.to(device, non_blocking=True)
             dists = move_tuple_to(dists, device, non_blocking=True)
             coords = move_tuple_to(coords, device, non_blocking=True)
-            mask_padding_and_unknown = (coords[0][:,0,:] != 0)
             mask = mask.to(device, non_blocking=True)  # Note that this is the padding mask, and not the mask for targets that are not available.
-            dists_pred, coords_pred = net(seq,mask)
+            mask_padding_and_unknown = (coords[0][:,0,:] != 0)
+            dists_pred, coords_pred = net(features,mask)
             _, coords_pred_tr, coords_tr = loss_tr_tuples(coords_pred, coords, return_coords=True)
-
-            DpA = dists_pred[0]*10 #Dist predicted in Angstrom
-            DtA = dists[0]*10 #Dist true in Angstrom
+            DpA = dists_pred[0]
+            DtA = dists[0]
             M = dists[0] != 0
             L = torch.sum(mask_padding_and_unknown,dim=1)
             L2 = torch.sum(mask,dim=1)
