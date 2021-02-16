@@ -282,7 +282,9 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
     scaling = 10.0 ** (pnet_log_unit - log_unit)
     min_acceptable_nn_dist *= scaling
     max_acceptable_nn_dist *= scaling
+    AA_LIST = list(AA_DICT)
     plot_sub_protein_comparison = False
+    save_subproteins = True
     t0 = time.time()
     with open(file, 'r') as f:
         id, seq, pssm, entropy, dssp, coords, mask, seq_len = read_record(f, 20, AA_DICT=AA_DICT, use_entropy=use_entropy, use_pssm=use_pssm, use_dssp=use_dssp, use_mask=use_mask, use_coord=use_coord, min_seq_len=min_seq_len, max_seq_len=max_seq_len, scaling=scaling)
@@ -362,6 +364,21 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
                 result, idx = array_in(seq[j],seqi)
                 if result:
                     idx_to_keep[i] = False
+                    if save_subproteins:
+                        ni = len(seqi)
+                        r1 = torch.from_numpy(rCa[i].T)
+                        r2 = torch.from_numpy(rCa[j][idx:idx+ni].T)
+                        cutfullprotein(rCa[j].T,idx,idx+ni, filename="./../results/figures/cut_in_protein_{:}_{:}".format(i,j))
+                        dist, r1cr, r2c = compare_coords_under_rot_and_trans(r1, r2)
+                        idi = id[i]
+                        if dist < 0.01:
+                            folder = "{:}".format("./../data/temp_ok/")
+                        else:
+                            folder = "{:}".format("./../data/temp/")
+
+                        np.savez(file="{:}subprotein_{:}.npz".format(folder,idi), seq=seq[i], rCa=rCa[i].T, rCb=rCb[i].T, rN=rN[i].T, id=id,
+                                 log_units=log_unit, AA_LIST=AA_LIST)
+                        plot_coordcomparison(r1cr.numpy(), r2c.numpy(), save_results="{:}comparison_{:}_{:}".format(i,j), num=2,title="distance = {:2.2f}".format(dist))
                     if plot_sub_protein_comparison:
                     # if True:
                         ni = len(seqi)
@@ -375,7 +392,6 @@ def parse_pnet(file, log_unit=-9, min_seq_len=-1, max_seq_len=999999, use_entrop
                     parent_proteins[j].append([idx, idx+len(seqi)])
                     break
         if save_parents:
-            AA_LIST = list(AA_DICT)
             for i in range(n):
                 if len(parent_proteins[i]) > 0:
                     sub_proteins = np.asarray(parent_proteins[i])

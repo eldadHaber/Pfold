@@ -155,7 +155,7 @@ if __name__ == '__main__':
     # output_folder = './../results/figures/data_aug/training2/'
     # pnetfile = './../data/casp11/validation'
     # output_folder = './../results/figures/data_aug/val2.5/'
-    inputfolder = './../data/casp11_validation_inpaint_fully_mapped/'
+    inputfolder = './../../data/casp11_validation_inpaint_fully_mapped/'
     # output_folder = './../data/casp11_training_90_fully_mapped_no_sub_augmented/'
     output_folder = './../data/casp11_validation_fully_mapped_augmented/'
     os.makedirs(output_folder, exist_ok=True)
