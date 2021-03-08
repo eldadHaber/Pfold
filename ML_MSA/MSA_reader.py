@@ -85,3 +85,4 @@ if __name__ == "__main__":
             n = msas.shape[0]
             l = msas.shape[1]
             print("# MSAs = {:}, sequence length {:}, time taken: {:2.2f}".format(n, l, time.time()- t0))
+

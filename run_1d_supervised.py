@@ -10,14 +10,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Distogram Predictor')
 
     # General
-    parser.add_argument('--seed', default=123557, type=int, metavar='N', help='seed number')
+    parser.add_argument('--seed', default=12357, type=int, metavar='N', help='seed number')
     parser.add_argument('--basefolder', default=os.path.basename(__file__).split(".")[0], type=str, metavar='N', help='Basefolder where results are saved')
     parser.add_argument('--mode', default='standard', type=str, metavar='N', help='Mode to run in (debug,fast,paper)')
     parser.add_argument('--viz', default=False, type=bool, metavar='N', help='select the neural network to train (resnet)')
     # data
     # parser.add_argument('--dataset-train', default='./data/train_npz/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='./data/casp11_validation_fully_mapped_augmented/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./data/casp11_training_90_fully_mapped_no_sub_20/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     parser.add_argument('--dataset-test', default='./data/casp11_validation_fully_mapped/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
@@ -31,10 +31,10 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer', default='adam', type=str, metavar='N', help='network to use')
     parser.add_argument('--weight-decay', default=0, type=float, metavar='N', help='network to use')
     parser.add_argument('--lr-scheduler', default='LinearRampUpAndDown', type=str, metavar='N', help='network to use')
-    parser.add_argument('--batch-size', default=2, type=int, metavar='N', help='batch size used in dataloader')
+    parser.add_argument('--batch-size', default=20, type=int, metavar='N', help='batch size used in dataloader')
     parser.add_argument('--SL-lr', default=1e-2, type=float, metavar='N', help='Learning Rate')
     parser.add_argument('--max-iter', default=100000, type=int, metavar='N', help='select the neural network to train (resnet)')
-    parser.add_argument('--report-iter', default=10, type=int, metavar='N', help='select the neural network to train (resnet)')
+    parser.add_argument('--report-iter', default=100, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--checkpoint', default=5000, type=int, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--exp_dist_loss', default=-1, type=float, metavar='N', help='select the neural network to train (resnet)')
     parser.add_argument('--load-nn-dists', default='./data/nn-distances.npz', type=str, metavar='N', help='Input feature types')
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         'log_units': -10,
         'flip_protein': 0.0,
         'AA_list': 'ACDEFGHIKLMNPQRSTVWY-',
-        'use_weight': True
+        'use_weight': False
     }
 
 
