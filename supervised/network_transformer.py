@@ -152,7 +152,10 @@ class CNN(nn.Module):
 def tr2DistSmall(Y):
     k = Y.shape[1]
     Z = Y - torch.mean(Y, dim=2, keepdim=True)
+    print(torch.cuda.memory_summary())
     D = torch.sum(Z**2, dim=1).unsqueeze(1) + torch.sum(Z**2, dim=1).unsqueeze(2) - 2*Z.transpose(1,2) @ Z
+    print(torch.cuda.memory_summary())
+    # D = torch.repeat_interleave(torch.sum(Z**2, dim=1).unsqueeze(1),Z.shape[-1],dim=1) + torch.repeat_interleave(torch.sum(Z**2, dim=1).unsqueeze(2),Z.shape[-1],dim=2) - 2*Z.transpose(1,2) @ Z
     D = 3*D/k
     D[...,torch.arange(D.shape[-1]),torch.arange(D.shape[-1])] = 0
     D = torch.relu(D)

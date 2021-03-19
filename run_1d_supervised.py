@@ -17,8 +17,8 @@ if __name__ == '__main__':
     # data
     # parser.add_argument('--dataset-train', default='./data/train_npz/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
     # parser.add_argument('--dataset-test', default='./data/test_FM/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-train', default='./data/casp11_training_90_fully_mapped_no_sub_20/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
-    parser.add_argument('--dataset-test', default='./data/casp11_validation_fully_mapped/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-train', default='./../../data/casp11_testing/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
+    parser.add_argument('--dataset-test', default='./../../data/casp11_testing/', type=str, metavar='N', help='Name of dataset to run, currently implemented: ')
 
     parser.add_argument('--use-loss-coord', default=False, type=bool, metavar='N', help='Input feature types')
     parser.add_argument('--use-loss-reg', default=False, type=bool, metavar='N', help='Input feature types')
@@ -74,9 +74,9 @@ if __name__ == '__main__':
         'stencil': 5}
     elif args.network.lower() == 'vnet':
         args.network_args = {
-        'nblocks': 4,
-        'nlayers_pr_block': 5,
-        'channels': 80,
+        'nblocks': 2,
+        'nlayers_pr_block': 3,
+        'channels': 40,
         'stencil_size': 3,
         'dropout_p': 0.2,
         }

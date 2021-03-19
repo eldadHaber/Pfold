@@ -10,9 +10,14 @@ from pathlib import Path
 import torch
 
 if __name__ == '__main__':
-    pnet_folder = './../../../data/msa_test_env/pnet/'
-    msa_folder = './../../../data/msa_test_env/msa/'
-    output_folder = './../../../data/msa_test_env/out/'
+    pnet_folder = './pnet/'
+    msa_folder = './msa/'
+    output_folder = './pnet_with_msa/'
+
+    # pnet_folder = './pnet/'
+    # msa_folder = './msa/'
+    # output_folder = './pnet_with_msa/'
+
     os.makedirs(output_folder, exist_ok=True)
     #This code will read in all the data in pnet and store it in memory.
     #It will then go through the data in the MSA folder one by one and pair try to pair it up against pnet data, when a match is found the data will be save to output combined, and the data will be removed from pnet, such that the search space gets smaller and smaller as it progresses
@@ -56,11 +61,11 @@ if __name__ == '__main__':
         seq_len = d['seq_len']
         len_idx = torch.nonzero(seq_len == seqs_len_unique)
         if len_idx.shape[0] > 0: #The seq_len exist in proteinnet, do we have any sequence that match?
-            seq_idx = torch.nonzero((seq == seqs_stacked_by_len[len_idx]).all(dim=1)).squeeze()
+            seq_idx = ((seq == seqs_stacked_by_len[len_idx]).all(dim=1)).nonzero()
             if seq_idx.shape[0] > 0:
                 # We found a match!, we save it immediately as numpy
                 file_out = "{:}{:}.npz".format(output_folder, Path(file).stem)
-                d_pnet = np.load(pnet_files[seq_idx.numpy()])
+                d_pnet = np.load(pnet_files[seq_idx.squeeze().numpy()])
                 np.savez(file=file_out, seq=seq.numpy(), pssm=d_pnet['pssm'], entropy=d_pnet['entropy'], rCa=d_pnet['rCa'],
                          rCb=d_pnet['rCb'], rN=d_pnet['rN'], id=d_pnet['id'], log_units=d_pnet['log_units'], AA_LIST=d_pnet['AA_LIST'],
                          msa=d['msas'].numpy(), nmsa_org=d['n_msas_org'])

@@ -1,6 +1,7 @@
 import glob
 import os
 import time
+import sys
 
 import torch
 from pathlib import Path
@@ -33,14 +34,16 @@ def copyfile(src, dst):
 
 
 if __name__ == '__main__':
-    folder_in = 'F:/test_in/'
-    folder_out = 'F:/test_out/'
+    print(torch.__version__)
+
+    folder_in = './'
+    folder_out = './sanitized/'
     os.makedirs(folder_out,exist_ok=True)
     t0 = time.time()
     search_command = folder_in + "*.pt"
     files_in = [f for f in sorted(glob.glob(search_command))]
 
-    min_msas_pr_seq = 300
+    min_msas_pr_seq = 100
 
 
     #First we load in all the information
@@ -48,13 +51,24 @@ if __name__ == '__main__':
     seqs = []
     seqs_len = torch.empty(nfiles,dtype=torch.int64)
     n_msas = torch.empty(nfiles,dtype=torch.float32)
-    for i, file_in in enumerate(files_in):
-        t1 = time.time()
-        d = torch.load(file_in)
-        t2 = time.time()
-        seqs.append(d['seq'])
-        seqs_len[i] = d['seq_len']
-        n_msas[i] = d['n_msas_org']
+    nfaulty_files = 0
+    with open("errors.log", "w+") as f:
+        for i, file_in in enumerate(files_in):
+            t1 = time.time()
+            try:
+                d = torch.load(file_in)
+                seqs.append(d['seq'])
+                seqs_len[i] = d['seq_len']
+                n_msas[i] = d['n_msas_org']
+            except:
+                nfaulty_files += 1
+                f.write("{:} \n".format(file_in))
+                print("Errors found = {:}".format(nfaulty_files))
+    if nfaulty_files > 0:
+        print("Errors founds, exiting now")
+        sys.exit()
+    else:
+        print("No errors found, continuing")
     t1 = time.time()
 
     #Now we sanitize it
@@ -111,5 +125,6 @@ if __name__ == '__main__':
         file_out = "{:}{:}.pt".format(folder_out, Path(file_in).stem)
         copyfile(file_in, file_out)
     t4 = time.time()
+    print("n duplicates found={:}, n_insufficient_msas found={:}".format(n_duplicates, n_insufficient_msas))
     print("Done, t_load={:2.2f},t_min_nmsas={:2.2f},t_duplicates={:2.2f},t_copy={:2.2f},total={:2.2f}".format(t1-t0,t2-t1,t3-t2,t4-t3,t4-t0))
 
